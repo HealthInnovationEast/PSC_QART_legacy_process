@@ -1,0 +1,1 @@
+This folder will be populated with empty template files for you to fill in.
