@@ -4,7 +4,7 @@ There are 3 main scripts for this automation process and 2 config scripts.
 
 ## Config scripts
 
-- *config_sharepoint_location.R* - This creates the chosenlib variable and base_url which will be used in all of the other scripts.
+- *config_sharepoint_location.R* - This creates the *chosenlib* variable and *base_url* which will be used in all of the other scripts.
 *site_url*, *base_url* and *chosenlib* variables will probably need to be altered depending on required location.
 Once the location has been selected, these variables should not be changed.
 
@@ -29,6 +29,6 @@ and source the *combine_templates.R* script.
 
 ## Template files
 
-- *template_files/readme.txt* - this file is the readme file that will be pasted in each site folder when setup_site_folders.R is run
+- *template_files/readme.txt* - this file is the readme file that will be pasted in each site folder when *setup_site_folders.R* is run
 
 - *template_files/preferred_template.xlsx*- this file is the excel file that network information will be added to in order to create each networks template.
