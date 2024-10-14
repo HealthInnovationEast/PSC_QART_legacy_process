@@ -4,8 +4,8 @@ library(tidyverse)
 library(Microsoft365R)
 source("config_sharepoint_location.R")
 
-location_lookup <- read.csv("psc_lookup.csv")
-psc<- unique(location_lookup$PSC)
+#upload a readme file to a folder with the name of each psc. 
+#To create a folder, a file must be uploaded to the folder- which creates the folder.
 
 for (psc_name in psc){
   chosenlib$upload_file(dest  = str_glue("{base_url}/{psc_name}/readme.txt"), src="template_files/readme.txt" )

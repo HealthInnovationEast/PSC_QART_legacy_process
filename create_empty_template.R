@@ -58,7 +58,8 @@ for (i in psc){
           file = "data/empty_template.xlsx")
   
   chosenlib$upload_file(dest  = str_glue("{base_url}/{i}/{current_quarter_year}/QART.xlsx"), src="data/empty_template.xlsx" )
- 
+  
+  #delete template file from local location. 
   file.remove( "data/empty_template.xlsx")
 
 }
