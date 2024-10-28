@@ -1,0 +1,36 @@
+---
+title: "NatPatSIP - Quarterly presentation"
+author: "Patient Safety Analysis Team"
+format: 
+  pptx:
+    reference-doc: template.pptx
+editor: visual
+---
+
+```{r}
+#|echo: false
+#|warning: false
+
+#read in required packages
+library(here)
+library(tidyverse)
+library(janitor)
+library(lubridate)
+library(ggplot2)
+library(readxl)
+
+mat_neo_data <- read_excel(here('data/MatNeoSIP.xlsx'), sheet = 'Data') |>
+  clean_names() |>
+  rename('stage_7_all' = 'stage_7') |>
+  rename_with(~ str_replace(., 'x', 'stage_'), starts_with('x'))
+```
+
+# MatNeoSIP 
+## Optimisation
+
+```{r}
+library(ggplot2)
+ggplot(airquality, aes(Temp, Ozone)) + 
+  geom_point() + 
+  geom_smooth(method = "loess", se = FALSE)
+```
