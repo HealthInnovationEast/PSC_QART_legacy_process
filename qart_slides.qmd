@@ -19,6 +19,7 @@ library(lubridate)
 library(ggplot2)
 library(readxl)
 library(forcats)
+library(scales)
 
 mat_neo_data <- read_excel(here('data/MatNeoSIP.xlsx'), sheet = 'Data') |>
   clean_names() |>
@@ -27,61 +28,120 @@ mat_neo_data <- read_excel(here('data/MatNeoSIP.xlsx'), sheet = 'Data') |>
   rename_with(~ str_replace(., 'x', 'stage_'), starts_with('x'))
 ```
 
-# MatNeoSIP 
-## Optimisation
-
 ```{r}
-mat_neo_data |> 
-  filter(quarter == '2024/25 Q1') |>
-  group_by(psc, magnesium_sulphate, stage_1) |>
-  summarise(n = n())
-```
+#functions
 
-
-```{r}
-x <- mat_neo_data |> 
-  filter(quarter == '2024/25 Q1') |>
-  group_by(psc, optimal_cord_management) |>
-  summarise(n = n()) |>
-  ungroup() |>
-  group_by(psc) |>
-  mutate(total = sum(n),
-         percentage = round((n/total)*100, 1)
-         ) |>
-  ungroup()
-
-head(x)
-```
-
-
-```{r}
-blues <- rev(brewer_pal()(7)) #blues in reversed order 
+#1 aggregate
+aggregate_int <- function(df, a_quarter, intervention){
   
-x |>
-  ggplot(aes(x = forcats::fct_rev(psc), #reverse alphabetical order
-             y = percentage,
-             fill = forcats::fct_rev(optimal_cord_management) #reverse stage order
-             )
-         )+
-  geom_bar(stat = 'identity',
-           position = 'stack',
-           size = 11
+  #to quote variable 
+  intervention <- enquo(intervention)
+  
+  df |> 
+    filter(quarter == a_quarter) |> #note quarter is a variable name in df so can't share same argument as function argument
+    group_by(psc, 
+             !!intervention
+             ) |>
+    summarise(n = n()) |>
+    ungroup() |>
+    group_by(psc) |>
+    mutate(total = sum(n),
+           percentage = round((n/total)*100, 1)
+           ) |>
+    ungroup()
+  
+}
+
+#2 make graph
+visualise <- function(df, intervention){
+
+  #to quote variable 
+  intervention <- enquo(intervention)
+  intervention_subtitle <- deparse(intervention)
+  
+  #custom palette of blues in reversed order 
+  blues <- rev(scales::brewer_pal()(7)) 
+  
+  df |>
+    ggplot(aes(x = forcats::fct_rev(psc), #reverse alphabetical order
+               y = percentage,
+               fill = forcats::fct_rev(!!intervention) #reverse stage order
+               )
            ) +
-  scale_fill_manual(values = blues) +
-  coord_flip() +
-  geom_text(aes(label = paste0(round(percentage), #rounding to no decimal places here
-                               '%') #so bars stack to 100 or as close as possible
-                ),
-          colour = 'white',
-          position = position_stack(vjust = 0.5)
-          ) +
-  labs(title = 'title') + 
-  theme_classic() + 
-  theme(axis.title = element_blank(),
-        axis.ticks = element_blank(),
-        axis.text.x = element_blank(),
-        legend.title = element_blank(),
-        legend.position = 'bottom'
-        )
+    geom_bar(stat = 'identity',
+             position = 'stack',
+             size = 11
+             ) +
+    scale_fill_manual(values = blues) +
+    coord_flip() +
+    geom_text(aes(label = paste0(round(percentage), #rounding to no decimal places here
+                                 '%') #so bars stack to 100 or as close as possible
+                  ),
+            colour = 'white',
+            position = position_stack(vjust = 0.5)
+            ) +
+    labs(title = 'Breakdown of stages of adoption across all PSCs',
+         subtitle = str_to_title( #3 capitalise clean string into title
+           str_replace_all( #2 replace _ with blank space
+             str_remove(intervention_subtitle, '~'), #1 remove ~ added by deparse
+             '_', ' ')
+           )
+         ) + 
+    #guide_legend(reverse = T) +
+    theme_classic() + 
+    theme(axis.title = element_blank(),
+          axis.ticks = element_blank(),
+          axis.text.x = element_blank(),
+          legend.title = element_blank(),
+          legend.position = 'bottom'
+          )
+}
 ```
 
+# MatNeoSIP - Optimisation
+
+```{r}
+#deploy functions
+visualise(aggregate_int(mat_neo_data, '2024/25 Q1', place_of_birth),
+          place_of_birth)
+```
+
+```{r}
+visualise(aggregate_int(mat_neo_data, '2024/25 Q1', maternal_breast_milk),
+          maternal_breast_milk)
+```
+
+```{r}
+visualise(aggregate_int(mat_neo_data, '2024/25 Q1', normothermia),
+          normothermia)
+```
+
+```{r}
+visualise(aggregate_int(mat_neo_data, '2024/25 Q1', optimal_cord_management),
+          optimal_cord_management)
+```
+
+```{r}
+visualise(aggregate_int(mat_neo_data, '2024/25 Q1', antibiotics),
+          antibiotics)
+```
+
+```{r}
+visualise(aggregate_int(mat_neo_data, '2024/25 Q1', corticosteroids),
+          corticosteroids)
+```
+
+```{r}
+visualise(aggregate_int(mat_neo_data, '2024/25 Q1', magnesium_sulphate),
+          magnesium_sulphate)
+```
+
+```{r}
+visualise(aggregate_int(mat_neo_data, '2024/25 Q1', newtt2),
+          newtt2)
+```
+
+```{r}
+visualise(aggregate_int(mat_neo_data, '2024/25 Q1', mews),
+          mews)
+```
