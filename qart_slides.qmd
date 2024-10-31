@@ -5,6 +5,8 @@ format:
   pptx:
     reference-doc: template.pptx
 editor: visual
+# params: 
+#   a_quarter
 ---
 
 ```{r}
@@ -32,13 +34,13 @@ mat_neo_data <- read_excel(here('data/MatNeoSIP.xlsx'), sheet = 'Data') |>
 #functions
 
 #1 aggregate
-aggregate_int <- function(df, a_quarter, intervention){
+aggregate_int <- function(df, my_filter, intervention){
   
   #to quote variable 
   intervention <- enquo(intervention)
   
   df |> 
-    filter(quarter == a_quarter) |> #note quarter is a variable name in df so can't share same argument as function argument
+    filter(!!my_filter) |> 
     group_by(psc, 
              !!intervention
              ) |>
@@ -61,6 +63,9 @@ visualise <- function(df, intervention){
   
   #custom palette of blues in reversed order 
   blues <- rev(scales::brewer_pal()(7)) 
+  
+  #fonts <- ()
+  #crate a NULL parameter for subtitle
   
   df |>
     ggplot(aes(x = forcats::fct_rev(psc), #reverse alphabetical order
@@ -100,48 +105,82 @@ visualise <- function(df, intervention){
 
 # MatNeoSIP - Optimisation
 
+## Maternity and Neonatal – Programme Overview
+
+![](data/matneo_overview.PNG)
+
+## title slide
+
+```{r}
+mat_neo_agg <- mat_neo_data |>
+  filter(quarter == "2024/25 Q1") |>
+  pivot_longer(
+    cols = magnesium_sulphate:mews,
+    names_to = "intervention",
+    values_to = "stage"
+  )
+
+visualise(
+  aggregate_int(
+    mat_neo_agg,
+    expr(!intervention %in% c(
+      "mews", "newtt2",
+      "volume_targeted_ventilation", # why has this been excluded?
+      "caffeine" # ditto
+    )),
+    stage
+  ),
+  stage
+)
+
+```
+
 ```{r}
 #deploy functions
-visualise(aggregate_int(mat_neo_data, '2024/25 Q1', place_of_birth),
+visualise(aggregate_int(mat_neo_data, expr(quarter == '2024/25 Q1'), place_of_birth),
           place_of_birth)
 ```
 
 ```{r}
-visualise(aggregate_int(mat_neo_data, '2024/25 Q1', maternal_breast_milk),
+visualise(aggregate_int(mat_neo_data, expr(quarter == '2024/25 Q1'), maternal_breast_milk),
           maternal_breast_milk)
 ```
 
 ```{r}
-visualise(aggregate_int(mat_neo_data, '2024/25 Q1', normothermia),
+visualise(aggregate_int(mat_neo_data, expr(quarter == '2024/25 Q1'), normothermia),
           normothermia)
 ```
 
 ```{r}
-visualise(aggregate_int(mat_neo_data, '2024/25 Q1', optimal_cord_management),
+visualise(aggregate_int(mat_neo_data, expr(quarter == '2024/25 Q1'), optimal_cord_management),
           optimal_cord_management)
 ```
 
 ```{r}
-visualise(aggregate_int(mat_neo_data, '2024/25 Q1', antibiotics),
+visualise(aggregate_int(mat_neo_data, expr(quarter == '2024/25 Q1'), antibiotics),
           antibiotics)
 ```
 
 ```{r}
-visualise(aggregate_int(mat_neo_data, '2024/25 Q1', corticosteroids),
+visualise(aggregate_int(mat_neo_data, expr(quarter == '2024/25 Q1'), corticosteroids),
           corticosteroids)
 ```
 
 ```{r}
-visualise(aggregate_int(mat_neo_data, '2024/25 Q1', magnesium_sulphate),
+visualise(aggregate_int(mat_neo_data, expr(quarter == '2024/25 Q1'), magnesium_sulphate),
           magnesium_sulphate)
 ```
 
+# MatNeoSIP - Deterioration Tools
+
+## temporary title
+
 ```{r}
-visualise(aggregate_int(mat_neo_data, '2024/25 Q1', newtt2),
+visualise(aggregate_int(mat_neo_data, expr(quarter == '2024/25 Q1'), newtt2),
           newtt2)
 ```
 
 ```{r}
-visualise(aggregate_int(mat_neo_data, '2024/25 Q1', mews),
+visualise(aggregate_int(mat_neo_data, expr(quarter == '2024/25 Q1'), mews),
           mews)
 ```
