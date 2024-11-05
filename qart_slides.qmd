@@ -13,7 +13,7 @@ editor: visual
 #|echo: false
 #|warning: false
 
-#read in required packages
+# read in required packages
 library(here)
 library(tidyverse)
 library(janitor)
@@ -23,83 +23,94 @@ library(readxl)
 library(forcats)
 library(scales)
 
-mat_neo_data <- read_excel(here('data/MatNeoSIP.xlsx'), sheet = 'Data') |>
+mat_neo_data <- read_excel(here("data/MatNeoSIP.xlsx"), sheet = "Data") |>
   clean_names() |>
-  rename('stage_7_all' = 'stage_7',
-         'quarter' = 'date') |>
-  rename_with(~ str_replace(., 'x', 'stage_'), starts_with('x'))
+  rename(
+    "stage_7_all" = "stage_7",
+    "quarter" = "date"
+  ) |>
+  rename_with(~ str_replace(., "x", "stage_"), starts_with("x"))
 ```
 
 ```{r}
-#functions
+# functions
 
-#1 aggregate
-aggregate_int <- function(df, my_filter, intervention){
-  
-  #to quote variable 
+# 1 aggregate
+aggregate_int <- function(df, my_filter, intervention) {
+  # to quote variable
   intervention <- enquo(intervention)
-  
-  df |> 
-    filter(!!my_filter) |> 
-    group_by(psc, 
-             !!intervention
-             ) |>
+
+  df |>
+    filter(!!my_filter) |>
+    group_by(
+      psc,
+      !!intervention
+    ) |>
     summarise(n = n()) |>
     ungroup() |>
     group_by(psc) |>
-    mutate(total = sum(n),
-           percentage = round((n/total)*100, 1)
-           ) |>
+    mutate(
+      total = sum(n),
+      percentage = round((n / total) * 100, 1)
+    ) |>
     ungroup()
-  
 }
 
-#2 make graph
-visualise <- function(df, intervention){
-
-  #to quote variable 
+# 2 make graph
+visualise <- function(df, intervention) {
+  # to quote variable
   intervention <- enquo(intervention)
   intervention_subtitle <- deparse(intervention)
-  
-  #custom palette of blues in reversed order 
-  blues <- rev(scales::brewer_pal()(7)) 
-  
-  #fonts <- ()
-  #crate a NULL parameter for subtitle
-  
+
+  # custom palette of blues in reversed order
+  blues <- rev(scales::brewer_pal()(7))
+  text_colour <- c(rep("white", 3), rep("black", 4))
+
+  # crate a NULL parameter for subtitle
+
   df |>
-    ggplot(aes(x = forcats::fct_rev(psc), #reverse alphabetical order
-               y = percentage,
-               fill = forcats::fct_rev(!!intervention) #reverse stage order
-               )
-           ) +
-    geom_bar(stat = 'identity',
-             position = 'stack',
-             size = 11
-             ) +
-    scale_fill_manual(values = blues) +
+    ggplot(aes(
+      x = forcats::fct_rev(psc), # reverse alphabetical order
+      y = percentage,
+      fill = forcats::fct_rev(!!intervention) # reverse stage order
+    )) +
+    geom_bar(
+      stat = "identity",
+      position = "stack",
+      size = 11
+    ) +
+    scale_fill_manual(values = blues, na.value = '#808080') +
+    scale_colour_manual(values = text_colour, na.value = 'white') +
     coord_flip() +
-    geom_text(aes(label = paste0(round(percentage), #rounding to no decimal places here
-                                 '%') #so bars stack to 100 or as close as possible
-                  ),
-            colour = 'white',
-            position = position_stack(vjust = 0.5)
-            ) +
-    labs(title = 'Breakdown of stages of adoption across all PSCs',
-         subtitle = str_to_title( #3 capitalise clean string into title
-           str_replace_all( #2 replace _ with blank space
-             str_remove(intervention_subtitle, '~'), #1 remove ~ added by deparse
-             '_', ' ')
-           )
-         ) + 
-    #guide_legend(reverse = T) +
-    theme_classic() + 
-    theme(axis.title = element_blank(),
-          axis.ticks = element_blank(),
-          axis.text.x = element_blank(),
-          legend.title = element_blank(),
-          legend.position = 'bottom'
-          )
+    geom_text(
+      aes(
+        label = paste0(
+          round(percentage), # rounding to no decimal places here
+          "%"
+        ), # so bars stack to 100 or as close as possible
+        colour = forcats::fct_rev(!!intervention) # reverse again so position argument is obeyed
+      ),
+      position = position_stack(vjust = 0.5),
+    ) +
+    guides(colour = guide_none()) +
+    labs(
+      title = "breakdown of stages of adoption across all pscs",
+      subtitle = str_to_title( # 3 capitalise clean string into title
+        str_replace_all( # 2 replace _ with blank space
+          str_remove(intervention_subtitle, "~"), # 1 remove ~ added by deparse
+          "_", " "
+        )
+      )
+    ) +
+    # guide_legend(reverse = T) +
+    theme_classic() +
+    theme(
+      axis.title = element_blank(),
+      axis.ticks = element_blank(),
+      axis.text.x = element_blank(),
+      legend.title = element_blank(),
+      legend.position = "bottom"
+    )
 }
 ```
 
@@ -112,8 +123,10 @@ visualise <- function(df, intervention){
 ## title slide
 
 ```{r}
+report_quarter <- "2024/25 Q1"
+
 mat_neo_agg <- mat_neo_data |>
-  filter(quarter == "2024/25 Q1") |>
+  filter(quarter == report_quarter) |>
   pivot_longer(
     cols = magnesium_sulphate:mews,
     names_to = "intervention",
@@ -132,55 +145,73 @@ visualise(
   ),
   stage
 )
-
 ```
 
 ```{r}
-#deploy functions
-visualise(aggregate_int(mat_neo_data, expr(quarter == '2024/25 Q1'), place_of_birth),
-          place_of_birth)
+# deploy functions
+visualise(
+  aggregate_int(mat_neo_data, expr(quarter == report_quarter), place_of_birth),
+  place_of_birth
+)
 ```
 
 ```{r}
-visualise(aggregate_int(mat_neo_data, expr(quarter == '2024/25 Q1'), maternal_breast_milk),
-          maternal_breast_milk)
+visualise(
+  aggregate_int(mat_neo_data, expr(quarter == report_quarter), maternal_breast_milk),
+  maternal_breast_milk
+)
 ```
 
 ```{r}
-visualise(aggregate_int(mat_neo_data, expr(quarter == '2024/25 Q1'), normothermia),
-          normothermia)
+visualise(
+  aggregate_int(mat_neo_data, expr(quarter == report_quarter), normothermia),
+  normothermia
+)
 ```
 
 ```{r}
-visualise(aggregate_int(mat_neo_data, expr(quarter == '2024/25 Q1'), optimal_cord_management),
-          optimal_cord_management)
+visualise(
+  aggregate_int(mat_neo_data, expr(quarter == report_quarter), optimal_cord_management),
+  optimal_cord_management
+)
 ```
 
 ```{r}
-visualise(aggregate_int(mat_neo_data, expr(quarter == '2024/25 Q1'), antibiotics),
-          antibiotics)
+visualise(
+  aggregate_int(mat_neo_data, expr(quarter == report_quarter), antibiotics),
+  antibiotics
+)
 ```
 
 ```{r}
-visualise(aggregate_int(mat_neo_data, expr(quarter == '2024/25 Q1'), corticosteroids),
-          corticosteroids)
+visualise(
+  aggregate_int(mat_neo_data, expr(quarter == report_quarter), corticosteroids),
+  corticosteroids
+)
 ```
 
 ```{r}
-visualise(aggregate_int(mat_neo_data, expr(quarter == '2024/25 Q1'), magnesium_sulphate),
-          magnesium_sulphate)
+visualise(
+  aggregate_int(mat_neo_data, expr(quarter == report_quarter), magnesium_sulphate),
+  magnesium_sulphate
+)
 ```
+
 
 # MatNeoSIP - Deterioration Tools
 
 ## temporary title
 
 ```{r}
-visualise(aggregate_int(mat_neo_data, expr(quarter == '2024/25 Q1'), newtt2),
-          newtt2)
+visualise(
+  aggregate_int(mat_neo_data, expr(quarter == report_quarter), newtt2),
+  newtt2
+)
 ```
 
 ```{r}
-visualise(aggregate_int(mat_neo_data, expr(quarter == '2024/25 Q1'), mews),
-          mews)
+visualise(
+  aggregate_int(mat_neo_data, expr(quarter == report_quarter), mews),
+  mews
+)
 ```
