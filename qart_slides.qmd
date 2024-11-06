@@ -1,5 +1,5 @@
 ---
-title: "NatPatSIP - Quarterly presentation"
+title: "NatPatSIP - Quarterly Presentation"
 author: "Patient Safety Analysis Team"
 format: 
   pptx:
@@ -57,10 +57,24 @@ aggregate_int <- function(df, my_filter, intervention) {
 }
 
 # 2 make graph
-visualise <- function(df, intervention) {
+visualise <- function(df, intervention, intervention_name = NULL) {
   # to quote variable
   intervention <- enquo(intervention)
-  intervention_subtitle <- deparse(intervention)
+  
+  # this is to set the subtitle string
+  if (is.null(intervention_name)) {
+    intervention_string <- deparse(intervention)
+
+    intervention_subtitle <- str_to_title( # 3 capitalise clean string into title
+      str_replace_all( # 2 replace _ with blank space
+        str_remove(intervention_string, "~"), # 1 remove ~ added by deparse
+        "_", " "
+      )
+    )
+  } else {
+    intervention_subtitle <- intervention_name
+  }
+
 
   # custom palette of blues in reversed order
   blues <- rev(scales::brewer_pal()(7))
@@ -79,9 +93,10 @@ visualise <- function(df, intervention) {
       position = "stack",
       size = 11
     ) +
-    scale_fill_manual(values = blues, na.value = '#808080') +
-    scale_colour_manual(values = text_colour, na.value = 'white') +
+    scale_fill_manual(values = blues, na.value = "#808080") +
+    scale_colour_manual(values = text_colour, na.value = "white") +
     coord_flip() +
+    scale_y_continuous(expand = c(0.025, 0.025)) +
     geom_text(
       aes(
         label = paste0(
@@ -94,13 +109,9 @@ visualise <- function(df, intervention) {
     ) +
     guides(colour = guide_none()) +
     labs(
-      title = "breakdown of stages of adoption across all pscs",
-      subtitle = str_to_title( # 3 capitalise clean string into title
-        str_replace_all( # 2 replace _ with blank space
-          str_remove(intervention_subtitle, "~"), # 1 remove ~ added by deparse
-          "_", " "
-        )
-      )
+      title = "Adoption across PCS's as a share of implementation stages",
+      subtitle = intervention_subtitle,
+      caption = glue::glue("Data reported by the PSC's for {report_quarter}")
     ) +
     # guide_legend(reverse = T) +
     theme_classic() +
@@ -109,7 +120,13 @@ visualise <- function(df, intervention) {
       axis.ticks = element_blank(),
       axis.text.x = element_blank(),
       legend.title = element_blank(),
-      legend.position = "bottom"
+      legend.position = "bottom",
+      legend.justification = "left",
+      plot.caption = element_text(
+        face = "italic",
+        size = 10,
+        hjust = 0 # so caption is on right hand side
+      )
     )
 }
 ```
@@ -143,7 +160,8 @@ visualise(
     )),
     stage
   ),
-  stage
+  stage,
+  "All optimisation interventions (Excl. caffeine and volume targeted ventilation)"
 )
 ```
 
@@ -151,7 +169,8 @@ visualise(
 # deploy functions
 visualise(
   aggregate_int(mat_neo_data, expr(quarter == report_quarter), place_of_birth),
-  place_of_birth
+  place_of_birth,
+  "Place of Birth"
 )
 ```
 
@@ -197,7 +216,6 @@ visualise(
 )
 ```
 
-
 # MatNeoSIP - Deterioration Tools
 
 ## temporary title
@@ -205,13 +223,15 @@ visualise(
 ```{r}
 visualise(
   aggregate_int(mat_neo_data, expr(quarter == report_quarter), newtt2),
-  newtt2
+  newtt2,
+  "NEWTT2"
 )
 ```
 
 ```{r}
 visualise(
   aggregate_int(mat_neo_data, expr(quarter == report_quarter), mews),
-  mews
+  mews,
+  "MEWS"
 )
 ```
