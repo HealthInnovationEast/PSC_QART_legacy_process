@@ -60,7 +60,7 @@ aggregate_int <- function(df, my_filter, intervention) {
 visualise <- function(df, intervention, intervention_name = NULL) {
   # to quote variable
   intervention <- enquo(intervention)
-  
+
   # this is to set the subtitle string
   if (is.null(intervention_name)) {
     intervention_string <- deparse(intervention)
@@ -141,8 +141,8 @@ visualise <- function(df, intervention, intervention_name = NULL) {
 
 ```{r}
 report_quarter <- "2024/25 Q1"
-
-mat_neo_agg <- mat_neo_data |>
+# mat_neo_agg |> select(psc:quarter, intervention, stage)
+mat_neo_long <- mat_neo_data |>
   filter(quarter == report_quarter) |>
   pivot_longer(
     cols = magnesium_sulphate:mews,
@@ -152,9 +152,9 @@ mat_neo_agg <- mat_neo_data |>
 
 visualise(
   aggregate_int(
-    mat_neo_agg,
-    expr(!intervention %in% c(
-      "mews", "newtt2",
+    mat_neo_long,
+    my_filter = expr(!intervention %in% c(
+      "mews", "newtt2", # excluded because they're not optimisation interventions
       "volume_targeted_ventilation", # why has this been excluded?
       "caffeine" # ditto
     )),
@@ -215,6 +215,39 @@ visualise(
   magnesium_sulphate
 )
 ```
+
+# Line chart slide 12
+
+```{r}
+mat_neo_agg_stage5_provider <- mat_neo_data |>
+  select(psc:volume_targeted_ventilation) |>
+  mutate(
+    all_stages = paste(magnesium_sulphate,
+      corticosteroids,
+      antibiotics,
+      optimal_cord_management,
+      normothermia,
+      maternal_breast_milk,
+      place_of_birth,
+      caffeine,
+      volume_targeted_ventilation,
+      sep = "_"
+    ), # will paste NA as string 'NA' and this is intentional for counts
+    stage_5_or_above = str_count(all_stages, "Stage (5|6|7)"),
+    stage_5_all = if_else(stage_5_or_above >= 7, 1, 0)
+  ) |>
+  select(-all_stages)
+
+mat_neo_agg_stage5_provider |>
+  group_by(quarter) |>
+  summarise(
+    s5_all = sum(stage_5_all),
+    all_reporters = n(),
+    percentage = (s5_all / all_reporters) * 100
+  ) |>
+  ungroup()
+```
+
 
 # MatNeoSIP - Deterioration Tools
 
