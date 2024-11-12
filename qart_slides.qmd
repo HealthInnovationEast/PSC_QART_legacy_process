@@ -109,7 +109,7 @@ visualise <- function(df, intervention, intervention_name = NULL) {
     ) +
     guides(colour = guide_none()) +
     labs(
-      title = "Adoption across PCS's as a share of implementation stages",
+      title = "Adoption of optimisation internventions across PCS's as a share of implementation stages",
       subtitle = intervention_subtitle,
       caption = glue::glue("Data reported by the PSC's for {report_quarter}")
     ) +
@@ -238,15 +238,119 @@ mat_neo_agg_stage5_provider <- mat_neo_data |>
   ) |>
   select(-all_stages)
 
-mat_neo_agg_stage5_provider |>
+bar_all <- mat_neo_agg_stage5_provider |>
   group_by(quarter) |>
   summarise(
     s5_all = sum(stage_5_all),
     all_reporters = n(),
-    percentage = (s5_all / all_reporters) * 100
+    percentage = (s5_all / all_reporters)
   ) |>
   ungroup()
+
+bar_all |> head()
 ```
+
+```{r}
+bar_all |>
+  ggplot(aes(x = quarter,
+             y = percentage,
+             group = 1)
+         ) +
+  geom_line(colour = '#660066'
+            ) +
+  geom_point(colour = '#660066',
+             size = 2
+             ) +
+  geom_hline(yintercept = 0.65,
+             linetype = 'dashed',
+             colour = 'navy'
+             ) +
+  scale_y_continuous(labels = scales::percent_format()) +
+  annotate(geom = 'text', x = '2021/22 Q3', y = 0.70, label = 'Target for 2022/23 Q4 (i.e., 65%)') +
+  theme_classic() +
+  theme(
+    axis.title = element_blank(),
+    axis.text.x = element_text(angle = 90)
+    )
+
+```
+
+```{r}
+#turn below into a function and then rbind then make spaghetti chart
+my_function <- function(df, intervention) {
+  
+  # to quote variable
+  intervention <- enquo(intervention)
+  
+  #to quote intervention name
+ intervention_string <- deparse(intervention)
+
+  intervention_name <- str_to_title( # 3 capitalise clean string into title
+    str_replace_all( # 2 replace _ with blank space
+      str_remove(intervention_string, "~"), # 1 remove ~ added by deparse
+      "_", " "
+    )
+  )
+  
+  df |>
+    select(psc:quarter, !!intervention) |>
+    mutate(
+      stage_5_or_above = str_count(!!intervention, "Stage (5|6|7)"),
+      stage_5_all = if_else(stage_5_or_above >= 1, 1, 0)
+      ) |> 
+    group_by(quarter) |>
+    summarise(
+      s5_all = sum(stage_5_all, na.rm = T),
+      all_reporters = n(),
+      percentage = (s5_all / all_reporters)
+    ) |>
+    ungroup() |>
+    mutate(intervention = intervention_name,
+           .after = quarter
+          )
+}
+```
+
+# 
+
+```{r}
+spaghetti_data <- bind_rows(
+  my_function(mat_neo_data, magnesium_sulphate),
+  my_function(mat_neo_data, corticosteroids),
+  my_function(mat_neo_data, antibiotics),
+  my_function(mat_neo_data, optimal_cord_management),
+  my_function(mat_neo_data, normothermia),
+  my_function(mat_neo_data, maternal_breast_milk),
+  my_function(mat_neo_data, place_of_birth),
+  my_function(mat_neo_data, caffeine), #not included in orignal chart, why?
+  my_function(mat_neo_data, volume_targeted_ventilation) #ditto
+  )
+
+spaghetti_data |> 
+  ggplot(aes(x = quarter,
+             y = percentage,
+             group = intervention,
+             colour = intervention
+             )
+         ) +
+  geom_line() +
+  geom_point(size = 2) +
+  geom_hline(yintercept = 0.65,
+             linetype = 'dashed',
+             colour = 'black'
+             ) +
+  scale_y_continuous(labels = scales::percent_format()) +
+  annotate(geom = 'text', x = '2023/24 Q3', y = 0.60, label = 'Target for 2022/23 Q4 (i.e., 65%)') +
+  theme_classic() +
+  theme(
+    axis.title = element_blank(),
+    axis.text.x = element_text(angle = 90),
+    legend.title = element_blank(),
+    legend.position = 'bottom'
+    )
+```
+
+
 
 
 # MatNeoSIP - Deterioration Tools
