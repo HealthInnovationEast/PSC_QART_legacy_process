@@ -22,6 +22,7 @@ library(ggplot2)
 library(readxl)
 library(forcats)
 library(scales)
+library(ggsci)
 
 mat_neo_data <- read_excel(here("data/MatNeoSIP.xlsx"), sheet = "Data") |>
   clean_names() |>
@@ -35,7 +36,7 @@ mat_neo_data <- read_excel(here("data/MatNeoSIP.xlsx"), sheet = "Data") |>
 ```{r}
 # functions
 
-# 1 aggregate
+# 1 aggregate by psc and intervention stage
 aggregate_int <- function(df, my_filter, intervention) {
   # to quote variable
   intervention <- enquo(intervention)
@@ -56,8 +57,42 @@ aggregate_int <- function(df, my_filter, intervention) {
     ungroup()
 }
 
-# 2 make graph
-visualise <- function(df, intervention, intervention_name = NULL) {
+# 2 aggregate by quarter and calcualte how many NHS orgs are reporting at stage 5 or above for a given intervention
+aggregate_stage <- function(df, intervention) {
+  # to quote variable
+  intervention <- enquo(intervention)
+
+  # to quote intervention name
+  intervention_string <- deparse(intervention)
+
+  intervention_name <- str_to_title( # 3 capitalise clean string into title
+    str_replace_all( # 2 replace _ with blank space
+      str_remove(intervention_string, "~"), # 1 remove ~ added by deparse
+      "_", " "
+    )
+  )
+
+  df |>
+    select(psc:quarter, !!intervention) |>
+    mutate(
+      stage_5_or_above = str_count(!!intervention, "Stage (5|6|7)"),
+      stage_5_all = if_else(stage_5_or_above >= 1, 1, 0)
+    ) |>
+    group_by(quarter) |>
+    summarise(
+      s5_all = sum(stage_5_all, na.rm = T),
+      all_reporters = n(),
+      percentage = (s5_all / all_reporters)
+    ) |>
+    ungroup() |>
+    mutate(
+      intervention = intervention_name,
+      .after = quarter
+    )
+}
+
+# 3 make graph
+visualise_bars <- function(df, intervention, intervention_name = NULL) {
   # to quote variable
   intervention <- enquo(intervention)
 
@@ -109,7 +144,7 @@ visualise <- function(df, intervention, intervention_name = NULL) {
     ) +
     guides(colour = guide_none()) +
     labs(
-      title = "Adoption of optimisation internventions across PCS's as a share of implementation stages",
+      title = "Adoption of optimisation interventions across PCS's as a share of implementation stages",
       subtitle = intervention_subtitle,
       caption = glue::glue("Data reported by the PSC's for {report_quarter}")
     ) +
@@ -129,6 +164,55 @@ visualise <- function(df, intervention, intervention_name = NULL) {
       )
     )
 }
+
+# 4 visualise line plots
+visualise_line <- function(df, aes_group, aes_colour,
+                           hline_colour, annotate_x, annotate_y, subtitle_string) {
+  ggplot(
+    data = df,
+    aes(quarter,
+      percentage,
+      group = !!aes_group,
+      colour = !!aes_colour
+    )
+  ) +
+    geom_hline(
+      yintercept = 0.65,
+      linetype = "dashed",
+      colour = hline_colour
+    ) +
+    scale_y_continuous(
+      labels = scales::percent_format(),
+      limits = c(0, 1)
+    ) +
+    annotate(
+      geom = "text",
+      x = annotate_x,
+      y = annotate_y,
+      label = "Target for 2022/23 Q4 (i.e., 65%)"
+    ) +
+    labs(
+      title = "Adoption of optimisation interventions across NHS Trusts",
+      subtitle = subtitle_string,
+      caption = glue::glue("Data reported by the PSC's for {report_quarter}")
+    ) +
+    theme_classic() +
+    theme(
+      axis.title = element_blank(),
+      axis.text.x = element_text(angle = 90),
+      panel.grid.major.y = element_line(),
+      plot.caption = element_text(
+        face = "italic",
+        size = 10,
+        hjust = 0 # so caption is on right hand side
+      ),
+      legend.title = element_blank(),
+      legend.position = "bottom",
+      legend.justification = "left"
+    )
+}
+
+report_quarter <- "2024/25 Q1"
 ```
 
 # MatNeoSIP - Optimisation
@@ -140,8 +224,6 @@ visualise <- function(df, intervention, intervention_name = NULL) {
 ## title slide
 
 ```{r}
-report_quarter <- "2024/25 Q1"
-# mat_neo_agg |> select(psc:quarter, intervention, stage)
 mat_neo_long <- mat_neo_data |>
   filter(quarter == report_quarter) |>
   pivot_longer(
@@ -150,7 +232,7 @@ mat_neo_long <- mat_neo_data |>
     values_to = "stage"
   )
 
-visualise(
+visualise_bars(
   aggregate_int(
     mat_neo_long,
     my_filter = expr(!intervention %in% c(
@@ -167,7 +249,7 @@ visualise(
 
 ```{r}
 # deploy functions
-visualise(
+visualise_bars(
   aggregate_int(mat_neo_data, expr(quarter == report_quarter), place_of_birth),
   place_of_birth,
   "Place of Birth"
@@ -175,51 +257,49 @@ visualise(
 ```
 
 ```{r}
-visualise(
+visualise_bars(
   aggregate_int(mat_neo_data, expr(quarter == report_quarter), maternal_breast_milk),
   maternal_breast_milk
 )
 ```
 
 ```{r}
-visualise(
+visualise_bars(
   aggregate_int(mat_neo_data, expr(quarter == report_quarter), normothermia),
   normothermia
 )
 ```
 
 ```{r}
-visualise(
+visualise_bars(
   aggregate_int(mat_neo_data, expr(quarter == report_quarter), optimal_cord_management),
   optimal_cord_management
 )
 ```
 
 ```{r}
-visualise(
+visualise_bars(
   aggregate_int(mat_neo_data, expr(quarter == report_quarter), antibiotics),
   antibiotics
 )
 ```
 
 ```{r}
-visualise(
+visualise_bars(
   aggregate_int(mat_neo_data, expr(quarter == report_quarter), corticosteroids),
   corticosteroids
 )
 ```
 
 ```{r}
-visualise(
+visualise_bars(
   aggregate_int(mat_neo_data, expr(quarter == report_quarter), magnesium_sulphate),
   magnesium_sulphate
 )
 ```
 
-# Line chart slide 12
-
 ```{r}
-mat_neo_agg_stage5_provider <- mat_neo_data |>
+mat_neo_agg_stage_provider <- mat_neo_data |>
   select(psc:volume_targeted_ventilation) |>
   mutate(
     all_stages = paste(magnesium_sulphate,
@@ -229,16 +309,16 @@ mat_neo_agg_stage5_provider <- mat_neo_data |>
       normothermia,
       maternal_breast_milk,
       place_of_birth,
-      caffeine,
-      volume_targeted_ventilation,
-      sep = "_"
+      # caffeine, #mot included why?
+      # volume_targeted_ventilation, #ditto
+      sep = " / "
     ), # will paste NA as string 'NA' and this is intentional for counts
     stage_5_or_above = str_count(all_stages, "Stage (5|6|7)"),
     stage_5_all = if_else(stage_5_or_above >= 7, 1, 0)
   ) |>
   select(-all_stages)
 
-bar_all <- mat_neo_agg_stage5_provider |>
+mat_neo_stage_all <- mat_neo_agg_stage_provider |>
   group_by(quarter) |>
   summarise(
     s5_all = sum(stage_5_all),
@@ -247,118 +327,55 @@ bar_all <- mat_neo_agg_stage5_provider |>
   ) |>
   ungroup()
 
-bar_all |> head()
-```
-
-```{r}
-bar_all |>
-  ggplot(aes(x = quarter,
-             y = percentage,
-             group = 1)
-         ) +
-  geom_line(colour = '#660066'
-            ) +
-  geom_point(colour = '#660066',
-             size = 2
-             ) +
-  geom_hline(yintercept = 0.65,
-             linetype = 'dashed',
-             colour = 'navy'
-             ) +
-  scale_y_continuous(labels = scales::percent_format()) +
-  annotate(geom = 'text', x = '2021/22 Q3', y = 0.70, label = 'Target for 2022/23 Q4 (i.e., 65%)') +
-  theme_classic() +
-  theme(
-    axis.title = element_blank(),
-    axis.text.x = element_text(angle = 90)
-    )
-
-```
-
-```{r}
-#turn below into a function and then rbind then make spaghetti chart
-my_function <- function(df, intervention) {
-  
-  # to quote variable
-  intervention <- enquo(intervention)
-  
-  #to quote intervention name
- intervention_string <- deparse(intervention)
-
-  intervention_name <- str_to_title( # 3 capitalise clean string into title
-    str_replace_all( # 2 replace _ with blank space
-      str_remove(intervention_string, "~"), # 1 remove ~ added by deparse
-      "_", " "
-    )
+visualise_line(
+  df = mat_neo_stage_all,
+  aes_group = expr(1),
+  aes_colour = expr(NULL),
+  hline_colour = "navy",
+  annotate_x = "2021/22 Q3",
+  annotate_y = 0.70,
+  subtitle_string = "Percentage of organisations reporting all implementation stages at level 5 or above\n(Excl. caffeine and volume targeted ventilation)"
+) +
+  geom_line(colour = "#660066") +
+  geom_point(
+    colour = "#660066",
+    size = 2
   )
-  
-  df |>
-    select(psc:quarter, !!intervention) |>
-    mutate(
-      stage_5_or_above = str_count(!!intervention, "Stage (5|6|7)"),
-      stage_5_all = if_else(stage_5_or_above >= 1, 1, 0)
-      ) |> 
-    group_by(quarter) |>
-    summarise(
-      s5_all = sum(stage_5_all, na.rm = T),
-      all_reporters = n(),
-      percentage = (s5_all / all_reporters)
-    ) |>
-    ungroup() |>
-    mutate(intervention = intervention_name,
-           .after = quarter
-          )
-}
 ```
-
-# 
 
 ```{r}
 spaghetti_data <- bind_rows(
-  my_function(mat_neo_data, magnesium_sulphate),
-  my_function(mat_neo_data, corticosteroids),
-  my_function(mat_neo_data, antibiotics),
-  my_function(mat_neo_data, optimal_cord_management),
-  my_function(mat_neo_data, normothermia),
-  my_function(mat_neo_data, maternal_breast_milk),
-  my_function(mat_neo_data, place_of_birth),
-  my_function(mat_neo_data, caffeine), #not included in orignal chart, why?
-  my_function(mat_neo_data, volume_targeted_ventilation) #ditto
-  )
+  aggregate_stage(mat_neo_data, magnesium_sulphate),
+  aggregate_stage(mat_neo_data, corticosteroids),
+  aggregate_stage(mat_neo_data, antibiotics),
+  aggregate_stage(mat_neo_data, optimal_cord_management),
+  aggregate_stage(mat_neo_data, normothermia),
+  aggregate_stage(mat_neo_data, maternal_breast_milk),
+  aggregate_stage(mat_neo_data, place_of_birth)
+  # aggregate_stage(mat_neo_data, caffeine), #not included in orignal chart, why?
+  # aggregate_stage(mat_neo_data, volume_targeted_ventilation) #ditto
+)
 
-spaghetti_data |> 
-  ggplot(aes(x = quarter,
-             y = percentage,
-             group = intervention,
-             colour = intervention
-             )
-         ) +
+visualise_line(
+  df = spaghetti_data,
+  aes_group = expr(intervention),
+  aes_colour = expr(intervention),
+  hline_colour = "black",
+  annotate_x = "2023/24 Q3",
+  annotate_y = 0.60,
+  subtitle_string = "Percentage of organisations reporting all implementation stages at level 5 or above"
+) +
   geom_line() +
   geom_point(size = 2) +
-  geom_hline(yintercept = 0.65,
-             linetype = 'dashed',
-             colour = 'black'
-             ) +
-  scale_y_continuous(labels = scales::percent_format()) +
-  annotate(geom = 'text', x = '2023/24 Q3', y = 0.60, label = 'Target for 2022/23 Q4 (i.e., 65%)') +
-  theme_classic() +
-  theme(
-    axis.title = element_blank(),
-    axis.text.x = element_text(angle = 90),
-    legend.title = element_blank(),
-    legend.position = 'bottom'
-    )
+  ggsci::scale_colour_jco()
 ```
-
-
-
 
 # MatNeoSIP - Deterioration Tools
 
 ## temporary title
 
 ```{r}
-visualise(
+visualise_bars(
   aggregate_int(mat_neo_data, expr(quarter == report_quarter), newtt2),
   newtt2,
   "NEWTT2"
@@ -366,7 +383,7 @@ visualise(
 ```
 
 ```{r}
-visualise(
+visualise_bars(
   aggregate_int(mat_neo_data, expr(quarter == report_quarter), mews),
   mews,
   "MEWS"
