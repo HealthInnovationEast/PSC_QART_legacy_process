@@ -312,7 +312,7 @@ mat_neo_agg_stage_provider <- mat_neo_data |>
       normothermia,
       maternal_breast_milk,
       place_of_birth,
-      # caffeine, #mot included why?
+      # caffeine, #not included why?
       # volume_targeted_ventilation, #ditto
       sep = " / "
     ), # will paste NA as string 'NA' and this is intentional for counts
@@ -394,37 +394,11 @@ visualise_bars(
 ```
 
 ```{r}
-mat_neo_agg_news_quarter <- mat_neo_data |>
-  select(quarter, organisation, newtt2) |>
-  filter(
-    newtt2 != "N/A", # had to use this for 2022/23 Q4 - Four orgs had this value
-    !is.na(newtt2) # not a fan of this filter because it makes denominators smaller than in spaghetti chart
-  ) |>
-  group_by(quarter, newtt2) |>
-  summarise(n = n()) |>
-  ungroup() |>
-  group_by(quarter) |>
-  mutate(
-    total = sum(n),
-    percentage = round((n / total) * 100, 1)
-  ) |>
-  ungroup()
-
-
-visualise_bars(
-  df = mat_neo_agg_news_quarter,
-  intervention = newtt2,
-  intervention_name = "NEWTT2",
-  aes_x = expr(quarter)
-)
-```
-
-```{r}
 mat_neo_agg_newtt2_quarter <- mat_neo_data |>
   select(quarter, organisation, newtt2) |>
   filter(
     newtt2 != "N/A", # had to use this for 2022/23 Q4 - Four orgs had this value
-    !is.na(newtt2) # not a fan of this filter because it makes denominators smaller than in spaghetti chart
+    !is.na(newtt2) # not a fan of this filter because it makes denominators smaller than in other bar charts
   ) |>
   group_by(quarter, newtt2) |>
   summarise(n = n()) |>
