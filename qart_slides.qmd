@@ -5,8 +5,8 @@ format:
   pptx:
     reference-doc: template.pptx
 editor: visual
-# params: 
-#   a_quarter
+params: 
+  report_quarter: "2024/25 Q1" #note this will be overwritten by param in run_quarto.R 
 ---
 
 ```{r}
@@ -215,7 +215,7 @@ visualise_line <- function(df, aes_group, aes_colour,
     )
 }
 
-report_quarter <- "2024/25 Q1"
+report_quarter <- params$report_quarter
 ```
 
 # MatNeoSIP - Optimisation

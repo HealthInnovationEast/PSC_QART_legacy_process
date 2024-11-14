@@ -5,8 +5,8 @@ library(glue)
 
 #### MAKE A QUARTER PARAMETER
 
-quarto_render("qart_slides.qmd"#, 
-              #execute_params = list('a_quarter' = a_quarter)
+quarto_render("qart_slides.qmd", 
+              execute_params = list(report_quarter = "2023/24 Q4")
               )
 
 file_name <- format(Sys.time(), "qart_test_%Y_%m_%d_%H%M%S.pptx")
