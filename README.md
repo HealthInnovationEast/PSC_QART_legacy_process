@@ -1,9 +1,3 @@
----
-editor_options: 
-  markdown: 
-    wrap: sentence
----
-
 # QART_Automation
 
 There are 5 main scripts for this automation process and 2 config scripts.
