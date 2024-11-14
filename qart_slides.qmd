@@ -92,7 +92,13 @@ aggregate_stage <- function(df, intervention) {
 }
 
 # 3 make graph
-visualise_bars <- function(df, intervention, intervention_name = NULL) {
+visualise_bars <- function(df, intervention,
+                           intervention_name = NULL,
+                           # most plots will have psc in their x axis, but some will need quarter instead
+                           aes_x = expr(psc),
+                           # mopst plots will use the title below, except the quarter charts
+                           plot_title = "Adoption of optimisation interventions across PCS's as a share of implementation stages",
+                           plot_caption = glue::glue("Data reported by the PSC's for {report_quarter}")) {
   # to quote variable
   intervention <- enquo(intervention)
 
@@ -110,16 +116,13 @@ visualise_bars <- function(df, intervention, intervention_name = NULL) {
     intervention_subtitle <- intervention_name
   }
 
-
   # custom palette of blues in reversed order
   blues <- rev(scales::brewer_pal()(7))
   text_colour <- c(rep("white", 3), rep("black", 4))
 
-  # crate a NULL parameter for subtitle
-
   df |>
     ggplot(aes(
-      x = forcats::fct_rev(psc), # reverse alphabetical order
+      x = forcats::fct_rev(!!aes_x), # reverse alphabetical order
       y = percentage,
       fill = forcats::fct_rev(!!intervention) # reverse stage order
     )) +
@@ -144,9 +147,9 @@ visualise_bars <- function(df, intervention, intervention_name = NULL) {
     ) +
     guides(colour = guide_none()) +
     labs(
-      title = "Adoption of optimisation interventions across PCS's as a share of implementation stages",
+      title = plot_title,
       subtitle = intervention_subtitle,
-      caption = glue::glue("Data reported by the PSC's for {report_quarter}")
+      caption = plot_caption
     ) +
     # guide_legend(reverse = T) +
     theme_classic() +
@@ -387,5 +390,87 @@ visualise_bars(
   aggregate_int(mat_neo_data, expr(quarter == report_quarter), mews),
   mews,
   "MEWS"
+)
+```
+
+```{r}
+mat_neo_agg_news_quarter <- mat_neo_data |>
+  select(quarter, organisation, newtt2) |>
+  filter(
+    newtt2 != "N/A", # had to use this for 2022/23 Q4 - Four orgs had this value
+    !is.na(newtt2) # not a fan of this filter because it makes denominators smaller than in spaghetti chart
+  ) |>
+  group_by(quarter, newtt2) |>
+  summarise(n = n()) |>
+  ungroup() |>
+  group_by(quarter) |>
+  mutate(
+    total = sum(n),
+    percentage = round((n / total) * 100, 1)
+  ) |>
+  ungroup()
+
+
+visualise_bars(
+  df = mat_neo_agg_news_quarter,
+  intervention = newtt2,
+  intervention_name = "NEWTT2",
+  aes_x = expr(quarter)
+)
+```
+
+```{r}
+mat_neo_agg_newtt2_quarter <- mat_neo_data |>
+  select(quarter, organisation, newtt2) |>
+  filter(
+    newtt2 != "N/A", # had to use this for 2022/23 Q4 - Four orgs had this value
+    !is.na(newtt2) # not a fan of this filter because it makes denominators smaller than in spaghetti chart
+  ) |>
+  group_by(quarter, newtt2) |>
+  summarise(n = n()) |>
+  ungroup() |>
+  group_by(quarter) |>
+  mutate(
+    total = sum(n),
+    percentage = round((n / total) * 100, 1)
+  ) |>
+  ungroup()
+
+# why do we have a plot by quarter only for NEWTT2 and MEWS
+visualise_bars(
+  df = mat_neo_agg_newtt2_quarter,
+  intervention = newtt2,
+  intervention_name = "Share of implementation stages across organisations reporting at stage 1 or above\n(Note: Denominators change between quarters)",
+  aes_x = expr(quarter),
+  plot_title = "Adoption of NEWTT2 across NHS organisations",
+  plot_caption = element_blank()
+)
+```
+
+```{r}
+mat_neo_agg_mews_quarter <- mat_neo_data |>
+  select(quarter, organisation, mews) |>
+  filter(
+    mews != "N/A", # had to use this for 2022/23 Q1 and Q4 -
+    !is.na(mews) # not a fan of this filter because it makes denominators smaller than in spaghetti chart
+  ) |>
+  group_by(quarter, mews) |>
+  summarise(n = n()) |>
+  ungroup() |>
+  group_by(quarter) |>
+  mutate(
+    total = sum(n),
+    percentage = round((n / total) * 100, 1)
+  ) |>
+  ungroup()
+
+
+visualise_bars(
+  df = mat_neo_agg_mews_quarter,
+  intervention = mews,
+  intervention_name = "Share of implementation stages across organisations reporting at stage 1 or above\n(Note: Denominators change between quarters)",
+  aes_x = expr(quarter),
+  plot_title = "Adoption of MEWS across NHS organisations",
+  plot_caption = element_blank()
 )
 ```
