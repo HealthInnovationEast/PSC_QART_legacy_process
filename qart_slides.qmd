@@ -4,6 +4,7 @@ author: "Patient Safety Analysis Team"
 format: 
   pptx:
     reference-doc: template.pptx
+    fig-dpi: 800
 editor: visual
 params: 
   report_quarter: "2024/25 Q1" #note this will be overwritten by param in run_quarto.R 
@@ -52,12 +53,12 @@ aggregate_int <- function(df, my_filter, intervention) {
     group_by(psc) |>
     mutate(
       total = sum(n),
-      percentage = round((n / total) * 100, 1)
+      percentage = scales::percent(n/total, 0.1)
     ) |>
     ungroup()
 }
 
-# 2 aggregate by quarter and calcualte how many NHS orgs are reporting at stage 5 or above for a given intervention
+# 2 aggregate by quarter and calculate how many NHS orgs are reporting at stage 5 or above for a given intervention
 aggregate_stage <- function(df, intervention) {
   # to quote variable
   intervention <- enquo(intervention)
@@ -65,12 +66,10 @@ aggregate_stage <- function(df, intervention) {
   # to quote intervention name
   intervention_string <- deparse(intervention)
 
-  intervention_name <- str_to_title( # 3 capitalise clean string into title
-    str_replace_all( # 2 replace _ with blank space
-      str_remove(intervention_string, "~"), # 1 remove ~ added by deparse
-      "_", " "
-    )
-  )
+intervention_name <- intervention_string |>
+    str_remove("~") |>  # 1 remove ~ added by deparse
+    str_replace_all("_"," ") |> # 2 replace _ with blank space
+    str_to_title() # 3 capitalise clean string into title
 
   df |>
     select(psc:quarter, !!intervention) |>
@@ -78,13 +77,12 @@ aggregate_stage <- function(df, intervention) {
       stage_5_or_above = str_count(!!intervention, "Stage (5|6|7)"),
       stage_5_all = if_else(stage_5_or_above >= 1, 1, 0)
     ) |>
-    group_by(quarter) |>
     summarise(
       s5_all = sum(stage_5_all, na.rm = T),
       all_reporters = n(),
-      percentage = (s5_all / all_reporters)
-    ) |>
-    ungroup() |>
+      percentage = (s5_all / all_reporters),
+      .by=quarter
+    ) 
     mutate(
       intervention = intervention_name,
       .after = quarter
