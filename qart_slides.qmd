@@ -54,7 +54,7 @@ aggregate_int <- function(df, my_filter, intervention) {
     group_by(psc) |>
     mutate(
       total = sum(n),
-      percentage = n/total
+      percentage = n / total
     ) |>
     ungroup()
 }
@@ -68,8 +68,8 @@ aggregate_stage <- function(df, intervention) {
   intervention_string <- deparse(intervention)
 
   intervention_name <- intervention_string |>
-    str_remove("~") |>  # 1 remove ~ added by deparse
-    str_replace_all("_"," ") |> # 2 replace _ with blank space
+    str_remove("~") |> # 1 remove ~ added by deparse
+    str_replace_all("_", " ") |> # 2 replace _ with blank space
     str_to_title() # 3 capitalise clean string into title
 
   df |>
@@ -82,7 +82,7 @@ aggregate_stage <- function(df, intervention) {
       s5_all = sum(stage_5_all, na.rm = T),
       all_reporters = n(),
       percentage = (s5_all / all_reporters),
-      .by=quarter
+      .by = quarter
     ) |>
     mutate(
       intervention = intervention_name,
@@ -104,12 +104,11 @@ visualise_bars <- function(df, intervention,
   # this is to set the subtitle string
   if (is.null(intervention_name)) {
     intervention_string <- deparse(intervention)
-    
-    intervention_subtitle <- intervention_string |>
-    str_remove("~") |>  # 1 remove ~ added by deparse
-    str_replace_all("_"," ") |> # 2 replace _ with blank space
-    str_to_title() # 3 capitalise clean string into title
 
+    intervention_subtitle <- intervention_string |>
+      str_remove("~") |> # 1 remove ~ added by deparse
+      str_replace_all("_", " ") |> # 2 replace _ with blank space
+      str_to_title() # 3 capitalise clean string into title
   } else {
     intervention_subtitle <- intervention_name
   }
@@ -117,6 +116,9 @@ visualise_bars <- function(df, intervention,
   # custom palette of blues in reversed order
   blues <- rev(scales::brewer_pal()(7))
   text_colour <- c(rep("white", 3), rep("black", 4))
+
+  # blues <- scales::brewer_pal()(7)
+  # text_colour <- c(rep("black", 4), rep("white", 3))
 
   df |>
     ggplot(aes(
@@ -129,7 +131,12 @@ visualise_bars <- function(df, intervention,
       position = "stack",
       size = 11
     ) +
-    scale_fill_manual(values = blues, na.value = "#808080") +
+    scale_fill_manual(
+      values = blues,
+      na.value = "#808080",
+      # below makes levels of factor appear in increasing order in legend (stage 1-7)
+      guide = guide_legend(reverse = T)
+    ) +
     scale_colour_manual(values = text_colour, na.value = "white") +
     coord_flip() +
     scale_y_continuous(expand = c(0.025, 0.025)) +
@@ -140,13 +147,14 @@ visualise_bars <- function(df, intervention,
       ),
       position = position_stack(vjust = 0.5),
     ) +
-    guides(colour = guide_none()) +
+    guides(
+      colour = guide_none() # removes 'a' text from boxes in legend
+    ) +
     labs(
       title = plot_title,
       subtitle = intervention_subtitle,
       caption = plot_caption
     ) +
-    # guide_legend(reverse = T) +
     theme_classic() +
     theme(
       axis.title = element_blank(),
@@ -239,60 +247,69 @@ aggregate_int(
   )),
   stage
 ) |>
-  visualise_bars(stage,
-  "All optimisation interventions (Excl. caffeine and volume targeted ventilation)"
+  visualise_bars(
+    stage,
+    "All optimisation interventions (Excl. caffeine and volume targeted ventilation)"
   )
 ```
 
 ```{r}
 # deploy functions
-visualise_bars(
-  aggregate_int(mat_neo_data, expr(quarter == report_quarter), place_of_birth),
-  place_of_birth,
-  "Place of Birth"
-)
+aggregate_int(
+  mat_neo_data,
+  expr(quarter == report_quarter),
+  place_of_birth
+) |>
+  visualise_bars(
+    place_of_birth,
+    "Place of Birth"
+  )
 ```
 
 ```{r}
-visualise_bars(
-  aggregate_int(mat_neo_data, expr(quarter == report_quarter), maternal_breast_milk),
+aggregate_int(
+  mat_neo_data,
+  expr(quarter == report_quarter),
   maternal_breast_milk
-)
+) |>
+  visualise_bars(
+    maternal_breast_milk
+  )
 ```
 
 ```{r}
-visualise_bars(
-  aggregate_int(mat_neo_data, expr(quarter == report_quarter), normothermia),
-  normothermia
-)
+aggregate_int(mat_neo_data, expr(quarter == report_quarter), normothermia) |>
+  visualise_bars(
+    normothermia
+  )
 ```
 
 ```{r}
-visualise_bars(
-  aggregate_int(mat_neo_data, expr(quarter == report_quarter), optimal_cord_management),
-  optimal_cord_management
-)
+aggregate_int(mat_neo_data, expr(quarter == report_quarter), optimal_cord_management) |>
+  visualise_bars(
+    optimal_cord_management
+  )
 ```
 
 ```{r}
-visualise_bars(
-  aggregate_int(mat_neo_data, expr(quarter == report_quarter), antibiotics),
-  antibiotics
-)
+aggregate_int(mat_neo_data, expr(quarter == report_quarter), antibiotics) |>
+  visualise_bars(
+    antibiotics
+  )
 ```
 
 ```{r}
-visualise_bars(
-  aggregate_int(mat_neo_data, expr(quarter == report_quarter), corticosteroids),
-  corticosteroids
-)
+aggregate_int(mat_neo_data, expr(quarter == report_quarter), corticosteroids) |>
+  visualise_bars(
+    corticosteroids
+  )
 ```
 
 ```{r}
-visualise_bars(
-  aggregate_int(mat_neo_data, expr(quarter == report_quarter), magnesium_sulphate),
-  magnesium_sulphate
-)
+aggregate_int(mat_neo_data, expr(quarter == report_quarter), magnesium_sulphate) |>
+  visualise_bars(
+    magnesium_sulphate
+  )
 ```
 
 ```{r}
@@ -372,16 +389,15 @@ visualise_line(
 ## temporary title
 
 ```{r}
-visualise_bars(
-  aggregate_int(mat_neo_data, expr(quarter == report_quarter), newtt2),
-  newtt2,
-  "NEWTT2"
-)
+aggregate_int(mat_neo_data, expr(quarter == report_quarter), newtt2) |>
+  visualise_bars(
+    newtt2,
+    "NEWTT2"
+  )
 ```
 
 ```{r}
-visualise_bars(
-  aggregate_int(mat_neo_data, expr(quarter == report_quarter), mews),
+aggregate_int(mat_neo_data, expr(quarter == report_quarter), mews) |> visualise_bars(
   mews,
   "MEWS"
 )
