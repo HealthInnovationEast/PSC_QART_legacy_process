@@ -7,7 +7,8 @@ format:
     fig-dpi: 800
 editor: visual
 params: 
-  report_quarter: "2024/25 Q1" #note this will be overwritten by param in run_quarto.R 
+  #report_quarter: "2024/25 Q1" #note this will be overwritten by param in run_quarto.R 
+  report_quarter: "2024/25 Q2" #for testing PR
 ---
 
 ```{r}
@@ -53,7 +54,7 @@ aggregate_int <- function(df, my_filter, intervention) {
     group_by(psc) |>
     mutate(
       total = sum(n),
-      percentage = scales::percent(n/total, 0.1)
+      percentage = n/total
     ) |>
     ungroup()
 }
@@ -66,7 +67,7 @@ aggregate_stage <- function(df, intervention) {
   # to quote intervention name
   intervention_string <- deparse(intervention)
 
-intervention_name <- intervention_string |>
+  intervention_name <- intervention_string |>
     str_remove("~") |>  # 1 remove ~ added by deparse
     str_replace_all("_"," ") |> # 2 replace _ with blank space
     str_to_title() # 3 capitalise clean string into title
@@ -82,7 +83,7 @@ intervention_name <- intervention_string |>
       all_reporters = n(),
       percentage = (s5_all / all_reporters),
       .by=quarter
-    ) 
+    ) |>
     mutate(
       intervention = intervention_name,
       .after = quarter
@@ -103,13 +104,12 @@ visualise_bars <- function(df, intervention,
   # this is to set the subtitle string
   if (is.null(intervention_name)) {
     intervention_string <- deparse(intervention)
+    
+    intervention_subtitle <- intervention_string |>
+    str_remove("~") |>  # 1 remove ~ added by deparse
+    str_replace_all("_"," ") |> # 2 replace _ with blank space
+    str_to_title() # 3 capitalise clean string into title
 
-    intervention_subtitle <- str_to_title( # 3 capitalise clean string into title
-      str_replace_all( # 2 replace _ with blank space
-        str_remove(intervention_string, "~"), # 1 remove ~ added by deparse
-        "_", " "
-      )
-    )
   } else {
     intervention_subtitle <- intervention_name
   }
@@ -135,10 +135,7 @@ visualise_bars <- function(df, intervention,
     scale_y_continuous(expand = c(0.025, 0.025)) +
     geom_text(
       aes(
-        label = paste0(
-          round(percentage), # rounding to no decimal places here
-          "%"
-        ), # so bars stack to 100 or as close as possible
+        label = scales::percent(percentage, accuracy = 1), # 1 means round to the nearest unit of 1, so 73.3 is rounded as 73 and no decimal places show on graph
         colour = forcats::fct_rev(!!intervention) # reverse again so position argument is obeyed
       ),
       position = position_stack(vjust = 0.5),
@@ -233,19 +230,18 @@ mat_neo_long <- mat_neo_data |>
     values_to = "stage"
   )
 
-visualise_bars(
-  aggregate_int(
-    mat_neo_long,
-    my_filter = expr(!intervention %in% c(
-      "mews", "newtt2", # excluded because they're not optimisation interventions
-      "volume_targeted_ventilation", # why has this been excluded?
-      "caffeine" # ditto
-    )),
-    stage
-  ),
-  stage,
+aggregate_int(
+  mat_neo_long,
+  my_filter = expr(!intervention %in% c(
+    "mews", "newtt2", # excluded because they're not optimisation interventions
+    "volume_targeted_ventilation", # why has this been excluded?
+    "caffeine" # ditto
+  )),
+  stage
+) |>
+  visualise_bars(stage,
   "All optimisation interventions (Excl. caffeine and volume targeted ventilation)"
-)
+  )
 ```
 
 ```{r}
@@ -404,7 +400,7 @@ mat_neo_agg_newtt2_quarter <- mat_neo_data |>
   group_by(quarter) |>
   mutate(
     total = sum(n),
-    percentage = round((n / total) * 100, 1)
+    percentage = (n / total)
   ) |>
   ungroup()
 
@@ -432,7 +428,7 @@ mat_neo_agg_mews_quarter <- mat_neo_data |>
   group_by(quarter) |>
   mutate(
     total = sum(n),
-    percentage = round((n / total) * 100, 1)
+    percentage = (n / total)
   ) |>
   ungroup()
 
