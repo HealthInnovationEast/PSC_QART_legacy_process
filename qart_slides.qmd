@@ -60,8 +60,8 @@ aggregate_int <- function(df, my_filter, intervention) {
     ungroup()
 }
 
-# 2 aggregate by quarter and calculate how many NHS orgs are reporting at stage 5 or above for a given intervention
-aggregate_stage <- function(df, intervention) {
+# 2 aggregate by quarter and calculate how many NHS orgs are reporting at a custom stage for a given intervention
+aggregate_stage <- function(df, intervention, stage = "Stage 7") {
   # to quote variable
   intervention <- enquo(intervention)
 
@@ -76,19 +76,18 @@ aggregate_stage <- function(df, intervention) {
   df |>
     select(psc:quarter, !!intervention) |>
     mutate(
-      stage_5_or_above = str_count(!!intervention, "Stage (5|6|7)"),
-      stage_5_all = if_else(stage_5_or_above >= 1, 1, 0)
+      stage_x_or_above = str_count(!!intervention, stage)
     ) |>
     summarise(
-      s5_all = sum(stage_5_all, na.rm = T),
+      stage_x_all = sum(stage_x_or_above, na.rm = T),
       all_reporters = n(),
-      percentage = (s5_all / all_reporters),
+      percentage = (stage_x_all / all_reporters),
       .by = quarter
     ) |>
     mutate(
       intervention = intervention_name,
       .after = quarter
-    )
+     )
 }
 
 # 3 make graph
@@ -97,7 +96,7 @@ visualise_bars <- function(df, intervention,
                            # most plots will have psc in their x axis, but some will need quarter instead
                            aes_x = expr(psc),
                            # mopst plots will use the title below, except the quarter charts
-                           plot_title = "Adoption of optimisation interventions across PCS's as a share of implementation stages",
+                           plot_title = "Percentage of NHS Trusts at each implementation stage, by PSC",
                            plot_caption = glue::glue("Data reported by the PSC's for {report_quarter}")) {
   # to quote variable
   intervention <- enquo(intervention)
@@ -193,7 +192,7 @@ visualise_line <- function(df, aes_group, aes_colour,
       geom = "text",
       x = annotate_x,
       y = annotate_y,
-      label = "Target for 2022/23 Q4 (i.e., 65%)"
+      label = "Target for FY 2024/25 (i.e., 65%)"
     ) +
     labs(
       title = "Adoption of optimisation interventions across NHS Trusts",
@@ -311,6 +310,9 @@ aggregate_int(mat_neo_data, expr(quarter == report_quarter), magnesium_sulphate)
 ```
 
 ```{r}
+#stage to use as benchmark progress
+stage <- "Stage 7"
+
 mat_neo_agg_stage_provider <- mat_neo_data |>
   select(psc:volume_targeted_ventilation) |>
   mutate(
@@ -325,17 +327,17 @@ mat_neo_agg_stage_provider <- mat_neo_data |>
       # volume_targeted_ventilation, #ditto
       sep = " / "
     ), # will paste NA as string 'NA' and this is intentional for counts
-    stage_5_or_above = str_count(all_stages, "Stage (5|6|7)"),
-    stage_5_all = if_else(stage_5_or_above >= 7, 1, 0)
+    stage_x = str_count(all_stages, stage),
+    stage_x_all = if_else(stage_x == 7, 1, 0)
   ) |>
   select(-all_stages)
 
 mat_neo_stage_all <- mat_neo_agg_stage_provider |>
   group_by(quarter) |>
   summarise(
-    s5_all = sum(stage_5_all),
+    stage_x_all_quarter = sum(stage_x_all),
     all_reporters = n(),
-    percentage = (s5_all / all_reporters)
+    percentage = (stage_x_all_quarter / all_reporters)
   ) |>
   ungroup()
 
@@ -344,9 +346,9 @@ visualise_line(
   aes_group = expr(1),
   aes_colour = expr(NULL),
   hline_colour = "navy",
-  annotate_x = "2021/22 Q3",
+  annotate_x = "2023/24 Q4",
   annotate_y = 0.70,
-  subtitle_string = "Percentage of organisations reporting all implementation stages at level 5 or above\n(Excl. caffeine and volume targeted ventilation)"
+  subtitle_string = "Percentage of organisations reporting all implementation stages at level 7\n(Excl. caffeine and volume targeted ventilation)"
 ) +
   geom_line(colour = "#660066") +
   geom_point(
@@ -373,9 +375,9 @@ visualise_line(
   aes_group = expr(intervention),
   aes_colour = expr(intervention),
   hline_colour = "black",
-  annotate_x = "2023/24 Q3",
-  annotate_y = 0.60,
-  subtitle_string = "Percentage of organisations reporting all implementation stages at level 5 or above"
+  annotate_x = "2023/24 Q4",
+  annotate_y = 0.8,
+  subtitle_string = "Percentage of organisations reporting all implementation stages at level 7, by intervention"
 ) +
   geom_line() +
   geom_point(size = 2) +
