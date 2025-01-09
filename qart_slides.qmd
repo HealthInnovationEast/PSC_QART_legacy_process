@@ -25,6 +25,7 @@ library(readxl)
 library(forcats)
 library(scales)
 library(ggsci)
+library(viridis)
 
 mat_neo_data <- read_excel(here("data/MatNeoSIP.xlsx"), sheet = "Data") |>
   clean_names() |>
@@ -113,12 +114,9 @@ visualise_bars <- function(df, intervention,
     intervention_subtitle <- intervention_name
   }
 
-  # custom palette of blues in reversed order
-  blues <- rev(scales::brewer_pal()(7))
-  text_colour <- c(rep("white", 3), rep("black", 4))
-
-  # blues <- scales::brewer_pal()(7)
-  # text_colour <- c(rep("black", 4), rep("white", 3))
+  # custom colour palette 
+  my_viridis <- viridis(7)
+  text_colour <- c(rep("white", 5), rep('black', 2))
 
   df |>
     ggplot(aes(
@@ -132,7 +130,7 @@ visualise_bars <- function(df, intervention,
       size = 11
     ) +
     scale_fill_manual(
-      values = blues,
+      values = my_viridis,
       na.value = "#808080",
       # below makes levels of factor appear in increasing order in legend (stage 1-7)
       guide = guide_legend(reverse = T)
