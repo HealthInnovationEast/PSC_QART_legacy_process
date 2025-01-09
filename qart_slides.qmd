@@ -7,8 +7,7 @@ format:
     fig-dpi: 800
 editor: visual
 params: 
-  #report_quarter: "2024/25 Q1" #note this will be overwritten by param in run_quarto.R 
-  report_quarter: "2024/25 Q2" #for testing PR
+  report_quarter: "2024/25 Q2" #note this will be overwritten by param in run_quarto.R 
 ---
 
 ```{r}
@@ -238,15 +237,13 @@ mat_neo_long <- mat_neo_data |>
 aggregate_int(
   mat_neo_long,
   my_filter = expr(!intervention %in% c(
-    "mews", "newtt2", # excluded because they're not optimisation interventions
-    "volume_targeted_ventilation", # why has this been excluded?
-    "caffeine" # ditto
+    "mews", "newtt2" # excluded because they're not optimisation interventions
   )),
   stage
 ) |>
   visualise_bars(
     stage,
-    "All optimisation interventions (Excl. caffeine and volume targeted ventilation)"
+    "All optimisation interventions"
   )
 ```
 
@@ -310,6 +307,21 @@ aggregate_int(mat_neo_data, expr(quarter == report_quarter), magnesium_sulphate)
 ```
 
 ```{r}
+aggregate_int(mat_neo_data, expr(quarter == report_quarter), caffeine) |>
+  visualise_bars(
+    caffeine
+  )
+```
+
+```{r}
+aggregate_int(mat_neo_data, expr(quarter == report_quarter), volume_targeted_ventilation) |>
+  visualise_bars(
+    volume_targeted_ventilation
+  )
+```
+
+
+```{r}
 #stage to use as benchmark progress
 stage <- "Stage 7"
 
@@ -323,8 +335,8 @@ mat_neo_agg_stage_provider <- mat_neo_data |>
       normothermia,
       maternal_breast_milk,
       place_of_birth,
-      # caffeine, #not included why?
-      # volume_targeted_ventilation, #ditto
+      caffeine, # not incorporated before project take over
+      volume_targeted_ventilation, #ditto
       sep = " / "
     ), # will paste NA as string 'NA' and this is intentional for counts
     stage_x = str_count(all_stages, stage),
@@ -348,7 +360,7 @@ visualise_line(
   hline_colour = "navy",
   annotate_x = "2023/24 Q4",
   annotate_y = 0.70,
-  subtitle_string = "Percentage of organisations reporting all implementation stages at level 7\n(Excl. caffeine and volume targeted ventilation)"
+  subtitle_string = "Percentage of organisations reporting implementation of all 9 optimisation interventions at stage level 7"
 ) +
   geom_line(colour = "#660066") +
   geom_point(
@@ -365,9 +377,9 @@ spaghetti_data <- bind_rows(
   aggregate_stage(mat_neo_data, optimal_cord_management),
   aggregate_stage(mat_neo_data, normothermia),
   aggregate_stage(mat_neo_data, maternal_breast_milk),
-  aggregate_stage(mat_neo_data, place_of_birth)
-  # aggregate_stage(mat_neo_data, caffeine), #not included in orignal chart, why?
-  # aggregate_stage(mat_neo_data, volume_targeted_ventilation) #ditto
+  aggregate_stage(mat_neo_data, place_of_birth),
+  aggregate_stage(mat_neo_data, caffeine), # not incorporated before project take over
+  aggregate_stage(mat_neo_data, volume_targeted_ventilation) # ditto
 )
 
 visualise_line(
@@ -406,10 +418,10 @@ aggregate_int(mat_neo_data, expr(quarter == report_quarter), mews) |> visualise_
 ```{r}
 mat_neo_agg_newtt2_quarter <- mat_neo_data |>
   select(quarter, organisation, newtt2) |>
-  filter(
-    newtt2 != "N/A", # had to use this for 2022/23 Q4 - Four orgs had this value
-    !is.na(newtt2) # not a fan of this filter because it makes denominators smaller than in other bar charts
-  ) |>
+  mutate(newtt2 = na_if(newtt2, "N/A")) |> 
+  filter(!quarter %in% c('2021/22 Q1', '2021/22 Q2', 
+                      '2021/22 Q3', '2021/22 Q4')
+         ) |> # excludes quarters that have no records for this measure 
   group_by(quarter, newtt2) |>
   summarise(n = n()) |>
   ungroup() |>
@@ -418,13 +430,13 @@ mat_neo_agg_newtt2_quarter <- mat_neo_data |>
     total = sum(n),
     percentage = (n / total)
   ) |>
-  ungroup()
+  ungroup() 
 
-# why do we have a plot by quarter only for NEWTT2 and MEWS
+# why do we have a plot by quarter only for NEWTT2 and MEWS ?
 visualise_bars(
   df = mat_neo_agg_newtt2_quarter,
   intervention = newtt2,
-  intervention_name = "Share of implementation stages across organisations reporting at stage 1 or above\n(Note: Denominators change between quarters)",
+  intervention_name = "Share of implementation stages across organisations",
   aes_x = expr(quarter),
   plot_title = "Adoption of NEWTT2 across NHS organisations",
   plot_caption = element_blank()
@@ -434,10 +446,10 @@ visualise_bars(
 ```{r}
 mat_neo_agg_mews_quarter <- mat_neo_data |>
   select(quarter, organisation, mews) |>
-  filter(
-    mews != "N/A", # had to use this for 2022/23 Q1 and Q4 -
-    !is.na(mews) # not a fan of this filter because it makes denominators smaller than in spaghetti chart
-  ) |>
+  mutate(mews = na_if(mews, "N/A")) |> 
+  filter(!quarter %in% c('2021/22 Q1', '2021/22 Q2', 
+                      '2021/22 Q3', '2021/22 Q4')
+         ) |>
   group_by(quarter, mews) |>
   summarise(n = n()) |>
   ungroup() |>
@@ -452,7 +464,7 @@ mat_neo_agg_mews_quarter <- mat_neo_data |>
 visualise_bars(
   df = mat_neo_agg_mews_quarter,
   intervention = mews,
-  intervention_name = "Share of implementation stages across organisations reporting at stage 1 or above\n(Note: Denominators change between quarters)",
+  intervention_name = "Share of implementation stages across organisations",
   aes_x = expr(quarter),
   plot_title = "Adoption of MEWS across NHS organisations",
   plot_caption = element_blank()
