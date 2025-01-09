@@ -1,0 +1,460 @@
+---
+title: "NatPatSIP - Quarterly Presentation"
+author: "Patient Safety Analysis Team"
+format: 
+  pptx:
+    reference-doc: template.pptx
+    fig-dpi: 800
+editor: visual
+params: 
+  #report_quarter: "2024/25 Q1" #note this will be overwritten by param in run_quarto.R 
+  report_quarter: "2024/25 Q2" #for testing PR
+---
+
+```{r}
+#|echo: false
+#|warning: false
+
+# read in required packages
+library(here)
+library(tidyverse)
+library(janitor)
+library(lubridate)
+library(ggplot2)
+library(readxl)
+library(forcats)
+library(scales)
+library(ggsci)
+library(viridis)
+
+mat_neo_data <- read_excel(here("data/MatNeoSIP.xlsx"), sheet = "Data") |>
+  clean_names() |>
+  rename(
+    "stage_7_all" = "stage_7",
+    "quarter" = "date"
+  ) |>
+  rename_with(~ str_replace(., "x", "stage_"), starts_with("x"))
+```
+
+```{r}
+# functions
+
+# 1 aggregate by psc and intervention stage
+aggregate_int <- function(df, my_filter, intervention) {
+  # to quote variable
+  intervention <- enquo(intervention)
+
+  df |>
+    filter(!!my_filter) |>
+    group_by(
+      psc,
+      !!intervention
+    ) |>
+    summarise(n = n()) |>
+    ungroup() |>
+    group_by(psc) |>
+    mutate(
+      total = sum(n),
+      percentage = n / total
+    ) |>
+    ungroup()
+}
+
+# 2 aggregate by quarter and calculate how many NHS orgs are reporting at a custom stage for a given intervention
+aggregate_stage <- function(df, intervention, stage = "Stage 7") {
+  # to quote variable
+  intervention <- enquo(intervention)
+
+  # to quote intervention name
+  intervention_string <- deparse(intervention)
+
+  intervention_name <- intervention_string |>
+    str_remove("~") |> # 1 remove ~ added by deparse
+    str_replace_all("_", " ") |> # 2 replace _ with blank space
+    str_to_title() # 3 capitalise clean string into title
+
+  df |>
+    select(psc:quarter, !!intervention) |>
+    mutate(
+      stage_x_or_above = str_count(!!intervention, stage)
+    ) |>
+    summarise(
+      stage_x_all = sum(stage_x_or_above, na.rm = T),
+      all_reporters = n(),
+      percentage = (stage_x_all / all_reporters),
+      .by = quarter
+    ) |>
+    mutate(
+      intervention = intervention_name,
+      .after = quarter
+     )
+}
+
+# 3 make graph
+visualise_bars <- function(df, intervention,
+                           intervention_name = NULL,
+                           # most plots will have psc in their x axis, but some will need quarter instead
+                           aes_x = expr(psc),
+                           # mopst plots will use the title below, except the quarter charts
+                           plot_title = "Percentage of NHS Trusts at each implementation stage, by PSC",
+                           plot_caption = glue::glue("Data reported by the PSC's for {report_quarter}")) {
+  # to quote variable
+  intervention <- enquo(intervention)
+
+  # this is to set the subtitle string
+  if (is.null(intervention_name)) {
+    intervention_string <- deparse(intervention)
+
+    intervention_subtitle <- intervention_string |>
+      str_remove("~") |> # 1 remove ~ added by deparse
+      str_replace_all("_", " ") |> # 2 replace _ with blank space
+      str_to_title() # 3 capitalise clean string into title
+  } else {
+    intervention_subtitle <- intervention_name
+  }
+
+  # custom colour palette 
+  my_viridis <- viridis(7)
+  text_colour <- c(rep("white", 5), rep('black', 2))
+
+  df |>
+    ggplot(aes(
+      x = forcats::fct_rev(!!aes_x), # reverse alphabetical order
+      y = percentage,
+      fill = forcats::fct_rev(!!intervention) # reverse stage order
+    )) +
+    geom_bar(
+      stat = "identity",
+      position = "stack",
+      size = 11
+    ) +
+    scale_fill_manual(
+      values = my_viridis,
+      na.value = "#808080",
+      # below makes levels of factor appear in increasing order in legend (stage 1-7)
+      guide = guide_legend(reverse = T)
+    ) +
+    scale_colour_manual(values = text_colour, na.value = "white") +
+    coord_flip() +
+    scale_y_continuous(expand = c(0.025, 0.025)) +
+    geom_text(
+      aes(
+        label = scales::percent(percentage, accuracy = 1), # 1 means round to the nearest unit of 1, so 73.3 is rounded as 73 and no decimal places show on graph
+        colour = forcats::fct_rev(!!intervention) # reverse again so position argument is obeyed
+      ),
+      position = position_stack(vjust = 0.5),
+    ) +
+    guides(
+      colour = guide_none() # removes 'a' text from boxes in legend
+    ) +
+    labs(
+      title = plot_title,
+      subtitle = intervention_subtitle,
+      caption = plot_caption
+    ) +
+    theme_classic() +
+    theme(
+      axis.title = element_blank(),
+      axis.ticks = element_blank(),
+      axis.text.x = element_blank(),
+      legend.title = element_blank(),
+      legend.position = "bottom",
+      legend.justification = "left",
+      plot.caption = element_text(
+        face = "italic",
+        size = 10,
+        hjust = 0 # so caption is on right hand side
+      )
+    )
+}
+
+# 4 visualise line plots
+visualise_line <- function(df, aes_group, aes_colour,
+                           hline_colour, annotate_x, annotate_y, subtitle_string) {
+  ggplot(
+    data = df,
+    aes(quarter,
+      percentage,
+      group = !!aes_group,
+      colour = !!aes_colour
+    )
+  ) +
+    geom_hline(
+      yintercept = 0.65,
+      linetype = "dashed",
+      colour = hline_colour
+    ) +
+    scale_y_continuous(
+      labels = scales::percent_format(),
+      limits = c(0, 1)
+    ) +
+    annotate(
+      geom = "text",
+      x = annotate_x,
+      y = annotate_y,
+      label = "Target for FY 2024/25 (i.e., 65%)"
+    ) +
+    labs(
+      title = "Adoption of optimisation interventions across NHS Trusts",
+      subtitle = subtitle_string,
+      caption = glue::glue("Data reported by the PSC's for {report_quarter}")
+    ) +
+    theme_classic() +
+    theme(
+      axis.title = element_blank(),
+      axis.text.x = element_text(angle = 90),
+      panel.grid.major.y = element_line(),
+      plot.caption = element_text(
+        face = "italic",
+        size = 10,
+        hjust = 0 # so caption is on right hand side
+      ),
+      legend.title = element_blank(),
+      legend.position = "bottom",
+      legend.justification = "left"
+    )
+}
+
+report_quarter <- params$report_quarter
+```
+
+# MatNeoSIP - Optimisation
+
+## Maternity and Neonatal – Programme Overview
+
+![](data/matneo_overview.PNG)
+
+## title slide
+
+```{r}
+mat_neo_long <- mat_neo_data |>
+  filter(quarter == report_quarter) |>
+  pivot_longer(
+    cols = magnesium_sulphate:mews,
+    names_to = "intervention",
+    values_to = "stage"
+  )
+
+aggregate_int(
+  mat_neo_long,
+  my_filter = expr(!intervention %in% c(
+    "mews", "newtt2", # excluded because they're not optimisation interventions
+    "volume_targeted_ventilation", # why has this been excluded?
+    "caffeine" # ditto
+  )),
+  stage
+) |>
+  visualise_bars(
+    stage,
+    "All optimisation interventions (Excl. caffeine and volume targeted ventilation)"
+  )
+```
+
+```{r}
+# deploy functions
+aggregate_int(
+  mat_neo_data,
+  expr(quarter == report_quarter),
+  place_of_birth
+) |>
+  visualise_bars(
+    place_of_birth,
+    "Place of Birth"
+  )
+```
+
+```{r}
+aggregate_int(
+  mat_neo_data,
+  expr(quarter == report_quarter),
+  maternal_breast_milk
+) |>
+  visualise_bars(
+    maternal_breast_milk
+  )
+```
+
+```{r}
+aggregate_int(mat_neo_data, expr(quarter == report_quarter), normothermia) |>
+  visualise_bars(
+    normothermia
+  )
+```
+
+```{r}
+aggregate_int(mat_neo_data, expr(quarter == report_quarter), optimal_cord_management) |>
+  visualise_bars(
+    optimal_cord_management
+  )
+```
+
+```{r}
+aggregate_int(mat_neo_data, expr(quarter == report_quarter), antibiotics) |>
+  visualise_bars(
+    antibiotics
+  )
+```
+
+```{r}
+aggregate_int(mat_neo_data, expr(quarter == report_quarter), corticosteroids) |>
+  visualise_bars(
+    corticosteroids
+  )
+```
+
+```{r}
+aggregate_int(mat_neo_data, expr(quarter == report_quarter), magnesium_sulphate) |>
+  visualise_bars(
+    magnesium_sulphate
+  )
+```
+
+```{r}
+#stage to use as benchmark progress
+stage <- "Stage 7"
+
+mat_neo_agg_stage_provider <- mat_neo_data |>
+  select(psc:volume_targeted_ventilation) |>
+  mutate(
+    all_stages = paste(magnesium_sulphate,
+      corticosteroids,
+      antibiotics,
+      optimal_cord_management,
+      normothermia,
+      maternal_breast_milk,
+      place_of_birth,
+      # caffeine, #not included why?
+      # volume_targeted_ventilation, #ditto
+      sep = " / "
+    ), # will paste NA as string 'NA' and this is intentional for counts
+    stage_x = str_count(all_stages, stage),
+    stage_x_all = if_else(stage_x == 7, 1, 0)
+  ) |>
+  select(-all_stages)
+
+mat_neo_stage_all <- mat_neo_agg_stage_provider |>
+  group_by(quarter) |>
+  summarise(
+    stage_x_all_quarter = sum(stage_x_all),
+    all_reporters = n(),
+    percentage = (stage_x_all_quarter / all_reporters)
+  ) |>
+  ungroup()
+
+visualise_line(
+  df = mat_neo_stage_all,
+  aes_group = expr(1),
+  aes_colour = expr(NULL),
+  hline_colour = "navy",
+  annotate_x = "2023/24 Q4",
+  annotate_y = 0.70,
+  subtitle_string = "Percentage of organisations reporting all implementation stages at level 7\n(Excl. caffeine and volume targeted ventilation)"
+) +
+  geom_line(colour = "#660066") +
+  geom_point(
+    colour = "#660066",
+    size = 2
+  )
+```
+
+```{r}
+spaghetti_data <- bind_rows(
+  aggregate_stage(mat_neo_data, magnesium_sulphate),
+  aggregate_stage(mat_neo_data, corticosteroids),
+  aggregate_stage(mat_neo_data, antibiotics),
+  aggregate_stage(mat_neo_data, optimal_cord_management),
+  aggregate_stage(mat_neo_data, normothermia),
+  aggregate_stage(mat_neo_data, maternal_breast_milk),
+  aggregate_stage(mat_neo_data, place_of_birth)
+  # aggregate_stage(mat_neo_data, caffeine), #not included in orignal chart, why?
+  # aggregate_stage(mat_neo_data, volume_targeted_ventilation) #ditto
+)
+
+visualise_line(
+  df = spaghetti_data,
+  aes_group = expr(intervention),
+  aes_colour = expr(intervention),
+  hline_colour = "black",
+  annotate_x = "2023/24 Q4",
+  annotate_y = 0.8,
+  subtitle_string = "Percentage of organisations reporting all implementation stages at level 7, by intervention"
+) +
+  geom_line() +
+  geom_point(size = 2) +
+  ggsci::scale_colour_jco()
+```
+
+# MatNeoSIP - Deterioration Tools
+
+## temporary title
+
+```{r}
+aggregate_int(mat_neo_data, expr(quarter == report_quarter), newtt2) |>
+  visualise_bars(
+    newtt2,
+    "NEWTT2"
+  )
+```
+
+```{r}
+aggregate_int(mat_neo_data, expr(quarter == report_quarter), mews) |> visualise_bars(
+  mews,
+  "MEWS"
+)
+```
+
+```{r}
+mat_neo_agg_newtt2_quarter <- mat_neo_data |>
+  select(quarter, organisation, newtt2) |>
+  filter(
+    newtt2 != "N/A", # had to use this for 2022/23 Q4 - Four orgs had this value
+    !is.na(newtt2) # not a fan of this filter because it makes denominators smaller than in other bar charts
+  ) |>
+  group_by(quarter, newtt2) |>
+  summarise(n = n()) |>
+  ungroup() |>
+  group_by(quarter) |>
+  mutate(
+    total = sum(n),
+    percentage = (n / total)
+  ) |>
+  ungroup()
+
+# why do we have a plot by quarter only for NEWTT2 and MEWS
+visualise_bars(
+  df = mat_neo_agg_newtt2_quarter,
+  intervention = newtt2,
+  intervention_name = "Share of implementation stages across organisations reporting at stage 1 or above\n(Note: Denominators change between quarters)",
+  aes_x = expr(quarter),
+  plot_title = "Adoption of NEWTT2 across NHS organisations",
+  plot_caption = element_blank()
+)
+```
+
+```{r}
+mat_neo_agg_mews_quarter <- mat_neo_data |>
+  select(quarter, organisation, mews) |>
+  filter(
+    mews != "N/A", # had to use this for 2022/23 Q1 and Q4 -
+    !is.na(mews) # not a fan of this filter because it makes denominators smaller than in spaghetti chart
+  ) |>
+  group_by(quarter, mews) |>
+  summarise(n = n()) |>
+  ungroup() |>
+  group_by(quarter) |>
+  mutate(
+    total = sum(n),
+    percentage = (n / total)
+  ) |>
+  ungroup()
+
+
+visualise_bars(
+  df = mat_neo_agg_mews_quarter,
+  intervention = mews,
+  intervention_name = "Share of implementation stages across organisations reporting at stage 1 or above\n(Note: Denominators change between quarters)",
+  aes_x = expr(quarter),
+  plot_title = "Adoption of MEWS across NHS organisations",
+  plot_caption = element_blank()
+)
+```
