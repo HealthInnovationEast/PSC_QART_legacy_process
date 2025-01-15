@@ -360,7 +360,7 @@ visualise_line(
   hline_colour = "navy",
   annotate_x = "2023/24 Q4",
   annotate_y = 0.70,
-  subtitle_string = "Percentage of organisations reporting implementation of all 9 optimisation interventions at stage level 7"
+  subtitle_string = "Percentage of organisations reporting implementation of all 9 optimisation interventions at stage 7"
 ) +
   geom_line(colour = "#660066") +
   geom_point(
