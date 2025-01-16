@@ -36,7 +36,7 @@ organisations <- submissions_data |>
 #API replacement
 #some of the manual replacements below are temporary, need to find files or API that has old names
 trusts <- organisations |>
-  distinct(organisation) |>
+  distinct(psc, organisation) |>
    mutate(organisation_tidy = case_when(
      organisation == "UNITED LINCOLNSHIRE HOSPITALS NHS TRUST" ~ 
        "UNITED LINCOLNSHIRE TEACHING HOSPITALS NHS TRUST", #old templates systematically omitted 'teaching'
@@ -72,7 +72,7 @@ distinct_trusts <- trusts |>
   distinct(organisation_tidy, url_end)
   
 #query by looking at name
-org_links <- apply(distinct_trusts[,2], 1, function(url_end) {
+call_org_links <- apply(distinct_trusts[,2], 1, function(url_end) {
   
   search_trust <- url_end |> 
     str_replace_all("%20", " ") |>
@@ -97,8 +97,6 @@ org_links <- apply(distinct_trusts[,2], 1, function(url_end) {
     api_org_role = trust$Organisations[[1]]$PrimaryRoleDescription
     api_org_code = trust$Organisations[[1]]$OrgId
     api_org_name = trust$Organisations[[1]]$Name
-    #unsure this means what I think it means
-    #api_org_status = trust$Organisations[[1]]$Status
     api_org_link = trust$Organisations[[1]]$OrgLink
   } else {
     #there are multiple hits produced in call and we want to determine which is relevant
@@ -112,8 +110,6 @@ org_links <- apply(distinct_trusts[,2], 1, function(url_end) {
         api_org_role = trust$Organisations[[hit_id]]$PrimaryRoleDescription
         api_org_code = trust$Organisations[[hit_id]]$OrgId
         api_org_name = trust$Organisations[[hit_id]]$Name
-        #unsure this means what I think it means
-        #api_org_status = trust$Organisations[[1]]$Status
         api_org_link = trust$Organisations[[hit_id]]$OrgLink
       }
     }
@@ -132,16 +128,57 @@ org_links <- apply(distinct_trusts[,2], 1, function(url_end) {
   as.data.frame()
 
 
-#go on and query ICBs and end dates of inactive orgs in another API call
+#query end dates of defunct orgs in another API call
 
-org_calls <- org_links |>
-  distinct(api_org_link) |>
-  head(1)
+org_calls <- call_org_links |>
+  distinct(api_org_link)
 
-org_status <- apply(org_calls, 1, function(api_org_link) {
+call_org_end_dates <- apply(org_calls, 1, function(api_org_link) {
   
   trust_info <- content(GET(api_org_link))
-  trust_info$Organisation$Date
+  
+  api_org_code = trust_info$Organisation$OrgId$extension
+  api_org_date <- trust_info$Organisation$Date
+  
+  date_elements <- as.numeric(length(api_org_date))
+  
+  if (date_elements > 1){
+    for (element in 1:date_elements){
+      date_type <- api_org_date[element][[1]]$Type
+      
+      if (date_type == 'Legal') {
+         #api_date_info <- unlist(api_org_date[element])
+         api_date_type <- date_type
+         api_date_start <- api_org_date[element][[1]]$Start
+         api_date_end <- api_org_date[element][[1]]$End
+       }
+    }
+  } else {
+    date_type <- api_org_date[1][[1]]$Type
+    api_date_type <- date_type
+    api_date_start <- api_org_date[1][[1]]$Start
+    #api_date_end <- NA
+    api_date_end <- api_org_date[1][[1]]$End
+  }
+  
+  tibble(api_org_link, 
+         api_org_code, 
+         api_date_type,
+         api_date_start,
+         api_date_end
+         )
 }) |> 
   bind_rows() |>
-  as.data.frame()
+  as.data.frame() 
+
+#left_join results from both calls 
+trusts_api_info <- trusts |> 
+  left_join(call_org_links, by = "url_end") |> 
+  left_join(call_org_end_dates, by = c("api_org_link", "api_org_code")) 
+
+#organisations to remove from Q3 24/25 templates
+trusts_api_info |> 
+  filter(!is.na(api_date_end)) |>
+  View()
+
+#TO DO: retrieve ICB mapping
