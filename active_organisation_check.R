@@ -186,7 +186,7 @@ trusts_api_info <- trusts |>
 # organisations to remove from Q3 24/25 templates
 date_series <- seq(
   from = as.Date("2021-04-01"),
-  to = as.Date("2024-09-30"),
+  to = as.Date("2024-09-30"), #TO DO: make object to store value of end date of previous reporting quarter
   by = "day"
 )
 
