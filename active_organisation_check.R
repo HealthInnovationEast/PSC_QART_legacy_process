@@ -8,16 +8,7 @@ library(jsonlite)
 library(lubridate)
 
 # find latest submission data
-files <- list.files(
-  path = here::here("data"),
-  full.names = T
-)
-
-file_info <- file.info(files)
-
-most_recent <- row.names(file_info)[which.max(file_info$mtime)]
-
-submissions_data <- read_excel(most_recent, sheet = "Data") |>
+submissions_data <- read_excel(here('data', 'MatNeoSIP.xlsx'), sheet = "Data") |>
   clean_names() |>
   rename(
     "stage_7_all" = "stage_7",
@@ -63,14 +54,7 @@ trusts <- organisations |>
   )) |>
   # URL links don't do white spaces nor apostrophes, so we encode them instead
   mutate(
-    organisation_shorter = case_when(
-      # do not remove nhsft from isle of wight, because there's an org called isle of wight healthcare
-      str_detect(organisation_tidy, "^ISLE OF WIGHT") ~ paste0(organisation_tidy),
-      # otherwise, remove all instances of nhs trust and nhs foundation trust
-      # to make results more succinct
-      .default = str_remove_all(organisation_tidy, "(?i) (nhs|nhs foundation) trust")
-    ),
-    organisation_shorter = str_trim(organisation_shorter), # can't figure out why str_remove_all introduces trailing white space
+    organisation_shorter = str_remove_all(organisation_tidy, "(?i) (nhs|nhs foundation) trust"),
     url_end = str_replace_all(
       organisation_shorter,
       "'", "%27"
@@ -79,7 +63,7 @@ trusts <- organisations |>
   )
 
 distinct_trusts <- trusts |>
-  distinct(organisation_tidy, url_end)
+  distinct(organisation_tidy, url_end) 
 
 # query by looking at name
 call_org_links <- apply(distinct_trusts[, 2], 1, function(url_end) {
@@ -87,13 +71,15 @@ call_org_links <- apply(distinct_trusts[, 2], 1, function(url_end) {
     str_replace_all("%20", " ") |>
     str_replace_all("%27", "'")
 
-  print(glue::glue("Now looking for {search_trust}")) 
+  print(glue::glue("Now looking for {search_trust}...")) 
   # trust <- content(GET(paste0('https://directory.spineservices.nhs.uk/ORD/2-0-0/organisations/?Name=', url_end)))
   trust <- content(GET(paste0("https://directory.spineservices.nhs.uk/ORD/2-0-0/organisations/?PrimaryRoleId=RO197&Name=", url_end)))
 
   # there might be multiple results from query, but we're only after NHS Trusts
   hits <- as.numeric(length(trust$Organisations))
-  glue::glue("Search has retrieved {hits} hit(s)") # won't print :(
+  print(glue::glue("Call has retrieved {hits} hit(s)")) 
+  
+  api_n_hits <- hits
 
   if (hits == 0) {
     api_org_role <- NA
@@ -101,41 +87,71 @@ call_org_links <- apply(distinct_trusts[, 2], 1, function(url_end) {
     api_org_name <- NA
     # api_org_status = NA
     api_org_link <- NA
+    api_hit <- NA
+    
   } else if (hits == 1) {
     # assume the 1 result is correct
     api_org_role <- trust$Organisations[[1]]$PrimaryRoleDescription
     api_org_code <- trust$Organisations[[1]]$OrgId
     api_org_name <- trust$Organisations[[1]]$Name
     api_org_link <- trust$Organisations[[1]]$OrgLink
+    api_hit <- hits
+    
   } else {
     # there are multiple hits produced in call and we want to determine which is relevant
     for (hit in 1:hits) {
       name_retrieved <- trust$Organisations[[hit]]$Name
+      status <- trust$Organisations[[hit]]$Status
 
       # the name retrieved has got to match the beginning of the string
-      if (str_detect(name_retrieved, paste0("^", search_trust))) {
+      # and it has to correspond to an organisation that's operationally active
+      if (str_detect(name_retrieved, paste0("^", search_trust)) & status == 'Active') {
         hit_id <- hit
 
         api_org_role <- trust$Organisations[[hit_id]]$PrimaryRoleDescription
         api_org_code <- trust$Organisations[[hit_id]]$OrgId
         api_org_name <- trust$Organisations[[hit_id]]$Name
         api_org_link <- trust$Organisations[[hit_id]]$OrgLink
+        api_hit <- hit_id
+        
+        print(glue::glue("Final result was retrieved from hit {hit_id}"))
       }
     }
   }
 
   # put results together
   tibble(
+    url_end,
+    api_n_hits,
+    api_hit,
     api_org_role,
     api_org_code,
     api_org_name,
-    api_org_link,
-    url_end
+    api_org_link
   )
 }) |>
-  bind_rows() |>
-  as.data.frame()
+  bind_rows() 
 
+#QA check 
+qa_multiple_hits <- call_org_links |> 
+  filter(api_n_hits > 1)
+
+# QA check compare org name used historically in templates vs. official name (from api)
+# these will be the trusts to change in the templates
+qa_name_discrepancies <- trusts |>
+  left_join(call_org_links, by = "url_end") |>
+  filter(organisation != api_org_name) |>
+  select(psc, 
+         url_end,
+         api_n_hits,
+         api_hit,
+         api_org_code,
+         api_org_name,
+         organisation,
+         organisation_tidy, 
+         organisation_shorter
+         ) |>
+  arrange(psc)
 
 # query end dates of defunct orgs in another API call
 
@@ -175,8 +191,7 @@ call_org_end_dates <- apply(org_calls, 1, function(api_org_link) {
     api_date_end
   )
 }) |>
-  bind_rows() |>
-  as.data.frame()
+  bind_rows()
 
 # left_join results from both calls
 trusts_api_info <- trusts |>
@@ -219,11 +234,6 @@ trusts_api_info |>
   arrange(valid_until_quarter) #|>
 # View()
 
-# organisations that need updating
-trusts_api_info |>
-  filter(organisation != api_org_name) |>
-  select(psc, organisation, api_org_name) |>
-  View()
 
 # TO DO: retrieve ICB mapping
 # output has to be mapping of active orgs for a quarter
