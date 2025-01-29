@@ -66,21 +66,21 @@ distinct_trusts <- trusts |>
   distinct(organisation_tidy, url_end) 
 
 # query by looking at name
-call_org_links <- apply(distinct_trusts[, 2], 1, function(url_end) {
+call_by_name <- function(url_end) {
   search_trust <- url_end |>
     str_replace_all("%20", " ") |>
     str_replace_all("%27", "'")
-
+  
   print(glue::glue("Now looking for {search_trust}...")) 
   # trust <- content(GET(paste0('https://directory.spineservices.nhs.uk/ORD/2-0-0/organisations/?Name=', url_end)))
   trust <- content(GET(paste0("https://directory.spineservices.nhs.uk/ORD/2-0-0/organisations/?PrimaryRoleId=RO197&Name=", url_end)))
-
+  
   # there might be multiple results from query, but we're only after NHS Trusts
   hits <- as.numeric(length(trust$Organisations))
   print(glue::glue("Call has retrieved {hits} hit(s)")) 
   
   api_n_hits <- hits
-
+  
   if (hits == 0) {
     api_org_role <- NA
     api_org_code <- NA
@@ -102,12 +102,12 @@ call_org_links <- apply(distinct_trusts[, 2], 1, function(url_end) {
     for (hit in 1:hits) {
       name_retrieved <- trust$Organisations[[hit]]$Name
       status <- trust$Organisations[[hit]]$Status
-
+      
       # the name retrieved has got to match the beginning of the string
       # and it has to correspond to an organisation that's operationally active
       if (str_detect(name_retrieved, paste0("^", search_trust)) & status == 'Active') {
         hit_id <- hit
-
+        
         api_org_role <- trust$Organisations[[hit_id]]$PrimaryRoleDescription
         api_org_code <- trust$Organisations[[hit_id]]$OrgId
         api_org_name <- trust$Organisations[[hit_id]]$Name
@@ -118,9 +118,9 @@ call_org_links <- apply(distinct_trusts[, 2], 1, function(url_end) {
       }
     }
   }
-
+  
   # put results together
-  tibble(
+  df <- tibble(
     url_end,
     api_n_hits,
     api_hit,
@@ -128,8 +128,12 @@ call_org_links <- apply(distinct_trusts[, 2], 1, function(url_end) {
     api_org_code,
     api_org_name,
     api_org_link
-  )
-}) |>
+  ) 
+  
+  return(df)
+}
+
+call_org_links <- apply(distinct_trusts[, 2], 1,  call_by_name) |> 
   bind_rows() 
 
 #QA check 
