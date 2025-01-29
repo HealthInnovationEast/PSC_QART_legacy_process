@@ -68,7 +68,7 @@ trusts <- organisations |>
       str_detect(organisation_tidy, "^ISLE OF WIGHT") ~ paste0(organisation_tidy),
       # otherwise, remove all instances of nhs trust and nhs foundation trust
       # to make results more succinct
-      .default = str_remove_all(organisation_tidy, "(?i)(nhs|nhs foundation) trust")
+      .default = str_remove_all(organisation_tidy, "(?i) (nhs|nhs foundation) trust")
     ),
     organisation_shorter = str_trim(organisation_shorter), # can't figure out why str_remove_all introduces trailing white space
     url_end = str_replace_all(
@@ -87,7 +87,7 @@ call_org_links <- apply(distinct_trusts[, 2], 1, function(url_end) {
     str_replace_all("%20", " ") |>
     str_replace_all("%27", "'")
 
-  glue::glue("Now looking for {search_trust}") # doesn't print :(
+  print(glue::glue("Now looking for {search_trust}")) 
   # trust <- content(GET(paste0('https://directory.spineservices.nhs.uk/ORD/2-0-0/organisations/?Name=', url_end)))
   trust <- content(GET(paste0("https://directory.spineservices.nhs.uk/ORD/2-0-0/organisations/?PrimaryRoleId=RO197&Name=", url_end)))
 
