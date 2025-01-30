@@ -71,7 +71,7 @@ call_by_name <- function(url_end) {
     str_replace_all("%20", " ") |>
     str_replace_all("%27", "'")
   
-  print(glue::glue("Now looking for {search_trust}...")) 
+  print(glue::glue("**Now looking for {search_trust}**")) 
   # trust <- content(GET(paste0('https://directory.spineservices.nhs.uk/ORD/2-0-0/organisations/?Name=', url_end)))
   trust <- content(GET(paste0("https://directory.spineservices.nhs.uk/ORD/2-0-0/organisations/?PrimaryRoleId=RO197&Name=", url_end)))
   
@@ -120,7 +120,7 @@ call_by_name <- function(url_end) {
   }
   
   # put results together
-  df <- tibble(
+  tibble(
     url_end,
     api_n_hits,
     api_hit,
@@ -129,14 +129,12 @@ call_by_name <- function(url_end) {
     api_org_name,
     api_org_link
   ) 
-  
-  return(df)
 }
 
 call_org_links <- apply(distinct_trusts[, 2], 1,  call_by_name) |> 
   bind_rows() 
 
-#QA check 
+#QA check results for calls where there was >1 hit  
 qa_multiple_hits <- call_org_links |> 
   filter(api_n_hits > 1)
 
@@ -162,39 +160,76 @@ qa_name_discrepancies <- trusts |>
 org_calls <- call_org_links |>
   distinct(api_org_link)
 
-call_org_end_dates <- apply(org_calls, 1, function(api_org_link) {
+call_by_org_link <- function(api_org_link){
   trust_info <- content(GET(api_org_link))
-
+  
   api_org_code <- trust_info$Organisation$OrgId$extension
+  api_org_name <- trust_info$Organisation$Name
   api_org_date <- trust_info$Organisation$Date
-
+  
+  print(glue::glue("** Getting mapping for {api_org_name} **"))
+  
   date_elements <- as.numeric(length(api_org_date))
-
-  if (date_elements > 1) {
-    for (element in 1:date_elements) {
-      date_type <- api_org_date[element][[1]]$Type
-
-      if (date_type == "Legal") {
-        api_date_type <- date_type
-        api_date_start <- api_org_date[element][[1]]$Start
-        api_date_end <- api_org_date[element][[1]]$End
+  
+  print(glue::glue("Found {date_elements} date type(s)"))
+  
+  # if there's only one date type, it is operational
+  # and operational date start would be the same as legal date start and no end date recorded
+  # https://www.odsdatasearchandexport.nhs.uk/?search=generalorg&query=RJR
+  # compare above result from ODS ODS portal vs API call below
+  # https://directory.spineservices.nhs.uk/ORD/2-0-0/organisations/RJR
+  if (date_elements == 1){
+    date_type <- api_org_date[1][[1]]$Type
+    
+    if (date_type == 'Operational'){
+      api_date_type <- date_type
+      api_date_start <- api_org_date[1][[1]]$Start
+      #this should be NULL 
+      api_date_end <- api_org_date[1][[1]]$End
+      print(glue::glue("Retrieved {api_date_type} Date Info"))
+    }
+  } else if (date_elements == 2 ) {
+    # some orgs might have both operational AND Legal date types 
+    # check the legal type element to determine whether it is relevant 
+    date_type <- api_org_date[2][[1]]$Type
+    api_date_info <- names(api_org_date[[2]])
+    
+    if (date_type == 'Legal' & 'End' %in% api_date_info ){
+      # if the organisation has a legal end date, it is a legacy organisation 
+      # for which we want to retrieve end date and successor information
+      api_date_type <- date_type
+      api_date_start <- api_org_date[2][[1]]$Start
+      # This should be ALWAYS have a date
+      api_date_end <- api_org_date[2][[1]]$End
+      
+    } else {
+      # some orgs will have both date types but no end dates
+      # meaning the organisation is current but had a different start date operationally and legally 
+      # we fetch operational info as that was the approach used when there was only 1 date type assigned to org 
+      api_date_type <- api_org_date[1][[1]]$Type
+      
+      if (api_date_type == 'Operational'){
+        api_date_start <- api_org_date[1][[1]]$Start
+        # This should be NULL because it won't exist
+        api_date_end <- api_org_date[1][[1]]$End
       }
     }
-  } else {
-    date_type <- api_org_date[1][[1]]$Type
-    api_date_type <- date_type
-    api_date_start <- api_org_date[1][[1]]$Start
-    api_date_end <- api_org_date[1][[1]]$End
+    
+    print(glue::glue("Retrieved {api_date_type} Date Info"))
   }
-
+  
   tibble(
     api_org_link,
     api_org_code,
+    api_org_name,
+    date_elements,
     api_date_type,
     api_date_start,
     api_date_end
   )
-}) |>
+}
+
+call_org_end_dates <- apply(org_calls, 1,  call_by_org_link) |>
   bind_rows()
 
 # left_join results from both calls
