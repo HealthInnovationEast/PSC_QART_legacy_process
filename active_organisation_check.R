@@ -8,7 +8,7 @@ library(jsonlite)
 library(lubridate)
 
 # find latest submission data
-submissions_data <- read_excel(here('data', 'MatNeoSIP.xlsx'), sheet = "Data") |>
+submissions_data <- read_excel(here("data", "MatNeoSIP.xlsx"), sheet = "Data") |>
   clean_names() |>
   rename(
     "stage_7_all" = "stage_7",
@@ -63,24 +63,24 @@ trusts <- organisations |>
   )
 
 distinct_trusts <- trusts |>
-  distinct(organisation_tidy, url_end) 
+  distinct(organisation_tidy, url_end)
 
 # query by looking at name
 call_by_name <- function(url_end) {
   search_trust <- url_end |>
     str_replace_all("%20", " ") |>
     str_replace_all("%27", "'")
-  
-  print(glue::glue("**Now looking for {search_trust}**")) 
+
+  print(glue::glue("**Now looking for {search_trust}**"))
   # trust <- content(GET(paste0('https://directory.spineservices.nhs.uk/ORD/2-0-0/organisations/?Name=', url_end)))
   trust <- content(GET(paste0("https://directory.spineservices.nhs.uk/ORD/2-0-0/organisations/?PrimaryRoleId=RO197&Name=", url_end)))
-  
+
   # there might be multiple results from query, but we're only after NHS Trusts
   hits <- as.numeric(length(trust$Organisations))
-  print(glue::glue("Call has retrieved {hits} hit(s)")) 
-  
+  print(glue::glue("Call has retrieved {hits} hit(s)"))
+
   api_n_hits <- hits
-  
+
   if (hits == 0) {
     api_org_role <- NA
     api_org_code <- NA
@@ -88,7 +88,6 @@ call_by_name <- function(url_end) {
     # api_org_status = NA
     api_org_link <- NA
     api_hit <- NA
-    
   } else if (hits == 1) {
     # assume the 1 result is correct
     api_org_role <- trust$Organisations[[1]]$PrimaryRoleDescription
@@ -96,29 +95,28 @@ call_by_name <- function(url_end) {
     api_org_name <- trust$Organisations[[1]]$Name
     api_org_link <- trust$Organisations[[1]]$OrgLink
     api_hit <- hits
-    
   } else {
     # there are multiple hits produced in call and we want to determine which is relevant
     for (hit in 1:hits) {
       name_retrieved <- trust$Organisations[[hit]]$Name
       status <- trust$Organisations[[hit]]$Status
-      
+
       # the name retrieved has got to match the beginning of the string
       # and it has to correspond to an organisation that's operationally active
-      if (str_detect(name_retrieved, paste0("^", search_trust)) & status == 'Active') {
+      if (str_detect(name_retrieved, paste0("^", search_trust)) & status == "Active") {
         hit_id <- hit
-        
+
         api_org_role <- trust$Organisations[[hit_id]]$PrimaryRoleDescription
         api_org_code <- trust$Organisations[[hit_id]]$OrgId
         api_org_name <- trust$Organisations[[hit_id]]$Name
         api_org_link <- trust$Organisations[[hit_id]]$OrgLink
         api_hit <- hit_id
-        
+
         print(glue::glue("Final result was retrieved from hit {hit_id}"))
       }
     }
   }
-  
+
   # put results together
   tibble(
     url_end,
@@ -128,14 +126,14 @@ call_by_name <- function(url_end) {
     api_org_code,
     api_org_name,
     api_org_link
-  ) 
+  )
 }
 
-call_org_links <- apply(distinct_trusts[, 2], 1,  call_by_name) |> 
-  bind_rows() 
+call_org_links <- apply(distinct_trusts[, 2], 1, call_by_name) |>
+  bind_rows()
 
-#QA check results for calls where there was >1 hit  
-qa_multiple_hits <- call_org_links |> 
+# QA check results for calls where there was >1 hit
+qa_multiple_hits <- call_org_links |>
   filter(api_n_hits > 1)
 
 # QA check compare org name used historically in templates vs. official name (from api)
@@ -143,16 +141,17 @@ qa_multiple_hits <- call_org_links |>
 qa_name_discrepancies <- trusts |>
   left_join(call_org_links, by = "url_end") |>
   filter(organisation != api_org_name) |>
-  select(psc, 
-         url_end,
-         api_n_hits,
-         api_hit,
-         api_org_code,
-         api_org_name,
-         organisation,
-         organisation_tidy, 
-         organisation_shorter
-         ) |>
+  select(
+    psc,
+    url_end,
+    api_n_hits,
+    api_hit,
+    api_org_code,
+    api_org_name,
+    organisation,
+    organisation_tidy,
+    organisation_shorter
+  ) |>
   arrange(psc)
 
 # query end dates of defunct orgs in another API call
@@ -160,64 +159,63 @@ qa_name_discrepancies <- trusts |>
 org_calls <- call_org_links |>
   distinct(api_org_link)
 
-call_by_org_link <- function(api_org_link){
+call_by_org_link <- function(api_org_link) {
   trust_info <- content(GET(api_org_link))
-  
+
   api_org_code <- trust_info$Organisation$OrgId$extension
   api_org_name <- trust_info$Organisation$Name
   api_org_date <- trust_info$Organisation$Date
-  
+
   print(glue::glue("** Getting mapping for {api_org_name} **"))
-  
+
   date_elements <- as.numeric(length(api_org_date))
-  
+
   print(glue::glue("Found {date_elements} date type(s)"))
-  
+
   # if there's only one date type, it is operational
   # and operational date start would be the same as legal date start and no end date recorded
   # https://www.odsdatasearchandexport.nhs.uk/?search=generalorg&query=RJR
   # compare above result from ODS ODS portal vs API call below
   # https://directory.spineservices.nhs.uk/ORD/2-0-0/organisations/RJR
-  if (date_elements == 1){
+  if (date_elements == 1) {
     date_type <- api_org_date[1][[1]]$Type
-    
-    if (date_type == 'Operational'){
+
+    if (date_type == "Operational") {
       api_date_type <- date_type
       api_date_start <- api_org_date[1][[1]]$Start
-      #this should be NULL 
+      # this should be NULL
       api_date_end <- api_org_date[1][[1]]$End
       print(glue::glue("Retrieved {api_date_type} Date Info"))
     }
-  } else if (date_elements == 2 ) {
-    # some orgs might have both operational AND Legal date types 
-    # check the legal type element to determine whether it is relevant 
+  } else if (date_elements == 2) {
+    # some orgs might have both operational AND Legal date types
+    # check the legal type element to determine whether it is relevant
     date_type <- api_org_date[2][[1]]$Type
     api_date_info <- names(api_org_date[[2]])
-    
-    if (date_type == 'Legal' & 'End' %in% api_date_info ){
-      # if the organisation has a legal end date, it is a legacy organisation 
+
+    if (date_type == "Legal" & "End" %in% api_date_info) {
+      # if the organisation has a legal end date, it is a legacy organisation
       # for which we want to retrieve end date and successor information
       api_date_type <- date_type
       api_date_start <- api_org_date[2][[1]]$Start
       # This should be ALWAYS have a date
       api_date_end <- api_org_date[2][[1]]$End
-      
     } else {
       # some orgs will have both date types but no end dates
-      # meaning the organisation is current but had a different start date operationally and legally 
-      # we fetch operational info as that was the approach used when there was only 1 date type assigned to org 
+      # meaning the organisation is current but had a different start date operationally and legally
+      # we fetch operational info as that was the approach used when there was only 1 date type assigned to org
       api_date_type <- api_org_date[1][[1]]$Type
-      
-      if (api_date_type == 'Operational'){
+
+      if (api_date_type == "Operational") {
         api_date_start <- api_org_date[1][[1]]$Start
         # This should be NULL because it won't exist
         api_date_end <- api_org_date[1][[1]]$End
       }
     }
-    
+
     print(glue::glue("Retrieved {api_date_type} Date Info"))
   }
-  
+
   tibble(
     api_org_link,
     api_org_code,
@@ -229,29 +227,22 @@ call_by_org_link <- function(api_org_link){
   )
 }
 
-call_org_end_dates <- apply(org_calls, 1,  call_by_org_link) |>
+call_org_end_dates <- apply(org_calls, 1, call_by_org_link) |>
   bind_rows()
 
-# left_join results from both calls
-trusts_api_info <- trusts |>
-  left_join(call_org_links, by = "url_end") |>
-  left_join(call_org_end_dates, by = c("api_org_link", "api_org_code"))
-
 # organisations to remove from Q3 24/25 templates
-date_series <- seq(
-  from = as.Date("2021-04-01"),
-  to = as.Date("2024-09-30"), #TO DO: make object to store value of end date of previous reporting quarter
-  by = "day"
-)
-
-quarters <- lubridate::quarter(date_series, type = "year.quarter", fiscal_start = 4) |>
-  unique()
-
-qart_quarters <- data.frame(quarters) |>
-  rename("quarter_end" = quarters) |>
+qart_quarters <- tibble(
+  q_date = seq(
+    from = as.Date("2021-04-01"),
+    to = as.Date("2024-09-30"), # TO DO: make object to store value of end date of previous reporting quarter
+    by = "quarter"
+  )
+) |>
+  mutate(quarter = lubridate::quarter(q_date, type = "year.quarter", fiscal_start = 4)) |>
+  # rename("quarter_end" = quarters) |>
   mutate(
-    quarter_start = round(quarters - 1),
-    nhs_quarter = paste(quarter_start, quarter_end, sep = "/"),
+    quarter_fy_start = round(quarter - 1),
+    nhs_quarter = paste(quarter_fy_start, quarter, sep = "/"),
     nhs_quarter = str_replace(
       nhs_quarter,
       fixed("."),
@@ -259,7 +250,16 @@ qart_quarters <- data.frame(quarters) |>
     )
   )
 
-trusts_api_info |>
+# left_join results from both calls
+trusts_api_info <- trusts |>
+  left_join(call_org_links, by = "url_end") |>
+  left_join(call_org_end_dates, by = c(
+    "api_org_link",
+    "api_org_code",
+    "api_org_name"
+  ))
+
+qa_remove_trusts <- trusts_api_info |>
   filter(
     !is.na(api_date_end),
     api_date_end <= as.Date("2024-09-30")
@@ -269,9 +269,8 @@ trusts_api_info |>
     type = "year.quarter",
     fiscal_start = 4
   )) |>
-  left_join(qart_quarters, by = c("valid_until_quarter" = "quarter_end")) |>
-  arrange(valid_until_quarter) #|>
-# View()
+  left_join(qart_quarters, by = c("valid_until_quarter" = "quarter")) |>
+  arrange(valid_until_quarter)
 
 
 # TO DO: retrieve ICB mapping
