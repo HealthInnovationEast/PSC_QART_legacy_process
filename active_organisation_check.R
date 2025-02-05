@@ -48,6 +48,8 @@ trusts <- organisations |>
       "ROYAL DEVON UNIVERSITY HEALTHCARE NHS FOUNDATION TRUST", # name change after acquisition in April 2022
     organisation == "HOMERTON UNIVERSITY HOSPITAL NHS FOUNDATION TRUST" ~
       "HOMERTON HEALTHCARE NHS FOUNDATION TRUST", # name change effective from April 2022
+    organisation == "PENNINE ACUTE HOSPITALS NHS TRUST" ~
+      "NORTHERN CARE ALLIANCE NHS FOUNDATION TRUST", # name change after dissolution in October 2021
     organisation == "YORK TEACHING HOSPITAL NHS FOUNDATION TRUST" ~
       "YORK AND SCARBOROUGH TEACHING HOSPITALS NHS FOUNDATION TRUST", # name change effective from FY21/22
     .default = paste0(organisation)
@@ -177,6 +179,7 @@ call_by_org_link <- function(api_org_link) {
   # https://www.odsdatasearchandexport.nhs.uk/?search=generalorg&query=RJR
   # compare above result from ODS ODS portal vs API call below
   # https://directory.spineservices.nhs.uk/ORD/2-0-0/organisations/RJR
+
   if (date_elements == 1) {
     date_type <- api_org_date[1][[1]]$Type
 
@@ -185,6 +188,7 @@ call_by_org_link <- function(api_org_link) {
       api_date_start <- api_org_date[1][[1]]$Start
       # this should be NULL
       api_date_end <- api_org_date[1][[1]]$End
+      api_succ_code <- NA
       print(glue::glue("Retrieved {api_date_type} Date Info"))
     }
   } else if (date_elements == 2) {
@@ -198,8 +202,25 @@ call_by_org_link <- function(api_org_link) {
       # for which we want to retrieve end date and successor information
       api_date_type <- date_type
       api_date_start <- api_org_date[2][[1]]$Start
-      # This should be ALWAYS have a date
+      # this should be ALWAYS have a date
       api_date_end <- api_org_date[2][[1]]$End
+
+      # retrieve the successor
+      succ_info <- trust_info$Organisation$Succs$Succ
+      succ_orgs <- as.numeric(length(succ_info))
+
+      print("Successor/predecessor history:")
+
+      for (succ_org in 1:succ_orgs) {
+        succ_type <- trust_info$Organisation$Succs$Succ[[succ_org]]$Type
+        print(succ_type)
+
+        if (succ_type == "Successor") {
+          succ_org_n <- succ_org
+          # api_succ_date
+          api_succ_code <- trust_info$Organisation$Succs$Succ[[succ_org_n]]$Target$OrgId$extension
+        }
+      }
     } else {
       # some orgs will have both date types but no end dates
       # meaning the organisation is current but had a different start date operationally and legally
@@ -210,6 +231,7 @@ call_by_org_link <- function(api_org_link) {
         api_date_start <- api_org_date[1][[1]]$Start
         # This should be NULL because it won't exist
         api_date_end <- api_org_date[1][[1]]$End
+        api_succ_code <- NA
       }
     }
 
@@ -223,17 +245,42 @@ call_by_org_link <- function(api_org_link) {
     date_elements,
     api_date_type,
     api_date_start,
-    api_date_end
+    api_date_end,
+    api_succ_code
   )
 }
 
 call_org_end_dates <- apply(org_calls, 1, call_by_org_link) |>
-  bind_rows()
+  bind_rows() |>
+  relocate(api_date_end, .after = api_date_start)
+
+qa_multiple_date_types <- call_org_end_dates |>
+  filter(date_elements > 1)
+
+# do we already have info for legacy orgs?
+legacy_details <- call_org_end_dates |>
+  filter(!is.na(api_date_end)) |>
+  select(api_date_end, api_succ_code) |>
+  left_join(call_org_end_dates |> select(api_org_code, api_org_name),
+    by = c("api_succ_code" = "api_org_code")
+  ) |>
+  rename("api_succ_name" = api_org_name)
+
+trusts_api_info <- call_org_end_dates |>
+  left_join(legacy_details, by = c("api_date_end", "api_succ_code")) |>
+  mutate(
+    api_current_code = case_when(is.na(api_succ_code) ~ paste0(api_org_code),
+      .default = paste0(api_succ_code)
+    ),
+    api_current_org_name = case_when(is.na(api_succ_name) ~ paste0(api_org_name),
+      .default = paste0(api_succ_name)
+    )
+  )
 
 # organisations to remove from Q3 24/25 templates
 qart_quarters <- tibble(
   q_date = seq(
-    from = as.Date("2021-04-01"),
+    from = as.Date("2020-04-01"),
     to = as.Date("2024-09-30"), # TO DO: make object to store value of end date of previous reporting quarter
     by = "quarter"
   )
@@ -251,27 +298,31 @@ qart_quarters <- tibble(
   )
 
 # left_join results from both calls
-trusts_api_info <- trusts |>
+current_trust_map <- trusts |>
   left_join(call_org_links, by = "url_end") |>
-  left_join(call_org_end_dates, by = c(
+  left_join(current_trust_map, by = c(
     "api_org_link",
     "api_org_code",
     "api_org_name"
   ))
 
-qa_remove_trusts <- trusts_api_info |>
-  filter(
-    !is.na(api_date_end),
-    api_date_end <= as.Date("2024-09-30")
-  ) |>
-  select(psc, organisation, api_org_name, api_date_end) |>
-  mutate(valid_until_quarter = lubridate::quarter(api_date_end,
-    type = "year.quarter",
-    fiscal_start = 4
-  )) |>
-  left_join(qart_quarters, by = c("valid_until_quarter" = "quarter")) |>
-  arrange(valid_until_quarter)
-
-
 # TO DO: retrieve ICB mapping
 # output has to be mapping of active orgs for a quarter
+
+#potential logic for removals
+qa_duplicate_and_legacy_trusts <- current_trust_map |>
+  group_by(psc, api_current_code, api_current_org_name) |>
+  filter(n() > 1) |>
+  select(
+    psc, organisation, organisation_tidy, api_org_code,
+    api_date_end, api_succ_code,
+    api_current_code, api_current_org_name
+  ) |>
+  filter(api_date_end <= as.Date("2024-09-30") | is.na(api_date_end)) |>
+  mutate(valid_until_quarter = lubridate::quarter(api_date_end,
+                                                  type = "year.quarter",
+                                                  fiscal_start = 4
+  )) |>
+  left_join(qart_quarters, by = c("valid_until_quarter" = "quarter")) |>
+  mutate(removal = if_else(!is.na(api_date_end), 1, 0)) |>
+  arrange(api_current_code, valid_until_quarter)
