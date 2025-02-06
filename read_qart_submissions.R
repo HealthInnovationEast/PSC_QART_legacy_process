@@ -24,16 +24,14 @@ hin_folders <- dr$list_files() |>
   as.vector() |>
   unlist() # so that vector length reflects number of pscs
 
-# generate list with HIN name as individual elements?
-# hin_folders_list <- split(hin_folders , seq(nrow(hin_folders)))
-
 # empty list to save results form loop below
-results <- list()
+# results <- list()
 
-for (hin in hin_folders) {
+results <- tibble()
+
+for (hin in hin_folders[1:2]) {
   # identify submission
   hin_dir <- reslib$get_item(glue::glue("Measurement/QART/{hin}"))
-  # print(hin_dir)
 
   hin_files <- hin_dir$list_files()
   # print(hin_files)
@@ -41,11 +39,23 @@ for (hin in hin_folders) {
   hin_submission_file <- hin_files |>
     select(name) |>
     # submissions must be saved with returned ending on file name
-    filter(str_detect(name, "returned"))
+    filter(str_detect(name, "(?i)returned"))
+
+  if (nrow(hin_submission_file) == 0) {
+    print(glue::glue("Skipping {hin}"))
+    print(glue::glue("There are no returned files"))
+    next
+  }
+
+  if (nrow(hin_submission_file) > 1) {
+    print(glue::glue("Skipping {hin}"))
+    print(glue::glue("There are multiple returned files: {hin_submission_file}"))
+    next
+  }
 
   hin_submission <- hin_dir$get_item(hin_submission_file)
 
-  # download file and store temporarily
+  # # download file and store temporarily
   tf <- tempfile(
     pattern = str_remove(hin_submission_file, fixed(".xlsx")),
     fileext = ".xlsx"
@@ -72,33 +82,70 @@ for (hin in hin_folders) {
     row_to_names(row_number = 2) |>
     remove_empty("rows")
 
-  # cut 2 newtt2 data
-  nwwtt2_coordinates <- which(data == "NEWTT 2", arr.ind = T)
-  nwwtt2_row <- nwwtt2_coordinates[1:1]
+  # validation - if cells are blank don't continue with upload
+  if (purrr::is_empty(which(is.na(data_opt_tidy))) == FALSE) {
+    print(glue::glue("Skipping {hin}"))
+    print("Optimisation data grid was not fully complete")
+    next
+  }
 
-  data_nwwtt2 <- data[nwwtt2_row:37, 1:3] |>
+  # cut 2 newtt2 data
+  data_nwwtt2_mews <- data[22:46, 1:6]
+
+  nwwtt2_location <- data.frame(which(data_nwwtt2_mews == "NEWTT 2", arr.ind = T))
+  # validation
+
+  if (nwwtt2_location$col != 3) {
+    print(glue::glue("Skipping {hin}"))
+    print("NWWTT2 data not found in expected location")
+    next
+  }
+
+  data_nwwtt2 <- data_nwwtt2_mews[, 1:nwwtt2_location$col] |>
     tail(-2)
 
   names(data_nwwtt2) <- c("ICB", "Trust", "Newtt2")
 
   data_nwwtt2_tidy <- data_nwwtt2 |>
     remove_empty("rows")
+  # validation
+  if (purrr::is_empty(which(is.na(data_nwwtt2_tidy))) == FALSE) {
+    print(glue::glue("Skipping {hin}"))
+    print("NWWTT2 grid was not fully complete")
+    next
+  }
 
   # cut 3 mews data
-  mews_coordinates <- which(data == "MEWS", arr.ind = T)
-  mews_row <- mews_coordinates[1:1]
-  mews_col <- mews_coordinates[3]
+  mews_location <- data.frame(which(data_nwwtt2_mews == "MEWS", arr.ind = T))
 
-  data_mews <- data[mews_row:37, c(1:2, mews_col)] |>
+  # validation
+
+  if (mews_location$col != 5) {
+    print(glue::glue("Skipping {hin}"))
+    print("MEWS data not found in expected location")
+    next
+  }
+
+  data_mews <- data_nwwtt2_mews[, c(1:2, mews_location$col)] |>
     tail(-2)
 
   names(data_mews) <- c("ICB", "Trust", "Mews")
 
   data_mews_tidy <- data_mews |>
     remove_empty("rows")
+  # validation
+  if (purrr::is_empty(which(is.na(data_mews_tidy))) == FALSE) {
+    print(glue::glue("Skipping {hin}"))
+    print("MEWS grid was not fully complete")
+    next
+  }
 
   # now join all 3 cuts
   data_combined <- data_opt_tidy |>
+    mutate(
+      hin_name = hin,
+      .before = ICB
+    ) |>
     left_join(data_nwwtt2_tidy, by = c("ICB", "Trust")) |>
     left_join(data_mews_tidy, by = c("ICB", "Trust")) |>
     mutate(
@@ -106,11 +153,11 @@ for (hin in hin_folders) {
       .after = Trust
     )
 
-  results[[hin]] <- data_combined
-}
+  # results[[hin]] <- data_combined
 
-data_combined <- do.call(rbind, results) |>
-  rownames_to_column("psc_origin_row")
+  results <- results |>
+    bind_rows(data_combined)
+}
 
 # write
 quarter_string <- reporting_quarter |>
