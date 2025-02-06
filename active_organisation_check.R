@@ -298,9 +298,9 @@ qart_quarters <- tibble(
   )
 
 # left_join results from both calls
-current_trust_map <- trusts |>
+map_current_trust <- trusts |>
   left_join(call_org_links, by = "url_end") |>
-  left_join(current_trust_map, by = c(
+  left_join(trusts_api_info, by = c(
     "api_org_link",
     "api_org_code",
     "api_org_name"
@@ -308,9 +308,73 @@ current_trust_map <- trusts |>
 
 # TO DO: retrieve ICB mapping
 # output has to be mapping of active orgs for a quarter
+current_trust_codes <- map_current_trust |>
+  distinct(api_current_code)
 
-#potential logic for removals
-qa_duplicate_and_legacy_trusts <- current_trust_map |>
+call_icb_code <- function(api_current_code) {
+  trust_info <- content(GET(paste0("https://directory.spineservices.nhs.uk/ORD/2-0-0/organisations/", api_current_code)))
+
+  api_current_org_name <- trust_info$Organisation$Name
+
+  print(glue::glue("** Getting ICB code for {api_current_org_name} **"))
+
+  relationships <- length(trust_info$Organisation$Rels$Rel)
+
+  for (relationship in 1:relationships) {
+    rel_id <- trust_info$Organisation$Rels$Rel[[relationship]]$id
+    rel_status <- trust_info$Organisation$Rels$Rel[[relationship]]$Status
+    if (rel_id == "RE5" & rel_status == "Active") { # RE5 is the ICB relationship
+      rel_n <- relationship # extract relationship number
+      print(glue::glue("Index of relationship extracted: {rel_n}"))
+    }
+  }
+
+  api_icb_code <- trust_info$Organisation$Rels$Rel[[rel_n]]$Target$OrgId$extension
+
+  tibble(
+    api_current_code,
+    api_current_org_name,
+    api_icb_code
+  )
+}
+
+call_org_icb_org_codes <- apply(current_trust_codes, 1, call_icb_code) |>
+  bind_rows()
+
+# retrieve all icb names
+link <- paste0(
+  "https://directory.spineservices.nhs.uk/ORD/2-0-0/organisations",
+  "?PrimaryRoleId=RO261",
+  "&Name=integrated%20care%20board",
+  "&Limit=1000"
+)
+
+all_icbs <- content(GET(link))
+
+call_icb_names <- data.frame()
+
+for (icb in 1:length(all_icbs$Organisations)) {
+  api_icb_code <- all_icbs$Organisations[[icb]]$OrgId
+  api_icb_name <- all_icbs$Organisations[[icb]]$Name
+
+  call_icb_names[icb, "api_icb_code"] <- api_icb_code
+  call_icb_names[icb, "api_icb_name"] <- api_icb_name
+}
+
+# map of icb details
+map_current_trust_icb_details <- map_current_trust |>
+  left_join(call_org_icb_org_codes, c("api_current_code", "api_current_org_name")) |>
+  left_join(call_icb_names, c("api_icb_code"))
+
+# output
+map_psc_current_trust_icb <- map_current_trust_icb_details |>
+  distinct(
+    psc, api_icb_code, api_icb_name,
+    api_current_code, api_current_org_name
+  )
+
+# potential logic for removals
+qa_duplicate_and_legacy_trusts <- map_current_trust |>
   group_by(psc, api_current_code, api_current_org_name) |>
   filter(n() > 1) |>
   select(
@@ -320,8 +384,8 @@ qa_duplicate_and_legacy_trusts <- current_trust_map |>
   ) |>
   filter(api_date_end <= as.Date("2024-09-30") | is.na(api_date_end)) |>
   mutate(valid_until_quarter = lubridate::quarter(api_date_end,
-                                                  type = "year.quarter",
-                                                  fiscal_start = 4
+    type = "year.quarter",
+    fiscal_start = 4
   )) |>
   left_join(qart_quarters, by = c("valid_until_quarter" = "quarter")) |>
   mutate(removal = if_else(!is.na(api_date_end), 1, 0)) |>
