@@ -103,7 +103,7 @@ call_by_name <- function(url_end) {
   } else {
     # there are multiple hits produced in call and we want to determine which is relevant
     #setup counter for how many hits were potentially correct
-    status <- 0
+    n_status <- 0
     hit_id <- NA
     for (hit in 1:hits) {
       name_retrieved <- trust$Organisations[[hit]]$Name
@@ -111,11 +111,14 @@ call_by_name <- function(url_end) {
        # the name retrieved has got to match the beginning of the string
       # and it has to correspond to an organisation that's operationally active
       hit_active <- str_detect(name_retrieved, paste0("^", search_trust)) & status == "Active"
-      hit_id <- hit 
-      status <- status + 1 
+      if (hit_active){
+        hit_id <- hit 
+        n_status <- n_status + 1 
+      }
     }
     
-    if(status==1){
+    print(str_glue("There were {n_status} hits matching our criteria"))
+    if(n_status==1){
       
       api_org_role <- trust$Organisations[[hit_id]]$PrimaryRoleDescription
       api_org_code <- trust$Organisations[[hit_id]]$OrgId
