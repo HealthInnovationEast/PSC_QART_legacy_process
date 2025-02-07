@@ -75,7 +75,10 @@ call_by_name <- function(url_end) {
 
   print(glue::glue("**Now looking for {search_trust}**"))
   # trust <- content(GET(paste0('https://directory.spineservices.nhs.uk/ORD/2-0-0/organisations/?Name=', url_end)))
-  trust <- content(GET(paste0("https://directory.spineservices.nhs.uk/ORD/2-0-0/organisations/?PrimaryRoleId=RO197&Name=", url_end)))
+  trust <- content(GET(paste0(
+    "https://directory.spineservices.nhs.uk/ORD/2-0-0/organisations/?PrimaryRoleId=RO197&Name=",
+    url_end
+  )))
 
   # there might be multiple results from query, but we're only after NHS Trusts
   hits <- as.numeric(length(trust$Organisations))
@@ -138,32 +141,12 @@ call_org_links <- apply(distinct_trusts[, 2], 1, call_by_name) |>
 qa_multiple_hits <- call_org_links |>
   filter(api_n_hits > 1)
 
-# QA check compare org name used historically in templates vs. official name (from api)
-# these will be the trusts to change in the templates
-qa_name_discrepancies <- trusts |>
-  left_join(call_org_links, by = "url_end") |>
-  filter(organisation != api_org_name) |>
-  select(
-    psc,
-    url_end,
-    api_n_hits,
-    api_hit,
-    api_org_code,
-    api_org_name,
-    organisation,
-    organisation_tidy,
-    organisation_shorter
-  ) |>
-  arrange(psc)
-
 # query end dates of defunct orgs in another API call
-
 org_calls <- call_org_links |>
   distinct(api_org_link)
 
 call_by_org_link <- function(api_org_link) {
   trust_info <- content(GET(api_org_link))
-
   api_org_code <- trust_info$Organisation$OrgId$extension
   api_org_name <- trust_info$Organisation$Name
   api_org_date <- trust_info$Organisation$Date
@@ -257,27 +240,7 @@ call_org_end_dates <- apply(org_calls, 1, call_by_org_link) |>
 qa_multiple_date_types <- call_org_end_dates |>
   filter(date_elements > 1)
 
-# do we already have info for legacy orgs?
-legacy_details <- call_org_end_dates |>
-  filter(!is.na(api_date_end)) |>
-  select(api_date_end, api_succ_code) |>
-  left_join(call_org_end_dates |> select(api_org_code, api_org_name),
-    by = c("api_succ_code" = "api_org_code")
-  ) |>
-  rename("api_succ_name" = api_org_name)
-
-trusts_api_info <- call_org_end_dates |>
-  left_join(legacy_details, by = c("api_date_end", "api_succ_code")) |>
-  mutate(
-    api_current_code = case_when(is.na(api_succ_code) ~ paste0(api_org_code),
-      .default = paste0(api_succ_code)
-    ),
-    api_current_org_name = case_when(is.na(api_succ_name) ~ paste0(api_org_name),
-      .default = paste0(api_succ_name)
-    )
-  )
-
-# organisations to remove from Q3 24/25 templates
+# determine which organisations are considered legacy for respective quarter
 qart_quarters <- tibble(
   q_date = seq(
     from = as.Date("2020-04-01"),
@@ -286,7 +249,6 @@ qart_quarters <- tibble(
   )
 ) |>
   mutate(quarter = lubridate::quarter(q_date, type = "year.quarter", fiscal_start = 4)) |>
-  # rename("quarter_end" = quarters) |>
   mutate(
     quarter_fy_start = round(quarter - 1),
     nhs_quarter = paste(quarter_fy_start, quarter, sep = "/"),
@@ -297,26 +259,59 @@ qart_quarters <- tibble(
     )
   )
 
-# left_join results from both calls
-map_current_trust <- trusts |>
+call_org_end_dates_quarter_info <- call_org_end_dates |>
+  # determine after which quarter the organisation becomes legacy
+  mutate(active_until_quarter = lubridate::quarter(api_date_end,
+    type = "year.quarter",
+    fiscal_start = 4
+  )) |>
+  left_join(qart_quarters |> select(quarter, nhs_quarter),
+    by = c(active_until_quarter = "quarter")
+  )
+
+# we already have info for legacy orgs
+legacy_details <- call_org_end_dates_quarter_info |>
+  filter(!is.na(nhs_quarter)) |>
+  select(api_date_end, api_succ_code) |>
+  left_join(call_org_end_dates_quarter_info |> select(api_org_code, api_org_name),
+    by = c("api_succ_code" = "api_org_code")
+  ) |>
+  rename("api_succ_name" = api_org_name)
+
+call_orgs_active_status_quarter <- call_org_end_dates_quarter_info |>
+  left_join(legacy_details, by = c("api_date_end", "api_succ_code")) |>
+  mutate(
+    api_current_code_quarter = case_when(is.na(nhs_quarter) ~ paste0(api_org_code),
+      .default = paste0(api_succ_code)
+    ),
+    api_current_org_name_quarter = case_when(is.na(nhs_quarter) ~ paste0(api_org_name),
+      .default = paste0(api_succ_name)
+    )
+  )
+
+# left_join results from detailed tables
+# below is a map of active trusts for the latest reporting quarter
+map_active_trusts_quarter <- trusts |>
   left_join(call_org_links, by = "url_end") |>
-  left_join(trusts_api_info, by = c(
+  left_join(call_orgs_active_status_quarter, by = c(
     "api_org_link",
     "api_org_code",
     "api_org_name"
   ))
 
-# TO DO: retrieve ICB mapping
-# output has to be mapping of active orgs for a quarter
-current_trust_codes <- map_current_trust |>
-  distinct(api_current_code)
+# ICB mapping
+current_trust_codes <- map_active_trusts_quarter |>
+  distinct(api_current_code_quarter)
 
-call_icb_code <- function(api_current_code) {
-  trust_info <- content(GET(paste0("https://directory.spineservices.nhs.uk/ORD/2-0-0/organisations/", api_current_code)))
+call_icb_code <- function(api_current_code_quarter) {
+  trust_info <- content(GET(paste0(
+    "https://directory.spineservices.nhs.uk/ORD/2-0-0/organisations/",
+    api_current_code_quarter
+  )))
 
-  api_current_org_name <- trust_info$Organisation$Name
+  api_current_org_name_quarter <- trust_info$Organisation$Name
 
-  print(glue::glue("** Getting ICB code for {api_current_org_name} **"))
+  print(glue::glue("** Getting ICB code for {api_current_org_name_quarter} **"))
 
   relationships <- length(trust_info$Organisation$Rels$Rel)
 
@@ -332,8 +327,8 @@ call_icb_code <- function(api_current_code) {
   api_icb_code <- trust_info$Organisation$Rels$Rel[[rel_n]]$Target$OrgId$extension
 
   tibble(
-    api_current_code,
-    api_current_org_name,
+    api_current_code_quarter,
+    api_current_org_name_quarter,
     api_icb_code
   )
 }
@@ -362,31 +357,27 @@ for (icb in 1:length(all_icbs$Organisations)) {
 }
 
 # map of icb details
-map_current_trust_icb_details <- map_current_trust |>
-  left_join(call_org_icb_org_codes, c("api_current_code", "api_current_org_name")) |>
+map_active_trusts_icb_details <- map_active_trusts_quarter |>
+  left_join(call_org_icb_org_codes, c(
+    "api_current_code_quarter",
+    "api_current_org_name_quarter"
+  )) |>
   left_join(call_icb_names, c("api_icb_code"))
 
-# output
-map_psc_current_trust_icb <- map_current_trust_icb_details |>
+# output 1: how organisations names will appear in templates
+map_psc_trust_icb_quarter <- map_active_trusts_icb_details |>
   distinct(
     psc, api_icb_code, api_icb_name,
-    api_current_code, api_current_org_name
-  )
+    api_current_code_quarter, api_current_org_name_quarter
+  ) |> 
+  arrange(psc, api_icb_name, api_current_org_name_quarter)
 
-# potential logic for removals
-qa_duplicate_and_legacy_trusts <- map_current_trust |>
-  group_by(psc, api_current_code, api_current_org_name) |>
-  filter(n() > 1) |>
+# output 2: to be used for retroactive data cleansing
+map_discrepancies <- map_active_trusts_icb_details |>
   select(
-    psc, organisation, organisation_tidy, api_org_code,
-    api_date_end, api_succ_code,
-    api_current_code, api_current_org_name
+    psc, organisation, organisation_tidy, api_org_code, api_date_end,
+    nhs_quarter, api_current_code_quarter, api_current_org_name_quarter
   ) |>
-  filter(api_date_end <= as.Date("2024-09-30") | is.na(api_date_end)) |>
-  mutate(valid_until_quarter = lubridate::quarter(api_date_end,
-    type = "year.quarter",
-    fiscal_start = 4
-  )) |>
-  left_join(qart_quarters, by = c("valid_until_quarter" = "quarter")) |>
-  mutate(removal = if_else(!is.na(api_date_end), 1, 0)) |>
-  arrange(api_current_code, valid_until_quarter)
+  filter(organisation != organisation_tidy |
+    organisation != api_current_org_name_quarter) |>
+  arrange(psc, api_current_org_name_quarter) 
