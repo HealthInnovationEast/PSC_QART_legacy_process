@@ -24,17 +24,15 @@ hin_folders <- dr$list_files() |>
   as.vector() |>
   unlist() # so that vector length reflects number of pscs
 
-# empty list to save results form loop below
-# results <- list()
-
 results <- tibble()
 
-for (hin in hin_folders[1:2]) {
+for (hin in hin_folders) {
   # identify submission
+  print(glue::glue("Checking data for {hin}"))
+  
   hin_dir <- reslib$get_item(glue::glue("Measurement/QART/{hin}"))
 
   hin_files <- hin_dir$list_files()
-  # print(hin_files)
 
   hin_submission_file <- hin_files |>
     select(name) |>
@@ -49,7 +47,8 @@ for (hin in hin_folders[1:2]) {
 
   if (nrow(hin_submission_file) > 1) {
     print(glue::glue("Skipping {hin}"))
-    print(glue::glue("There are multiple returned files: {hin_submission_file}"))
+    print("There are multiple returned files:")
+    print(glue::glue("{hin_submission_file}"))
     next
   }
 
@@ -108,6 +107,7 @@ for (hin in hin_folders[1:2]) {
 
   data_nwwtt2_tidy <- data_nwwtt2 |>
     remove_empty("rows")
+  
   # validation
   if (purrr::is_empty(which(is.na(data_nwwtt2_tidy))) == FALSE) {
     print(glue::glue("Skipping {hin}"))
@@ -119,7 +119,6 @@ for (hin in hin_folders[1:2]) {
   mews_location <- data.frame(which(data_nwwtt2_mews == "MEWS", arr.ind = T))
 
   # validation
-
   if (mews_location$col != 5) {
     print(glue::glue("Skipping {hin}"))
     print("MEWS data not found in expected location")
@@ -133,6 +132,7 @@ for (hin in hin_folders[1:2]) {
 
   data_mews_tidy <- data_mews |>
     remove_empty("rows")
+  
   # validation
   if (purrr::is_empty(which(is.na(data_mews_tidy))) == FALSE) {
     print(glue::glue("Skipping {hin}"))
@@ -152,9 +152,9 @@ for (hin in hin_folders[1:2]) {
       quarter = reporting_quarter,
       .after = Trust
     )
-
-  # results[[hin]] <- data_combined
-
+  
+  print(glue::glue("Successful data extraction for {hin}"))
+  
   results <- results |>
     bind_rows(data_combined)
 }
