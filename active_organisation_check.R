@@ -129,7 +129,7 @@ call_by_name <- function(url_end) {
       print(glue::glue("Final result was retrieved from hit {hit_id}"))
       
     }else{
-      
+      print(str_glue("Setting values to NA as either 0 or more than 1 hits met our criteria"))
       api_org_role <- NA
       api_org_code <- NA
       api_org_name <- NA
