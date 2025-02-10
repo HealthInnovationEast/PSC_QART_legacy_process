@@ -102,24 +102,44 @@ call_by_name <- function(url_end) {
     api_hit <- hits
   } else {
     # there are multiple hits produced in call and we want to determine which is relevant
+    #setup counter for how many hits were potentially correct
+    n_status <- 0
+    hit_id <- NA
     for (hit in 1:hits) {
       name_retrieved <- trust$Organisations[[hit]]$Name
       status <- trust$Organisations[[hit]]$Status
-
-      # the name retrieved has got to match the beginning of the string
+       # the name retrieved has got to match the beginning of the string
       # and it has to correspond to an organisation that's operationally active
-      if (str_detect(name_retrieved, paste0("^", search_trust)) & status == "Active") {
-        hit_id <- hit
-
-        api_org_role <- trust$Organisations[[hit_id]]$PrimaryRoleDescription
-        api_org_code <- trust$Organisations[[hit_id]]$OrgId
-        api_org_name <- trust$Organisations[[hit_id]]$Name
-        api_org_link <- trust$Organisations[[hit_id]]$OrgLink
-        api_hit <- hit_id
-
-        print(glue::glue("Final result was retrieved from hit {hit_id}"))
+      hit_active <- str_detect(name_retrieved, paste0("^", search_trust)) & status == "Active"
+      if (hit_active){
+        hit_id <- hit 
+        n_status <- n_status + 1 
       }
     }
+    
+    print(str_glue("There were {n_status} hits matching our criteria"))
+    if(n_status==1){
+      
+      api_org_role <- trust$Organisations[[hit_id]]$PrimaryRoleDescription
+      api_org_code <- trust$Organisations[[hit_id]]$OrgId
+      api_org_name <- trust$Organisations[[hit_id]]$Name
+      api_org_link <- trust$Organisations[[hit_id]]$OrgLink
+      api_hit <- hit_id
+      
+      print(glue::glue("Final result was retrieved from hit {hit_id}"))
+      
+    }else{
+      print(str_glue("Setting values to NA as either 0 or more than 1 hits met our criteria"))
+      api_org_role <- NA
+      api_org_code <- NA
+      api_org_name <- NA
+      # api_org_status = NA
+      api_org_link <- NA
+      api_hit <- NA
+    }
+    
+      
+     
   }
 
   # put results together
