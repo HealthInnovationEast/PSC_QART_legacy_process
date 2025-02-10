@@ -7,7 +7,7 @@ library(httr)
 library(jsonlite)
 library(lubridate)
 
-# find latest submission data
+# read latest submission data
 submissions_data <- read_excel(here("data", "MatNeoSIP.xlsx"), sheet = "Data") |>
   clean_names() |>
   rename(
@@ -15,6 +15,10 @@ submissions_data <- read_excel(here("data", "MatNeoSIP.xlsx"), sheet = "Data") |
     "quarter" = "date"
   ) |>
   rename_with(~ str_replace(., "x", "stage_"), starts_with("x"))
+
+# read latest psc (hin) names
+hin_names <- read.csv("hin_names.csv") |>
+  arrange(hin_folders)
 
 # extract organisation list
 organisations <- submissions_data |>
@@ -27,33 +31,53 @@ organisations <- submissions_data |>
     "Worthing (UHSX)"
   ))
 
+trust_psc_name_old <- organisations |>
+  mutate(psc = case_when(psc == "Health Innovation Network" ~ "South London HIN", 
+                         psc == "Health Innovation Manchester" ~ "Manchester HIN",
+                         .default = paste0(psc)) , 
+         organisation_tidy = case_when(
+           organisation == "UNITED LINCOLNSHIRE HOSPITALS NHS TRUST" ~
+             "UNITED LINCOLNSHIRE TEACHING HOSPITALS NHS TRUST", # old templates systematically omitted 'teaching'
+           organisation == "WEST HERTFORDSHIRE HOSPITALS NHS TRUST" ~
+             "WEST HERTFORDSHIRE TEACHING HOSPITALS NHS TRUST", # ditto
+           organisation == "MID YORKSHIRE HOSPITALS NHS TRUST" ~
+             "MID YORKSHIRE TEACHING NHS TRUST", # name change effective from May 2023
+           organisation == "KINGSTON HOSPITAL NHS FOUNDATION TRUST" ~
+             "KINGSTON AND RICHMOND NHS FOUNDATION TRUST", # name change after acquisition in Nov 2024
+           organisation == "ST HELENS AND KNOWSLEY TEACHING HOSPITALS NHS TRUST" ~
+             "MERSEY AND WEST LANCASHIRE TEACHING HOSPITALS NHS TRUST", # name change after merger in July 2023
+           organisation == "WESTERN SUSSEX HOSPITALS NHS FOUNDATION TRUST" ~
+             "UNIVERSITY HOSPITALS SUSSEX NHS FOUNDATION TRUST", # name change after acquisition in April 2021
+           organisation == "ROYAL DEVON AND EXETER NHS FOUNDATION TRUST" ~
+             "ROYAL DEVON UNIVERSITY HEALTHCARE NHS FOUNDATION TRUST", # name change after acquisition in April 2022
+           organisation == "HOMERTON UNIVERSITY HOSPITAL NHS FOUNDATION TRUST" ~
+             "HOMERTON HEALTHCARE NHS FOUNDATION TRUST", # name change effective from April 2022
+           organisation == "PENNINE ACUTE HOSPITALS NHS TRUST" ~
+             "NORTHERN CARE ALLIANCE NHS FOUNDATION TRUST", # name change after dissolution in October 2021
+           organisation == "YORK TEACHING HOSPITAL NHS FOUNDATION TRUST" ~
+             "YORK AND SCARBOROUGH TEACHING HOSPITALS NHS FOUNDATION TRUST", # name change effective from FY21/22
+           .default = paste0(organisation)
+         )) |>
+  distinct(psc, organisation, organisation_tidy) 
+
+# replace old psc names with their appropriate HIN name
+psc_old_names <- trust_psc_name_old |> 
+  distinct(psc) |>
+  arrange(psc)
+
+psc_name_look_up <- data.frame(hin_names, psc_old_names) |>
+  rename('latest_psc_name' = hin_folders,
+         'former_psc_name' = psc)
+
+trust_psc_name_corrected <- trust_psc_name_old |> 
+  left_join(psc_name_look_up, by = c('psc' = 'former_psc_name')) |>
+  relocate(latest_psc_name, 
+           .after = psc) |> 
+  select(-psc)
+
 # API replacement
 # some of the manual replacements below are temporary, need to find files or API that has old names
-trusts <- organisations |>
-  distinct(psc, organisation) |>
-  mutate(organisation_tidy = case_when(
-    organisation == "UNITED LINCOLNSHIRE HOSPITALS NHS TRUST" ~
-      "UNITED LINCOLNSHIRE TEACHING HOSPITALS NHS TRUST", # old templates systematically omitted 'teaching'
-    organisation == "WEST HERTFORDSHIRE HOSPITALS NHS TRUST" ~
-      "WEST HERTFORDSHIRE TEACHING HOSPITALS NHS TRUST", # ditto
-    organisation == "MID YORKSHIRE HOSPITALS NHS TRUST" ~
-      "MID YORKSHIRE TEACHING NHS TRUST", # name change effective from May 2023
-    organisation == "KINGSTON HOSPITAL NHS FOUNDATION TRUST" ~
-      "KINGSTON AND RICHMOND NHS FOUNDATION TRUST", # name change after acquisition in Nov 2024
-    organisation == "ST HELENS AND KNOWSLEY TEACHING HOSPITALS NHS TRUST" ~
-      "MERSEY AND WEST LANCASHIRE TEACHING HOSPITALS NHS TRUST", # name change after merger in July 2023
-    organisation == "WESTERN SUSSEX HOSPITALS NHS FOUNDATION TRUST" ~
-      "UNIVERSITY HOSPITALS SUSSEX NHS FOUNDATION TRUST", # name change after acquisition in April 2021
-    organisation == "ROYAL DEVON AND EXETER NHS FOUNDATION TRUST" ~
-      "ROYAL DEVON UNIVERSITY HEALTHCARE NHS FOUNDATION TRUST", # name change after acquisition in April 2022
-    organisation == "HOMERTON UNIVERSITY HOSPITAL NHS FOUNDATION TRUST" ~
-      "HOMERTON HEALTHCARE NHS FOUNDATION TRUST", # name change effective from April 2022
-    organisation == "PENNINE ACUTE HOSPITALS NHS TRUST" ~
-      "NORTHERN CARE ALLIANCE NHS FOUNDATION TRUST", # name change after dissolution in October 2021
-    organisation == "YORK TEACHING HOSPITAL NHS FOUNDATION TRUST" ~
-      "YORK AND SCARBOROUGH TEACHING HOSPITALS NHS FOUNDATION TRUST", # name change effective from FY21/22
-    .default = paste0(organisation)
-  )) |>
+trusts <- trust_psc_name_corrected |>
   # URL links don't do white spaces nor apostrophes, so we encode them instead
   mutate(
     organisation_shorter = str_remove_all(organisation_tidy, "(?i) (nhs|nhs foundation) trust"),
@@ -387,17 +411,19 @@ map_active_trusts_icb_details <- map_active_trusts_quarter |>
 # output 1: how organisations names will appear in templates
 map_psc_trust_icb_quarter <- map_active_trusts_icb_details |>
   distinct(
-    psc, api_icb_code, api_icb_name,
+    latest_psc_name, api_icb_code, api_icb_name,
     api_current_code_quarter, api_current_org_name_quarter
   ) |> 
-  arrange(psc, api_icb_name, api_current_org_name_quarter)
+  arrange(latest_psc_name, api_icb_name, api_current_org_name_quarter)
+
+write.csv(map_psc_trust_icb_quarter, 'psc_lookup.csv', row.names = F)
 
 # output 2: to be used for retroactive data cleansing
 map_discrepancies <- map_active_trusts_icb_details |>
   select(
-    psc, organisation, organisation_tidy, api_org_code, api_date_end,
+    latest_psc_name, organisation, organisation_tidy, api_org_code, api_date_end,
     nhs_quarter, api_current_code_quarter, api_current_org_name_quarter
   ) |>
   filter(organisation != organisation_tidy |
     organisation != api_current_org_name_quarter) |>
-  arrange(psc, api_current_org_name_quarter) 
+  arrange(latest_psc_name, api_current_org_name_quarter) 
