@@ -29,7 +29,7 @@ results <- tibble()
 for (hin in hin_folders) {
   # identify submission
   print(glue::glue("Checking data for {hin}"))
-  
+
   hin_dir <- reslib$get_item(glue::glue("Measurement/QART/{hin}"))
 
   hin_files <- hin_dir$list_files()
@@ -107,7 +107,7 @@ for (hin in hin_folders) {
 
   data_nwwtt2_tidy <- data_nwwtt2 |>
     remove_empty("rows")
-  
+
   # validation
   if (purrr::is_empty(which(is.na(data_nwwtt2_tidy))) == FALSE) {
     print(glue::glue("Skipping {hin}"))
@@ -132,7 +132,7 @@ for (hin in hin_folders) {
 
   data_mews_tidy <- data_mews |>
     remove_empty("rows")
-  
+
   # validation
   if (purrr::is_empty(which(is.na(data_mews_tidy))) == FALSE) {
     print(glue::glue("Skipping {hin}"))
@@ -152,14 +152,14 @@ for (hin in hin_folders) {
       quarter = reporting_quarter,
       .after = Trust
     )
-  
+
   print(glue::glue("Successful data extraction for {hin}"))
-  
+
   results <- results |>
     bind_rows(data_combined)
 }
 
-# write
+# write combined data
 quarter_string <- reporting_quarter |>
   str_replace_all("/| ", "_")
 
@@ -167,5 +167,13 @@ time_stamp_ext <- format(Sys.time(), "%Y-%m-%d_%H%M%S.csv")
 
 write.csv(data_combined,
   file = here(glue::glue("output/psc_submissions_{quarter_string}_processed_{time_stamp_ext}")),
+  row.names = F
+)
+
+# write current hin names for lookup file(s)
+hin_names <- hin_folders |> as.data.frame()
+
+write.csv(hin_names,
+  file = here("hin_names.csv"),
   row.names = F
 )
