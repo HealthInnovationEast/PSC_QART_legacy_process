@@ -5,7 +5,7 @@ library(janitor)
 library(glue)
 library(Microsoft365R)
 
-reporting_quarter <- "2024/25 Q2"
+reporting_quarter <- "2024/25 Q3"
 
 site_url <- "https://nhs.sharepoint.com/sites/MED/ps2/it/mit"
 
@@ -28,7 +28,7 @@ results <- tibble()
 
 for (hin in hin_folders) {
   # identify submission
-  print(glue::glue("Checking data for {hin}"))
+  print(glue::glue("** Checking data for {hin} **"))
 
   hin_dir <- reslib$get_item(glue::glue("Measurement/QART/{hin}"))
 
@@ -153,7 +153,8 @@ for (hin in hin_folders) {
       .after = Trust
     )
 
-  print(glue::glue("Successful data extraction for {hin}"))
+  print(glue::glue("Successful data extraction for {hin}. Data retrieved from:"))
+  print(glue::glue("{hin_submission_file}"))
 
   results <- results |>
     bind_rows(data_combined)
