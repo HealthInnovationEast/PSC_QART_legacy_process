@@ -22,7 +22,8 @@ hin_folders <- dr$list_files() |>
   filter(str_detect(name, "HIN$")) |>
   arrange(name) |>
   as.vector() |>
-  unlist() # so that vector length reflects number of pscs
+  unlist() |> # so that vector length reflects number of pscs
+  unname()
 
 results <- tibble()
 
