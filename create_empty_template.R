@@ -5,62 +5,98 @@ library(Microsoft365R)
 source("config_sharepoint_location.R")
 source("config_quarter_info.R")
 
-#loop through locations
+#loop through locations provided in psc_lookup.csv
 for (i in psc){
   
-  #dataset with ics and trust
-  location_icb<-locations %>% 
-    filter(ICB=="East Midlands") %>% #don't have lookup table- use this as demo
-    select(ICS, TRUST)
+  # grid with icb codes and names 
+  location_icb <- location_lookup |> 
+    filter(latest_psc_name == psc) |> 
+    distinct(api_icb_code, api_icb_name)
   
-  #dataset with trusts
-  location_trust <- location_icb %>% select(TRUST)
+  # grid with icb code, icb name, trust code, and trust name
+  location_icb_trust <- location_lookup |> 
+    filter(latest_psc_name == psc) |> 
+    #choosing this order to accommodate most aesthetic width of cells in template
+    select(api_icb_code, api_current_code_quarter,
+           api_icb_name, api_current_org_name_quarter)
   
-  #dataset just ics
-  location_ics <- location_icb %>% select(ICS) %>% distinct()
+  # grid with trust code and trust name
+  location_trusts <- location_lookup |> 
+    filter(latest_psc_name == psc) |> 
+    #choosing this order to accommodate most aesthetic width of cells in template
+    select(api_current_code_quarter, api_current_org_name_quarter)
   
-  
-  location_icb_2_quarters<- bind_rows(location_icb %>% mutate(Quarter=current_quarter_number),
-                                      location_icb %>% mutate(Quarter = last_quarter_number))
   #load template excel file
   wb <- openxlsx2::wb_load("template_files/preferred_template.xlsx")
   
   
-  wb<- wb_add_data(wb, 
-              sheet= "MatNeo optimisation", 
-              x = location_icb_2_quarters, 
-              start_col = 1, 
-              start_row = 2,
-              col_names = FALSE)
+  #order of replacement is gotta be icb code, org code, then names
+  #TO DO: replace "this quarter" with #Data fro 2024/25 Q1 (example)
   
+  # add ICB names to Medicines tab
   wb<- wb_add_data(wb, 
-                   sheet= "MatNeo early warning", 
-                   x = location_icb_2_quarters,
-                   start_col = 1, 
-                   start_row = 2,
+                   sheet= "Medicines", 
+                   #x = ?
+                   x = location_icb, 
+                   start_col = 2, 
+                   start_row = 6,
                    col_names = FALSE)
   
   wb<- wb_add_data(wb, 
-                   sheet= "MatNeo lead engagement", 
-                   x = location_trust,
-                   start_col = 1, 
-                   start_row = 2,
+                   sheet= "Medicines", 
+                   #x = ?
+                   x = location_icb, 
+                   start_col = 2, 
+                   start_row = 17,
                    col_names = FALSE)
   
+  # add ICB and Trust names to MatNeo tab
+  
+  # optimisation grid
   wb<- wb_add_data(wb, 
-                   sheet= "MatNeo PAS", 
-                   x = location_ics,
-                   start_col = 1, 
-                   start_row = 2,
+                   sheet= "MatNeo", 
+                   #x = ?
+                   x = location_icb_trust,
+                   start_col = 2, 
+                   start_row = 9,
                    col_names = FALSE)
+  
+  # deterioration tools grid
+  wb<- wb_add_data(wb, 
+                   sheet= "MatNeo", 
+                   #x = ?
+                   x = location_icb_trust,
+                   start_col = 2, 
+                   start_row = 30,
+                   col_names = FALSE)
+  
+  # preterm birth lead engagement 
+  wb<- wb_add_data(wb, 
+                   sheet= "MatNeo", 
+                   #x = ?
+                   x = location_trusts,
+                   start_col = 3, 
+                   start_row = 62,
+                   col_names = FALSE)
+  
+  # PAS score
+  wb <- wb_add_data(wb, 
+                    sheet= "MatNeo", 
+                    #x = ?
+                    x = location_icb,
+                    start_col = 3, 
+                    start_row = 82,
+                    col_names = FALSE)
   
   wb_save(wb, 
-          file = "data/empty_template.xlsx")
+          file = "output/empty_template.xlsx")
   
-  chosenlib$upload_file(dest  = str_glue("{base_url}/{i}/{current_quarter_year}/QART.xlsx"), src="data/empty_template.xlsx" )
+  #TO DO: FIX quarter format think '.' could give us trouble
+  chosenlib$upload_file(dest  = str_glue("{base_url}/{i}/{i} QART {current_quarter_year}.xlsx"), 
+                        src = "output/empty_template.xlsx" )
   
   #delete template file from local location. 
-  file.remove( "data/empty_template.xlsx")
+  file.remove( "output/empty_template.xlsx")
 
 }
 

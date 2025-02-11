@@ -6,5 +6,4 @@ base_url <- "Measurement/QART"
 
 
 location_lookup <- read.csv("psc_lookup.csv")
-psc<- unique(location_lookup$PSC)
-locations<- read.csv("lookup.csv")
+psc<- unique(location_lookup$latest_psc_name)
