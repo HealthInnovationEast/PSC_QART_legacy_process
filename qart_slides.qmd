@@ -32,7 +32,8 @@ mat_neo_data <- read_excel(here("data/MatNeoSIP.xlsx"), sheet = "Data") |>
     "stage_7_all" = "stage_7",
     "quarter" = "date"
   ) |>
-  rename_with(~ str_replace(., "x", "stage_"), starts_with("x"))
+  rename_with(~ str_replace(., "x", "stage_"), starts_with("x")) |>
+  mutate(psc = str_remove_all(psc, 'HIN'))
 ```
 
 ```{r}
@@ -319,7 +320,6 @@ aggregate_int(mat_neo_data, expr(quarter == report_quarter), volume_targeted_ven
     volume_targeted_ventilation
   )
 ```
-
 
 ```{r}
 #stage to use as benchmark progress
