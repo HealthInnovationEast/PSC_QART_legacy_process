@@ -156,8 +156,14 @@ for (hin in hin_folders) {
   print(glue::glue("Successful data extraction for {hin}. Data retrieved from:"))
   print(glue::glue("{hin_submission_file}"))
 
-  results <- results |>
-    bind_rows(data_combined)
+  # results <- results |>
+  #   bind_rows(data_combined)
+  
+  results <- rbind(results, data_combined)
+}
+
+if (length(unique(results$hin_name)) != 15){
+  stop('Data not appended correctly')
 }
 
 # write combined data
@@ -166,7 +172,7 @@ quarter_string <- reporting_quarter |>
 
 time_stamp_ext <- format(Sys.time(), "%Y-%m-%d_%H%M%S.csv")
 
-write.csv(data_combined,
+write.csv(results,
   file = here(glue::glue("output/psc_submissions_{quarter_string}_processed_{time_stamp_ext}")),
   row.names = F
 )
