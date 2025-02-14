@@ -166,6 +166,21 @@ if (length(unique(results$hin_name)) != 15){
   stop('Data not appended correctly')
 }
 
+# number of organisations using the deterioration tools
+# these numbers are used for an impact slide produced by improvement team
+# our role is to provide an udpate on these figures
+orgs_newtt2 <- results |>
+  filter(str_detect(Newtt2, '(?i)stage (4|5|6|7)')) 
+
+print(str_glue("Number of organisations using NEWTT2:
+               {length(unique(orgs_newtt2$Trust))}"))
+
+orgs_mews <- results |>
+  filter(str_detect(Mews, '(?i)stage (4|5|6|7)')) 
+
+print(str_glue("Number of organisations using MEWS:
+               {length(unique(orgs_mews$Trust))}"))
+
 # write combined data
 quarter_string <- reporting_quarter |>
   str_replace_all("/| ", "_")
