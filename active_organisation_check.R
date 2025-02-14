@@ -23,13 +23,25 @@ hin_names <- read.csv("hin_names.csv") |>
 # extract organisation list
 organisations <- submissions_data |>
   select(1:4) |>
-  # we already know of submissions under trust sites instead of trusts names
+  # we know of submissions under trust sites instead of trusts names
   filter(!organisation %in% c(
     "Eastbourne & Conquest Hospital",
     "Royal Sussex County (RSCH) (UHSX)",
     "Princess Royal (PRH) (UHSX)",
     "Worthing (UHSX)"
   ))
+
+# Name fixes
+# ideally, the hard coded replacements below would be replaced with a file or API call
+# The name changes for the concerned organisations below reflect one of 3 events:
+# 1. Incorrect use of a name that's slightly different from legal name
+# (e.g., omitting 'teaching' in 'teaching hospitals)
+# 2. An aesthetic name change (imagine a rebranding)
+# 3. A name change following a statutory legal changes (e.g, a merger). For example,
+# org A acquired org B, then org A (as a fused entity) changes name to Org C
+# this means org B is succeeded by org C and org A had a rebrand (which is what
+# is represented in the hard coded name change below)
+# consult https://www.england.nhs.uk/publication/<old-organisation-name> for more details
 
 trust_psc_name_old <- organisations |>
   mutate(psc = case_when(psc == "Health Innovation Network" ~ "South London HIN", 
@@ -76,7 +88,6 @@ trust_psc_name_corrected <- trust_psc_name_old |>
   select(-psc)
 
 # API replacement
-# some of the manual replacements below are temporary, need to find files or API that has old names
 trusts <- trust_psc_name_corrected |>
   # URL links don't do white spaces nor apostrophes, so we encode them instead
   mutate(
@@ -91,14 +102,27 @@ trusts <- trust_psc_name_corrected |>
 distinct_trusts <- trusts |>
   distinct(organisation_tidy, url_end)
 
-# query by looking at name
+# API call flow:
+# 1. look for names, extract api link
+# 2. use links to determine legacy status and extract succession history
+# 3. use org codes of active trusts to extract ICB codes
+# 4. extract all names using ICB codes
+
+# API search 1
+# Function below makes an API call using a name string
+# and restricting results by organisations categorised as an NHS Trust
+# if there are multiple hits that match the string and role criteria,
+# the function adds and additional legal status criteria to determine the relevant hit
+# once the relevant linked is inferred,
+# we extract a hyperlink that can be used as a subsequent API call to consult more details
+
 call_by_name <- function(url_end) {
   search_trust <- url_end |>
     str_replace_all("%20", " ") |>
     str_replace_all("%27", "'")
 
-  print(glue::glue("**Now looking for {search_trust}**"))
-  # trust <- content(GET(paste0('https://directory.spineservices.nhs.uk/ORD/2-0-0/organisations/?Name=', url_end)))
+  print(glue::glue("** Now looking for {search_trust} **"))
+
   trust <- content(GET(paste0(
     "https://directory.spineservices.nhs.uk/ORD/2-0-0/organisations/?PrimaryRoleId=RO197&Name=",
     url_end
@@ -126,33 +150,31 @@ call_by_name <- function(url_end) {
     api_hit <- hits
   } else {
     # there are multiple hits produced in call and we want to determine which is relevant
-    #setup counter for how many hits were potentially correct
+    # setup counter for how many hits were potentially correct
     n_status <- 0
     hit_id <- NA
     for (hit in 1:hits) {
       name_retrieved <- trust$Organisations[[hit]]$Name
       status <- trust$Organisations[[hit]]$Status
-       # the name retrieved has got to match the beginning of the string
+      # the name retrieved has got to match the beginning of the string
       # and it has to correspond to an organisation that's operationally active
       hit_active <- str_detect(name_retrieved, paste0("^", search_trust)) & status == "Active"
-      if (hit_active){
-        hit_id <- hit 
-        n_status <- n_status + 1 
+      if (hit_active) {
+        hit_id <- hit
+        n_status <- n_status + 1
       }
     }
-    
+
     print(str_glue("There were {n_status} hits matching our criteria"))
-    if(n_status==1){
-      
+    if (n_status == 1) {
       api_org_role <- trust$Organisations[[hit_id]]$PrimaryRoleDescription
       api_org_code <- trust$Organisations[[hit_id]]$OrgId
       api_org_name <- trust$Organisations[[hit_id]]$Name
       api_org_link <- trust$Organisations[[hit_id]]$OrgLink
       api_hit <- hit_id
-      
+
       print(glue::glue("Final result was retrieved from hit {hit_id}"))
-      
-    }else{
+    } else {
       print(str_glue("Setting values to NA as either 0 or more than 1 hits met our criteria"))
       api_org_role <- NA
       api_org_code <- NA
@@ -161,9 +183,6 @@ call_by_name <- function(url_end) {
       api_org_link <- NA
       api_hit <- NA
     }
-    
-      
-     
   }
 
   # put results together
@@ -189,6 +208,16 @@ qa_multiple_hits <- call_org_links |>
 org_calls <- call_org_links |>
   distinct(api_org_link)
 
+# API search 2
+# Function below uses the links extracted in the first API call to determine
+# legacy status and succession history (if applicable) by checking the date types
+# stored against an organisation
+# we extract the date the organisation became active.
+# If deemed a legacy organisation, we also extract end date and organisation code of successor
+# the extraction logic below is backed up by API documentation:
+# https://www.odsdatasearchandexport.nhs.uk/referenceDataCatalogue/ODS-Date-Concepts_620601026.html#:~:text=%2Dmm%2Ddd.-,Type%20%2D%20Legal%20vs%20Operational,need%20of%20systems%20and%20services.
+# https://www.odsdatasearchandexport.nhs.uk/referenceDataCatalogue/Succession_587381243.html
+
 call_by_org_link <- function(api_org_link) {
   trust_info <- content(GET(api_org_link))
   api_org_code <- trust_info$Organisation$OrgId$extension
@@ -201,26 +230,22 @@ call_by_org_link <- function(api_org_link) {
 
   print(glue::glue("Found {date_elements} date type(s)"))
 
-  # if there's only one date type, it is operational
-  # and operational date start would be the same as legal date start and no end date recorded
-  # https://www.odsdatasearchandexport.nhs.uk/?search=generalorg&query=RJR
-  # compare above result from ODS ODS portal vs API call below
-  # https://directory.spineservices.nhs.uk/ORD/2-0-0/organisations/RJR
+  # if there's only one date type, it is always operational
+  # (legal dates are only provided when they differ from operational)
+  # if there is no end date, the organisation is not legacy
+  # (end dates are only provided when there's succession history and they're always of legal type)
 
   if (date_elements == 1) {
-    date_type <- api_org_date[1][[1]]$Type
-
-    if (date_type == "Operational") {
-      api_date_type <- date_type
-      api_date_start <- api_org_date[1][[1]]$Start
-      # this should be NULL
-      api_date_end <- api_org_date[1][[1]]$End
-      api_succ_code <- NA
-      print(glue::glue("Retrieved {api_date_type} Date Info"))
-    }
+    api_date_type <- api_org_date[1][[1]]$Type
+    api_date_start <- api_org_date[1][[1]]$Start
+    # this should be NULL
+    api_date_end <- api_org_date[1][[1]]$End
+    api_succ_code <- NA
+    print(glue::glue("Retrieved {api_date_type} Date Info"))
   } else if (date_elements == 2) {
     # some orgs might have both operational AND Legal date types
-    # check the legal type element to determine whether it is relevant
+    # but this doesn't automatically equate to the org being legacy
+    # check the legal type element to determine whether there is succession history
     date_type <- api_org_date[2][[1]]$Type
     api_date_info <- names(api_org_date[[2]])
 
@@ -232,25 +257,33 @@ call_by_org_link <- function(api_org_link) {
       # this should be ALWAYS have a date
       api_date_end <- api_org_date[2][[1]]$End
 
-      # retrieve the successor
+      # retrieve the successor history
       succ_info <- trust_info$Organisation$Succs$Succ
       succ_orgs <- as.numeric(length(succ_info))
+      succ_org_types <- sapply(succ_info, `[[`, "Type")
+      succ_n_orgs <- length(which(succ_org_types == "Successor"))
 
-      print("Successor/predecessor history:")
+      if (succ_n_orgs > 1) {
+        print(glue::glue("** Warning: {api_org_code} **"))
+        print(glue::glue("There are {succ_n_orgs} succesor organisations recorded in this record"))
+        print("Investigate succession history further")
+        api_succ_code <- "Multiple"
+      } else if (succ_n_orgs == 1) {
+        print(glue::glue("Successor/predecessor history:"))
 
-      for (succ_org in 1:succ_orgs) {
-        succ_type <- trust_info$Organisation$Succs$Succ[[succ_org]]$Type
-        print(succ_type)
+        for (succ_org in 1:succ_orgs) {
+          succ_type <- trust_info$Organisation$Succs$Succ[[succ_org]]$Type
+          print(succ_type)
 
-        if (succ_type == "Successor") {
-          succ_org_n <- succ_org
-          # api_succ_date
-          api_succ_code <- trust_info$Organisation$Succs$Succ[[succ_org_n]]$Target$OrgId$extension
+          if (succ_type == "Successor") {
+            succ_org_n <- succ_org
+            api_succ_code <- trust_info$Organisation$Succs$Succ[[succ_org_n]]$Target$OrgId$extension
+          }
         }
       }
     } else {
       # some orgs will have both date types but no end dates
-      # meaning the organisation is current but had a different start date operationally and legally
+      # meaning the organisation is current but had a different start dates operationally and legally
       # we fetch operational info as that was the approach used when there was only 1 date type assigned to org
       api_date_type <- api_org_date[1][[1]]$Type
 
@@ -261,9 +294,9 @@ call_by_org_link <- function(api_org_link) {
         api_succ_code <- NA
       }
     }
-
     print(glue::glue("Retrieved {api_date_type} Date Info"))
   }
+
 
   tibble(
     api_org_link,
@@ -283,6 +316,18 @@ call_org_end_dates <- apply(org_calls, 1, call_by_org_link) |>
 
 qa_multiple_date_types <- call_org_end_dates |>
   filter(date_elements > 1)
+
+# This table should be EMPTY
+# If it isn't, the main successor needs to be worked out. The link below is super helpful
+# https://www.england.nhs.uk/publication/<predecessor-name>
+qa_multiple_succ <- qa_multiple_date_types |>
+  filter(api_succ_code == "Multiple")
+
+empty_qa_multiple_succ <- nrow(qa_multiple_succ) == 0
+
+if (empty_qa_multiple_succ == F) {
+  warning("Check qa_multiple_succ for multiple successors")
+}
 
 # determine which organisations are considered legacy for respective quarter
 qart_quarters <- tibble(
@@ -322,14 +367,15 @@ legacy_details <- call_org_end_dates_quarter_info |>
   ) |>
   rename("api_succ_name" = api_org_name)
 
+# determine organisations codes and names relevant for latest reporting quarter
 call_orgs_active_status_quarter <- call_org_end_dates_quarter_info |>
   left_join(legacy_details, by = c("api_date_end", "api_succ_code")) |>
   mutate(
-    api_current_code_quarter = case_when(is.na(nhs_quarter) ~ paste0(api_org_code),
-      .default = paste0(api_succ_code)
+    api_current_code_quarter = case_when(is.na(nhs_quarter) ~ api_org_code,
+      .default = api_succ_code
     ),
-    api_current_org_name_quarter = case_when(is.na(nhs_quarter) ~ paste0(api_org_name),
-      .default = paste0(api_succ_name)
+    api_current_org_name_quarter = case_when(is.na(nhs_quarter) ~ api_org_name,
+      .default = api_succ_name
     )
   )
 
@@ -343,7 +389,14 @@ map_active_trusts_quarter <- trusts |>
     "api_org_name"
   ))
 
-# ICB mapping
+# API search 3 - ICB mapping
+# Function below uses trust codes for organisations deemed as active for present quarter
+# A call by trust code is generated and relationships of the Trust
+# with other organisations are evaluated
+# we extract the ICB (code) under which the Trusts falls into (RE5 = IS LOCATED IN THE GROGRAPHY OF)
+# Info on relationships:
+# https://www.odsdatasearchandexport.nhs.uk/referenceDataCatalogue/Relationships_571324965.html
+
 current_trust_codes <- map_active_trusts_quarter |>
   distinct(api_current_code_quarter)
 
@@ -359,16 +412,27 @@ call_icb_code <- function(api_current_code_quarter) {
 
   relationships <- length(trust_info$Organisation$Rels$Rel)
 
+  # setup counter for how many hits were potentially correct
+  n_status <- 0
+  rel_n <- NA
+
   for (relationship in 1:relationships) {
     rel_id <- trust_info$Organisation$Rels$Rel[[relationship]]$id
     rel_status <- trust_info$Organisation$Rels$Rel[[relationship]]$Status
     if (rel_id == "RE5" & rel_status == "Active") { # RE5 is the ICB relationship
+      n_status <- n_status + 1
       rel_n <- relationship # extract relationship number
       print(glue::glue("Index of relationship extracted: {rel_n}"))
     }
   }
 
-  api_icb_code <- trust_info$Organisation$Rels$Rel[[rel_n]]$Target$OrgId$extension
+  if (n_status == 1) {
+    api_icb_code <- trust_info$Organisation$Rels$Rel[[rel_n]]$Target$OrgId$extension
+  } else {
+    print(str_glue("Setting ICB code to NA as either 0 or more than 1 hits met our criteria"))
+    api_icb_code <- NA
+  }
+
 
   tibble(
     api_current_code_quarter,
@@ -377,10 +441,14 @@ call_icb_code <- function(api_current_code_quarter) {
   )
 }
 
-call_org_icb_org_codes <- apply(current_trust_codes, 1, call_icb_code) |>
+call_icb_org_codes <- apply(current_trust_codes, 1, call_icb_code) |>
   bind_rows()
 
-# retrieve all icb names
+# API search 4 - all ICB names
+# below we make a single call that extracts all organisations whose name contains ICB
+# and whose role is R0261 (STRATEGIC PARTNERSHIP)
+# roles list available here: https://www.odsdatasearchandexport.nhs.uk/referenceDataCatalogue/Roles_571324911.html
+
 link <- paste0(
   "https://directory.spineservices.nhs.uk/ORD/2-0-0/organisations",
   "?PrimaryRoleId=RO261",
@@ -401,8 +469,9 @@ for (icb in 1:length(all_icbs$Organisations)) {
 }
 
 # map of icb details
+# use ICB codes to fetch ICB names so active trusts have all icb details needed
 map_active_trusts_icb_details <- map_active_trusts_quarter |>
-  left_join(call_org_icb_org_codes, c(
+  left_join(call_icb_org_codes, c(
     "api_current_code_quarter",
     "api_current_org_name_quarter"
   )) |>
@@ -418,6 +487,7 @@ map_psc_trust_icb_quarter <- map_active_trusts_icb_details |>
 
 write.csv(map_psc_trust_icb_quarter, 'psc_lookup.csv', row.names = F)
 
+
 # output 2: to be used for retroactive data cleansing
 map_discrepancies <- map_active_trusts_icb_details |>
   select(
@@ -427,3 +497,4 @@ map_discrepancies <- map_active_trusts_icb_details |>
   filter(organisation != organisation_tidy |
     organisation != api_current_org_name_quarter) |>
   arrange(latest_psc_name, api_current_org_name_quarter) 
+
