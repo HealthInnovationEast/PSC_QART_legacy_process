@@ -1,27 +1,9 @@
-library(here)
-library(readxl)
-library(tidyverse)
-library(janitor)
-library(glue)
-library(httr)
-library(jsonlite)
-library(lubridate)
-
-# read latest submission data
-submissions_data <- read_excel(here("data", "MatNeoSIP.xlsx"), sheet = "Data") |>
-  clean_names() |>
-  rename(
-    "stage_7_all" = "stage_7",
-    "quarter" = "date"
-  ) |>
-  rename_with(~ str_replace(., "x", "stage_"), starts_with("x"))
-
-# read latest psc (hin) names
-hin_names <- read.csv(here("lookups", "hin_names.csv")) |>
-  arrange(hin_folders)
+# this source might be temporary
+source('psc_name_update.R')
+# below produces submissions_previous_psc_updated (with data up to 2024/25 Q2) 
 
 # extract organisation list
-organisations <- submissions_data |>
+organisations <- submissions_previous_psc_updated |>
   select(1:4) |>
   # we know of submissions under trust sites instead of trusts names
   filter(!organisation %in% c(
@@ -44,10 +26,7 @@ organisations <- submissions_data |>
 # consult https://www.england.nhs.uk/publication/<old-organisation-name> for more details
 
 org_names_previous_submissions <- organisations |>
-  mutate(psc = case_when(psc == "Health Innovation Network" ~ "South London HIN", 
-                         psc == "Health Innovation Manchester" ~ "Manchester HIN",
-                         .default = paste0(psc)) , 
-         organisation_tidy = case_when(
+  mutate(organisation_tidy = case_when(
            organisation == "UNITED LINCOLNSHIRE HOSPITALS NHS TRUST" ~
              "UNITED LINCOLNSHIRE TEACHING HOSPITALS NHS TRUST", # old templates systematically omitted 'teaching'
            organisation == "WEST HERTFORDSHIRE HOSPITALS NHS TRUST" ~
@@ -70,22 +49,7 @@ org_names_previous_submissions <- organisations |>
              "YORK AND SCARBOROUGH TEACHING HOSPITALS NHS FOUNDATION TRUST", # name change effective from FY21/22
            .default = paste0(organisation)
          )) |>
-  distinct(psc, organisation, organisation_tidy) 
-
-# replace old psc names with their appropriate HIN name
-psc_old_names <- org_names_previous_submissions |> 
-  distinct(psc) |>
-  arrange(psc)
-
-psc_name_look_up <- data.frame(hin_names, psc_old_names) |>
-  rename('latest_psc_name' = hin_folders,
-         'former_psc_name' = psc)
-
-trust_psc_name_corrected <- org_names_previous_submissions |> 
-  left_join(psc_name_look_up, by = c('psc' = 'former_psc_name')) |>
-  relocate(latest_psc_name, 
-           .after = psc) |> 
-  select(-psc)
+  distinct(latest_psc_name, organisation, organisation_tidy) 
 
 # API replacement
 trusts <- trust_psc_name_corrected |>
