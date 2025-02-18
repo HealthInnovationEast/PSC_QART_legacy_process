@@ -5,9 +5,19 @@ library(Microsoft365R)
 source("config_sharepoint_location.R")
 source("config_quarter_info.R")
 
+### these could be parameters ###
 location_lookup <- read.csv(here("lookups", "psc_lookup.csv"))
 psc <- unique(location_lookup$latest_psc_name)
+master_files_folder <- "1. Master files"
+template_file_name <- "preferred_template.xlsx"
+###########################
 
+# download template file from SharePoint
+master_files_dr <- chosenlib$get_item(glue::glue("{base_url}/{master_files_folder}"))
+template_file <- master_files_dr$get_item(str_glue({template_file_name}))
+template_file$download(dest = here("lookups", str_glue({template_file_name})), 
+                       overwrite = T)
+  
 # loop through locations provided in psc_lookup.csv
 for (i in psc) {
   # grid with icb codes and names
@@ -31,8 +41,8 @@ for (i in psc) {
     select(api_current_code_quarter, api_current_org_name_quarter)
 
   # load template excel file
-  wb <- openxlsx2::wb_load("template_files/preferred_template.xlsx")
-
+  #wb <- openxlsx2::wb_load("template_files/preferred_template.xlsx")
+  wb <- openxlsx2::wb_load(here("lookups", str_glue({template_file_name})))
 
   # order of replacement is gotta be icb code, org code, then names
   # TO DO: replace "this quarter" with "Data for 2024/25 Q1" (example)
@@ -103,6 +113,9 @@ for (i in psc) {
   )
 
   # upload
+  print(str_glue("Uploading template to:
+                 {base_url}/{i}"))
+  
   chosenlib$upload_file(
     dest = str_glue("{base_url}/{i}/{i} QART {current_quarter_year}.xlsx"),
     src = "output/empty_template.xlsx"

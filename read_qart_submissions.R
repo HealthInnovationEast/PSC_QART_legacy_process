@@ -5,17 +5,8 @@ library(janitor)
 library(glue)
 library(Microsoft365R)
 
+source("config_sharepoint_location.R")
 reporting_quarter <- "2024/25 Q3"
-
-site_url <- "https://nhs.sharepoint.com/sites/MED/ps2/it/mit"
-
-site <- get_sharepoint_site(site_url = site_url, tenant = "nhs")
-
-# retrieve hin folders
-
-reslib <- site$get_drive("Restricted Library")
-
-dr <- reslib$get_item("Measurement/QART")
 
 hin_folders <- dr$list_files() |>
   select(name) |>
@@ -40,7 +31,7 @@ for (hin in hin_folders) {
   # identify submission
   print(glue::glue("** Checking data for {hin} **"))
 
-  hin_dir <- reslib$get_item(glue::glue("Measurement/QART/{hin}"))
+  hin_dir <- chosenlib$get_item(glue::glue("{base_url}/{hin}"))
 
   hin_files <- hin_dir$list_files()
 
