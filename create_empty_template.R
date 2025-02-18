@@ -5,6 +5,9 @@ library(Microsoft365R)
 source("config_sharepoint_location.R")
 source("config_quarter_info.R")
 
+location_lookup <- read.csv(here("lookups", "psc_lookup.csv"))
+psc <- unique(location_lookup$latest_psc_name)
+
 # loop through locations provided in psc_lookup.csv
 for (i in psc) {
   # grid with icb codes and names

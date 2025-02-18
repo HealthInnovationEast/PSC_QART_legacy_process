@@ -25,6 +25,15 @@ hin_folders <- dr$list_files() |>
   unlist() |> # so that vector length reflects number of pscs
   unname()
 
+# write current hin names for lookup file(s)
+hin_names <- hin_folders |> as.data.frame()
+
+write.csv(hin_names,
+          file = here("lookups", "hin_names.csv"),
+          row.names = F
+)
+
+# empty data frame to save submnissions
 results <- tibble()
 
 for (hin in hin_folders) {
@@ -190,13 +199,5 @@ time_stamp_ext <- format(Sys.time(), "%Y-%m-%d_%H%M%S.csv")
 
 write.csv(results,
   file = here(glue::glue("output/psc_submissions_{quarter_string}_processed_{time_stamp_ext}")),
-  row.names = F
-)
-
-# write current hin names for lookup file(s)
-hin_names <- hin_folders |> as.data.frame()
-
-write.csv(hin_names,
-  file = here("hin_names.csv"),
   row.names = F
 )

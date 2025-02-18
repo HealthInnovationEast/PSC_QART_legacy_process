@@ -17,7 +17,7 @@ submissions_data <- read_excel(here("data", "MatNeoSIP.xlsx"), sheet = "Data") |
   rename_with(~ str_replace(., "x", "stage_"), starts_with("x"))
 
 # read latest psc (hin) names
-hin_names <- read.csv("hin_names.csv") |>
+hin_names <- read.csv(here("lookups", "hin_names.csv")) |>
   arrange(hin_folders)
 
 # extract organisation list
@@ -29,7 +29,7 @@ organisations <- submissions_data |>
     "Royal Sussex County (RSCH) (UHSX)",
     "Princess Royal (PRH) (UHSX)",
     "Worthing (UHSX)"
-  ))
+  )) 
 
 # Name fixes
 # ideally, the hard coded replacements below would be replaced with a file or API call
@@ -43,7 +43,7 @@ organisations <- submissions_data |>
 # is represented in the hard coded name change below)
 # consult https://www.england.nhs.uk/publication/<old-organisation-name> for more details
 
-trust_psc_name_old <- organisations |>
+org_names_previous_submissions <- organisations |>
   mutate(psc = case_when(psc == "Health Innovation Network" ~ "South London HIN", 
                          psc == "Health Innovation Manchester" ~ "Manchester HIN",
                          .default = paste0(psc)) , 
@@ -73,7 +73,7 @@ trust_psc_name_old <- organisations |>
   distinct(psc, organisation, organisation_tidy) 
 
 # replace old psc names with their appropriate HIN name
-psc_old_names <- trust_psc_name_old |> 
+psc_old_names <- org_names_previous_submissions |> 
   distinct(psc) |>
   arrange(psc)
 
@@ -81,7 +81,7 @@ psc_name_look_up <- data.frame(hin_names, psc_old_names) |>
   rename('latest_psc_name' = hin_folders,
          'former_psc_name' = psc)
 
-trust_psc_name_corrected <- trust_psc_name_old |> 
+trust_psc_name_corrected <- org_names_previous_submissions |> 
   left_join(psc_name_look_up, by = c('psc' = 'former_psc_name')) |>
   relocate(latest_psc_name, 
            .after = psc) |> 
@@ -485,8 +485,7 @@ map_psc_trust_icb_quarter <- map_active_trusts_icb_details |>
   ) |> 
   arrange(latest_psc_name, api_icb_name, api_current_org_name_quarter)
 
-write.csv(map_psc_trust_icb_quarter, 'psc_lookup.csv', row.names = F)
-
+write.csv(map_psc_trust_icb_quarter, here("lookups", "psc_lookup.csv"), row.names = F)
 
 # output 2: to be used for retroactive data cleansing
 map_discrepancies <- map_active_trusts_icb_details |>
