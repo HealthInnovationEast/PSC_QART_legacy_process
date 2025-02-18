@@ -6,7 +6,10 @@ library(glue)
 library(Microsoft365R)
 
 source("config_sharepoint_location.R")
+
+######### parameter
 reporting_quarter <- "2024/25 Q3"
+#########
 
 hin_folders <- dr$list_files() |>
   select(name) |>

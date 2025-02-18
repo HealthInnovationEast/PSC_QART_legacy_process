@@ -3,9 +3,11 @@ library(tidyverse)
 library(Microsoft365R)
 
 source("config_sharepoint_location.R")
-source("config_quarter_info.R")
 
 ### these could be parameters ###
+current_quarter_year <- "2425 Q3" #This must be changed each quarter. 
+# Note that quarter format has changes and we probably need to think about harmonising
+# across files
 location_lookup <- read.csv(here("lookups", "psc_lookup.csv"))
 psc <- unique(location_lookup$latest_psc_name)
 master_files_folder <- "1. Master files"
