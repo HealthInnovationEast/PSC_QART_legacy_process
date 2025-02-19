@@ -5,17 +5,11 @@ library(janitor)
 library(glue)
 library(Microsoft365R)
 
-reporting_quarter <- "2024/25 Q2"
+source("config_sharepoint_location.R")
 
-site_url <- "https://nhs.sharepoint.com/sites/MED/ps2/it/mit"
-
-site <- get_sharepoint_site(site_url = site_url, tenant = "nhs")
-
-# retrieve hin folders
-
-reslib <- site$get_drive("Restricted Library")
-
-dr <- reslib$get_item("Measurement/QART")
+######### parameter
+reporting_quarter <- "2024/25 Q3"
+#########
 
 hin_folders <- dr$list_files() |>
   select(name) |>
@@ -25,13 +19,22 @@ hin_folders <- dr$list_files() |>
   unlist() |> # so that vector length reflects number of pscs
   unname()
 
+# write current hin names for lookup file(s)
+hin_names <- hin_folders |> as.data.frame()
+
+write.csv(hin_names,
+          file = here("lookups", "hin_names.csv"),
+          row.names = F
+)
+
+# empty data frame to save submnissions
 results <- tibble()
 
 for (hin in hin_folders) {
   # identify submission
-  print(glue::glue("Checking data for {hin}"))
-  
-  hin_dir <- reslib$get_item(glue::glue("Measurement/QART/{hin}"))
+  print(glue::glue("** Checking data for {hin} **"))
+
+  hin_dir <- chosenlib$get_item(glue::glue("{base_url}/{hin}"))
 
   hin_files <- hin_dir$list_files()
 
@@ -108,7 +111,7 @@ for (hin in hin_folders) {
 
   data_nwwtt2_tidy <- data_nwwtt2 |>
     remove_empty("rows")
-  
+
   # validation
   if (purrr::is_empty(which(is.na(data_nwwtt2_tidy))) == FALSE) {
     print(glue::glue("Skipping {hin}"))
@@ -133,7 +136,7 @@ for (hin in hin_folders) {
 
   data_mews_tidy <- data_mews |>
     remove_empty("rows")
-  
+
   # validation
   if (purrr::is_empty(which(is.na(data_mews_tidy))) == FALSE) {
     print(glue::glue("Skipping {hin}"))
@@ -153,20 +156,42 @@ for (hin in hin_folders) {
       quarter = reporting_quarter,
       .after = Trust
     )
+
+  print(glue::glue("Successful data extraction for {hin}. Data retrieved from:"))
+  print(glue::glue("{hin_submission_file}"))
+
+  # results <- results |>
+  #   bind_rows(data_combined)
   
-  print(glue::glue("Successful data extraction for {hin}"))
-  
-  results <- results |>
-    bind_rows(data_combined)
+  results <- rbind(results, data_combined)
 }
 
-# write
+if (length(unique(results$hin_name)) != 15){
+  stop('Data not appended correctly')
+}
+
+# number of organisations using the deterioration tools
+# these numbers are used for an impact slide produced by improvement team
+# our role is to provide an udpate on these figures
+orgs_newtt2 <- results |>
+  filter(str_detect(Newtt2, '(?i)stage (4|5|6|7)')) 
+
+print(str_glue("Number of organisations using NEWTT2:
+               {length(unique(orgs_newtt2$Trust))}"))
+
+orgs_mews <- results |>
+  filter(str_detect(Mews, '(?i)stage (4|5|6|7)')) 
+
+print(str_glue("Number of organisations using MEWS:
+               {length(unique(orgs_mews$Trust))}"))
+
+# write combined data
 quarter_string <- reporting_quarter |>
   str_replace_all("/| ", "_")
 
 time_stamp_ext <- format(Sys.time(), "%Y-%m-%d_%H%M%S.csv")
 
-write.csv(data_combined,
+write.csv(results,
   file = here(glue::glue("output/psc_submissions_{quarter_string}_processed_{time_stamp_ext}")),
   row.names = F
 )
