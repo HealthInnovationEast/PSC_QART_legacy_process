@@ -52,7 +52,7 @@ org_names_previous_submissions <- organisations |>
   distinct(latest_psc_name, organisation, organisation_tidy) 
 
 # API replacement
-trusts <- trust_psc_name_corrected |>
+trusts <- org_names_previous_submissions |>
   # URL links don't do white spaces nor apostrophes, so we encode them instead
   mutate(
     organisation_shorter = str_remove_all(organisation_tidy, "(?i) (nhs|nhs foundation) trust"),
@@ -304,7 +304,8 @@ qart_quarters <- tibble(
   mutate(quarter = lubridate::quarter(q_date, type = "year.quarter", fiscal_start = 4)) |>
   mutate(
     quarter_fy_start = round(quarter - 1),
-    nhs_quarter = paste(quarter_fy_start, quarter, sep = "/"),
+    quarter_fy_end = str_extract((quarter), '(.{4})$'),
+    nhs_quarter = paste(quarter_fy_start, quarter_fy_end, sep = "/"),
     nhs_quarter = str_replace(
       nhs_quarter,
       fixed("."),
@@ -461,3 +462,4 @@ map_discrepancies <- map_active_trusts_icb_details |>
     organisation != api_current_org_name_quarter) |>
   arrange(latest_psc_name, api_current_org_name_quarter) 
 
+write.csv(map_discrepancies, here("lookups", "discrepancies_lookup.csv"), row.names = F)
