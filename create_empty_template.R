@@ -2,17 +2,8 @@ library(openxlsx2)
 library(tidyverse)
 library(Microsoft365R)
 
-source("config_sharepoint_location.R")
-
-### these could be parameters ###
-current_quarter_year <- "2425 Q3" #This must be changed each quarter. 
-# Note that quarter format has changes and we probably need to think about harmonising
-# across files
 location_lookup <- read.csv(here("lookups", "psc_lookup.csv"))
 psc <- unique(location_lookup$latest_psc_name)
-master_files_folder <- "1. Master files"
-template_file_name <- "preferred_template.xlsx"
-###########################
 
 # download template file from SharePoint
 master_files_dr <- chosenlib$get_item(glue::glue("{base_url}/{master_files_folder}"))
@@ -43,7 +34,6 @@ for (i in psc) {
     select(api_current_code_quarter, api_current_org_name_quarter)
 
   # load template excel file
-  #wb <- openxlsx2::wb_load("template_files/preferred_template.xlsx")
   wb <- openxlsx2::wb_load(here("lookups", str_glue({template_file_name})))
 
   # order of replacement is gotta be icb code, org code, then names

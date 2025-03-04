@@ -1,5 +1,4 @@
-source("psc_name_update.R")
-source("config_sharepoint_location.R")
+#NOTE: this script needs to have sourced "psc_name_update.R"
 
 # select relevant variables from data set (i.e, org info and interventions)
 previous_submissions_data <- submissions_previous_psc_updated |>
@@ -370,8 +369,6 @@ previous_submissions_data_cleansed = previous_submissions_prunned |>
 write.csv(previous_submissions_data_cleansed, 
           here('output/mat_neo_sip_qart_cleansed.csv'),
           row.names = F)
-
-master_files_folder <- "1. Master files"
 
 chosenlib$upload_file(
   dest = str_glue("{base_url}/{master_files_folder}/mat_neo_sip_qart_cleansed.csv"),

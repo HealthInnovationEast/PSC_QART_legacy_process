@@ -40,9 +40,3 @@ submissions_previous_psc_updated <- submissions_previous_psc_name |>
   relocate(latest_psc_name, 
            .after = psc) |> 
   select(-psc)
-
-# UNDECIDED about below. might need for a data cleansing script 
-# but will determine in next PR
-# write.csv(submissions_previous_psc_updated, 
-#           here("data", "mat_neo_qart_previous_data.csv"),
-#           row.names = F)

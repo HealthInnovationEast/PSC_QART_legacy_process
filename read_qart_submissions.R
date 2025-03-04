@@ -5,12 +5,6 @@ library(janitor)
 library(glue)
 library(Microsoft365R)
 
-source("config_sharepoint_location.R")
-
-######### parameter
-reporting_quarter <- "2024/25 Q3"
-#########
-
 hin_folders <- dr$list_files() |>
   select(name) |>
   filter(str_detect(name, "HIN$")) |>
@@ -147,7 +141,7 @@ for (hin in hin_folders) {
   # now join all 3 cuts
   data_combined <- data_opt_tidy |>
     mutate(
-      hin_name = hin,
+      latest_psc_name = hin,
       .before = ICB
     ) |>
     left_join(data_nwwtt2_tidy, by = c("ICB", "Trust")) |>
@@ -166,7 +160,7 @@ for (hin in hin_folders) {
   results <- rbind(results, data_combined)
 }
 
-if (length(unique(results$hin_name)) != 15){
+if (length(unique(results$latest_psc_name)) != 15){
   stop('Data not appended correctly')
 }
 
@@ -190,8 +184,9 @@ quarter_string <- reporting_quarter |>
   str_replace_all("/| ", "_")
 
 time_stamp_ext <- format(Sys.time(), "%Y-%m-%d_%H%M%S.csv")
+reporting_quarter_submissions_path <- glue::glue("output/psc_submissions_{quarter_string}_processed_{time_stamp_ext}")
 
 write.csv(results,
-  file = here(glue::glue("output/psc_submissions_{quarter_string}_processed_{time_stamp_ext}")),
+  file = here(reporting_quarter_submissions_path),
   row.names = F
 )
