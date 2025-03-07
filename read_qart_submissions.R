@@ -21,7 +21,7 @@ write.csv(hin_names,
           row.names = F
 )
 
-# empty data frame to save submnissions
+# empty data frame to save submissions
 results <- tibble()
 
 for (hin in hin_folders) {
@@ -52,7 +52,7 @@ for (hin in hin_folders) {
 
   hin_submission <- hin_dir$get_item(hin_submission_file)
 
-  # # download file and store temporarily
+  # download file and store temporarily
   tf <- tempfile(
     pattern = str_remove(hin_submission_file, fixed(".xlsx")),
     fileext = ".xlsx"
@@ -163,6 +163,12 @@ for (hin in hin_folders) {
 if (length(unique(results$latest_psc_name)) != 15){
   stop('Data not appended correctly')
 }
+
+# this is a fix for misspelling this intervention in the excel templates 
+# templates have been corrected so this will only be relevant for 2024.25 Q3 
+# will comment out after PR 
+results <- results |>
+  rename(Corticosteroids = Corticosteriods)
 
 # number of organisations using the deterioration tools
 # these numbers are used for an impact slide produced by improvement team

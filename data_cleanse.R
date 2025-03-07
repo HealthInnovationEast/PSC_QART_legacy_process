@@ -354,7 +354,7 @@ previous_submissions_prunned <- previous_submissions_data |>
   anti_join(rows_to_replace, by = c('latest_psc_name', 'ics',
                                     'organisation_as_recorded', 'quarter')) 
 
-previous_submissions_data_cleansed = previous_submissions_prunned |> 
+previous_submissions_data_cleansed <- previous_submissions_prunned |> 
   bind_rows(
     # this data df kept col organisation_as_recorded
     previous_data_org_name_corrected,
@@ -363,14 +363,15 @@ previous_submissions_data_cleansed = previous_submissions_prunned |>
   relocate(organisation_after_cleanse, .after = organisation_as_recorded) |>
   mutate(organisation_after_cleanse = 
            case_when(!is.na(organisation_after_cleanse) ~ organisation_after_cleanse,
-                     is.na(organisation_after_cleanse) ~ organisation_as_recorded))
+                     is.na(organisation_after_cleanse) ~ organisation_as_recorded)) |>
+  rename(icb = ics)
 
 # write to share point
 write.csv(previous_submissions_data_cleansed, 
-          here('output/mat_neo_sip_qart_cleansed.csv'),
+          here('output/mat_neo_qart_cleansed_upto_2425_Q2.csv'),
           row.names = F)
 
 chosenlib$upload_file(
-  dest = str_glue("{base_url}/{master_files_folder}/mat_neo_sip_qart_cleansed.csv"),
-  src = 'output/mat_neo_sip_qart_cleansed.csv'
+  dest = str_glue("{base_url}/{master_files_folder}/mat_neo_qart_cleansed_upto_2425_Q2.csv"),
+  src = 'output/mat_neo_qart_cleansed_upto_2425_Q2.csv'
 )

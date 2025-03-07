@@ -10,6 +10,9 @@ master_files_dr <- chosenlib$get_item(glue::glue("{base_url}/{master_files_folde
 template_file <- master_files_dr$get_item(str_glue({template_file_name}))
 template_file$download(dest = here("lookups", str_glue({template_file_name})), 
                        overwrite = T)
+
+# file friendly naming string for saving results
+current_quarter_year <- str_remove_all(reporting_quarter, '20|/')
   
 # loop through locations provided in psc_lookup.csv
 for (i in psc) {
