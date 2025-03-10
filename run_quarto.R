@@ -15,4 +15,5 @@ quarto_render("qart_slides.qmd",
 file_name <- format(Sys.time(), "qart_test_%Y_%m_%d_%H%M%S.pptx")
 
 # move the quarto report into the output folder and change name
+# TO DO: save file to SharePoint quart_cleansed_date_2425_Q3
 file.rename('qart_slides.pptx', here(glue::glue('output/{file_name}')))
