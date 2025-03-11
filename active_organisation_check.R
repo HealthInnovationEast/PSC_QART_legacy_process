@@ -1,70 +1,108 @@
-# this source might be temporary
-source('psc_name_update.R')
-# below produces submissions_previous_psc_updated (with data up to 2024/25 Q2) 
+library(here)
+library(readxl)
+library(tidyverse)
+library(janitor)
+library(glue)
+library(httr)
+library(jsonlite)
+library(lubridate)
 
-# extract organisation list
-organisations <- submissions_previous_psc_updated |>
-  select(1:4) |>
-  # we know of submissions under trust sites instead of trusts names
-  filter(!organisation %in% c(
-    "Eastbourne & Conquest Hospital",
-    "Royal Sussex County (RSCH) (UHSX)",
-    "Princess Royal (PRH) (UHSX)",
-    "Worthing (UHSX)"
-  )) 
+if (retroactive_fixes){
+  source('psc_name_update.R')
+  # below produces submissions_previous_psc_updated (with data up to 2024/25 Q2) 
+  
+  # extract organisation list
+  organisations <- submissions_previous_psc_updated |>
+    select(1:4) |>
+    # we know of submissions under trust sites instead of trusts names
+    filter(!organisation %in% c(
+      "Eastbourne & Conquest Hospital",
+      "Royal Sussex County (RSCH) (UHSX)",
+      "Princess Royal (PRH) (UHSX)",
+      "Worthing (UHSX)"
+    )) 
+  
+  # Name fixes
+  # ideally, the hard coded replacements below would be replaced with a file or API call
+  # The name changes for the concerned organisations below reflect one of 3 events:
+  # 1. Incorrect use of a name that's slightly different from legal name
+  # (e.g., omitting 'teaching' in 'teaching hospitals)
+  # 2. An aesthetic name change (imagine a rebranding)
+  # 3. A name change following a statutory legal changes (e.g, a merger). For example,
+  # org A acquired org B, then org A (as a fused entity) changes name to Org C
+  # this means org B is succeeded by org C and org A had a rebrand (which is what
+  # is represented in the hard coded name change below)
+  # consult https://www.england.nhs.uk/publication/<old-organisation-name> for more details
+  
+  org_names_previous_submissions <- organisations |>
+    mutate(organisation_tidy = case_when(
+      organisation == "UNITED LINCOLNSHIRE HOSPITALS NHS TRUST" ~
+        "UNITED LINCOLNSHIRE TEACHING HOSPITALS NHS TRUST", # old templates systematically omitted 'teaching'
+      organisation == "WEST HERTFORDSHIRE HOSPITALS NHS TRUST" ~
+        "WEST HERTFORDSHIRE TEACHING HOSPITALS NHS TRUST", # ditto
+      organisation == "MID YORKSHIRE HOSPITALS NHS TRUST" ~
+        "MID YORKSHIRE TEACHING NHS TRUST", # name change effective from May 2023
+      organisation == "KINGSTON HOSPITAL NHS FOUNDATION TRUST" ~
+        "KINGSTON AND RICHMOND NHS FOUNDATION TRUST", # name change after acquisition in Nov 2024
+      organisation == "ST HELENS AND KNOWSLEY TEACHING HOSPITALS NHS TRUST" ~
+        "MERSEY AND WEST LANCASHIRE TEACHING HOSPITALS NHS TRUST", # name change after merger in July 2023
+      organisation == "WESTERN SUSSEX HOSPITALS NHS FOUNDATION TRUST" ~
+        "UNIVERSITY HOSPITALS SUSSEX NHS FOUNDATION TRUST", # name change after acquisition in April 2021
+      organisation == "ROYAL DEVON AND EXETER NHS FOUNDATION TRUST" ~
+        "ROYAL DEVON UNIVERSITY HEALTHCARE NHS FOUNDATION TRUST", # name change after acquisition in April 2022
+      organisation == "HOMERTON UNIVERSITY HOSPITAL NHS FOUNDATION TRUST" ~
+        "HOMERTON HEALTHCARE NHS FOUNDATION TRUST", # name change effective from April 2022
+      organisation == "PENNINE ACUTE HOSPITALS NHS TRUST" ~
+        "NORTHERN CARE ALLIANCE NHS FOUNDATION TRUST", # name change after dissolution in October 2021
+      organisation == "YORK TEACHING HOSPITAL NHS FOUNDATION TRUST" ~
+        "YORK AND SCARBOROUGH TEACHING HOSPITALS NHS FOUNDATION TRUST", # name change effective from FY21/22
+      .default = paste0(organisation)
+    )) |>
+    distinct(latest_psc_name, organisation, organisation_tidy) 
+  
+  # API replacement
+  trusts <- org_names_previous_submissions |>
+    # URL links don't do white spaces nor apostrophes, so we encode them instead
+    mutate(
+      organisation_shorter = str_remove_all(organisation_tidy, "(?i) (nhs|nhs foundation) trust"),
+      url_end = str_replace_all(
+        organisation_shorter,
+        "'", "%27"
+      ),
+      url_end = str_replace_all(url_end, " ", "%20")
+    )
+  
+  distinct_trusts <- trusts |>
+    distinct(organisation_tidy, url_end)
+  
+} else {
+  # here we evaluate the organisation names for quarters after retroactive changes have been applied 
+  # i.e., to account for changes in orgs from 2024/25 Q4 onwards
+  org_names_previous_submissions <- read.csv(
+    here(str_glue('output/{previous_submissions_file_name}'))
+    ) |>
+    # some of the encoding went off so we fix here 
+    mutate_if(
+      is.character,
+      function(row) iconv(row, to = "UTF-8", sub = "")
+    ) |>
+    mutate_if(is.character, ~ gsub("[^ -~]", " ", .)) |>
+    # we know of submissions under trust sites instead of trusts names
+    filter(quarter == previous_quarter) |>
+    distinct(latest_psc_name, organisation_after_cleanse) 
+  
+  trusts <- org_names_previous_submissions |>
+    # URL links don't do white spaces nor apostrophes, so we encode them instead
+    mutate(
+      organisation_shorter = str_remove_all(organisation_after_cleanse, "(?i) (nhs|nhs foundation) trust"),
+      url_end = str_replace_all(organisation_shorter,"'", "%27"),
+      url_end = str_replace_all(url_end, " ", "%20")
+    )
+  
+  distinct_trusts <- trusts |>
+    distinct(organisation_after_cleanse, url_end)
+}
 
-# Name fixes
-# ideally, the hard coded replacements below would be replaced with a file or API call
-# The name changes for the concerned organisations below reflect one of 3 events:
-# 1. Incorrect use of a name that's slightly different from legal name
-# (e.g., omitting 'teaching' in 'teaching hospitals)
-# 2. An aesthetic name change (imagine a rebranding)
-# 3. A name change following a statutory legal changes (e.g, a merger). For example,
-# org A acquired org B, then org A (as a fused entity) changes name to Org C
-# this means org B is succeeded by org C and org A had a rebrand (which is what
-# is represented in the hard coded name change below)
-# consult https://www.england.nhs.uk/publication/<old-organisation-name> for more details
-
-org_names_previous_submissions <- organisations |>
-  mutate(organisation_tidy = case_when(
-           organisation == "UNITED LINCOLNSHIRE HOSPITALS NHS TRUST" ~
-             "UNITED LINCOLNSHIRE TEACHING HOSPITALS NHS TRUST", # old templates systematically omitted 'teaching'
-           organisation == "WEST HERTFORDSHIRE HOSPITALS NHS TRUST" ~
-             "WEST HERTFORDSHIRE TEACHING HOSPITALS NHS TRUST", # ditto
-           organisation == "MID YORKSHIRE HOSPITALS NHS TRUST" ~
-             "MID YORKSHIRE TEACHING NHS TRUST", # name change effective from May 2023
-           organisation == "KINGSTON HOSPITAL NHS FOUNDATION TRUST" ~
-             "KINGSTON AND RICHMOND NHS FOUNDATION TRUST", # name change after acquisition in Nov 2024
-           organisation == "ST HELENS AND KNOWSLEY TEACHING HOSPITALS NHS TRUST" ~
-             "MERSEY AND WEST LANCASHIRE TEACHING HOSPITALS NHS TRUST", # name change after merger in July 2023
-           organisation == "WESTERN SUSSEX HOSPITALS NHS FOUNDATION TRUST" ~
-             "UNIVERSITY HOSPITALS SUSSEX NHS FOUNDATION TRUST", # name change after acquisition in April 2021
-           organisation == "ROYAL DEVON AND EXETER NHS FOUNDATION TRUST" ~
-             "ROYAL DEVON UNIVERSITY HEALTHCARE NHS FOUNDATION TRUST", # name change after acquisition in April 2022
-           organisation == "HOMERTON UNIVERSITY HOSPITAL NHS FOUNDATION TRUST" ~
-             "HOMERTON HEALTHCARE NHS FOUNDATION TRUST", # name change effective from April 2022
-           organisation == "PENNINE ACUTE HOSPITALS NHS TRUST" ~
-             "NORTHERN CARE ALLIANCE NHS FOUNDATION TRUST", # name change after dissolution in October 2021
-           organisation == "YORK TEACHING HOSPITAL NHS FOUNDATION TRUST" ~
-             "YORK AND SCARBOROUGH TEACHING HOSPITALS NHS FOUNDATION TRUST", # name change effective from FY21/22
-           .default = paste0(organisation)
-         )) |>
-  distinct(latest_psc_name, organisation, organisation_tidy) 
-
-# API replacement
-trusts <- org_names_previous_submissions |>
-  # URL links don't do white spaces nor apostrophes, so we encode them instead
-  mutate(
-    organisation_shorter = str_remove_all(organisation_tidy, "(?i) (nhs|nhs foundation) trust"),
-    url_end = str_replace_all(
-      organisation_shorter,
-      "'", "%27"
-    ),
-    url_end = str_replace_all(url_end, " ", "%20")
-  )
-
-distinct_trusts <- trusts |>
-  distinct(organisation_tidy, url_end)
 
 # API call flow:
 # 1. look for names, extract api link
@@ -161,7 +199,10 @@ call_by_name <- function(url_end) {
   )
 }
 
-call_org_links <- apply(distinct_trusts[, 2], 1, call_by_name) |>
+#call_org_links <- apply(distinct_trusts[, 2], 1, call_by_name) |>
+  #bind_rows()
+
+call_org_links <- apply(distinct_trusts[c('url_end')], 1, call_by_name) |>
   bind_rows()
 
 # QA check results for calls where there was >1 hit
