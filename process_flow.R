@@ -3,23 +3,28 @@ source('config_sharepoint_location.R')
 
 # ----------------- parameters ------------------------
 reporting_quarter <- "2024/25 Q3" # will change very quarter
+#reporting_quarter <- "2024/25 Q4" # TEST 2: no retroactive fixes
 previous_quarter <- "2024/25 Q2"
+#previous_quarter <- "2024/25 Q3" # TEST 2: no retroactive fixes
 previous_quarter_end_date <- as.Date("2024-09-30")
-#previous_quarter_end_date <- as.Date("2024-12-31")
+#previous_quarter_end_date <- as.Date("2024-12-31") # TEST 2: no retroactive fixes
+
 master_files_folder <- "1. Master files" # where data files are in SharePoint
 slides_folder <- "2. Slides" # where presentation will be saved in SharePoint
 template_file_name <- "preferred_template.xlsx"
 # below will be used after 2024/25 Q3 to append Q4 data 
-#previous_submissions_file_name <- 'mat_neo_qart_all_data_upto_2024_25_Q3.csv' # will change very quarter
+previous_submissions_file_name <- 'mat_neo_qart_all_data_upto_2024_25_Q3.csv' # will change very quarter
 
 # process control
 # needs running once only 
 set_up_folders <- F 
-retroactive_fixes <- T 
+retroactive_fixes <- T
+#retroactive_fixes <- F # TEST 2: no retroactive fixes
 # will consistently need running
 org_name_checks <- T # always T
 prepare_templates <- T #T
 process_submissions <- T
+#process_submissions <- F # TEST 2: no retroactive fixes
 # ------------------------------------------------------
 
 # process execution 

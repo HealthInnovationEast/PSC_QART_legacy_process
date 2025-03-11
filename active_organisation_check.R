@@ -205,16 +205,15 @@ call_by_name <- function(url_end) {
 call_org_links <- apply(distinct_trusts[c('url_end')], 1, call_by_name) |>
   bind_rows()
 
-# NOT SURE IF BELOW IS ALWAYS RUN, need to see in retroactive fixes path
-# {# QA do we have hits with no names
-# qa_no_hits <- call_org_links |>
-#   filter(api_n_hits == 0)  
-# 
-# empty_qa_no_hits <- nrow(qa_no_hits) == 0
-# 
-# if (empty_qa_multiple_succ == F) {
-#   warning("Check qa_no_hits for no returns by name")
-# }}
+# QA do we have hits with no names
+qa_no_hits <- call_org_links |>
+   filter(api_n_hits == 0)  
+ 
+empty_qa_no_hits <- nrow(qa_no_hits) == 0
+
+if (empty_qa_multiple_succ == F) {
+  stop("Check qa_no_hits as there have been calls with no return by name")
+  }
 
 # QA check results for calls where there was >1 hit
 qa_multiple_hits <- call_org_links |>
@@ -503,6 +502,14 @@ map_psc_trust_icb_quarter <- map_active_trusts_icb_details |>
   arrange(latest_psc_name, api_icb_name, api_current_org_name_quarter)
 
 write.csv(map_psc_trust_icb_quarter, here("lookups", "psc_lookup.csv"), row.names = F)
+
+# print a message of where organisation changes have occurred 
+map_legacy <- map_active_trusts_icb_details |> 
+  filter(!is.na(api_date_end)) |>
+  select(latest_psc_name, api_org_code, api_org_name, api_date_end, api_succ_code, api_succ_name)
+
+message(print('The following organisation changes are applicable to the list of trust and quarters provided:'))
+print(t(map_legacy))
 
 # output 2: to be used for retroactive data cleansing
 if (retroactive_fixes){
