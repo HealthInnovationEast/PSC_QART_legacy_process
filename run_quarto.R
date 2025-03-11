@@ -12,8 +12,13 @@ quarto_render("qart_slides.qmd",
                                     )
               )
 
-file_name <- format(Sys.time(), "qart_test_%Y_%m_%d_%H%M%S.pptx")
+file_name <- glue::glue("matneo_qart_slides_{quarter_string}.pptx")
 
 # move the quarto report into the output folder and change name
-# TO DO: save file to SharePoint quart_cleansed_date_2425_Q3
 file.rename('qart_slides.pptx', here(glue::glue('output/{file_name}')))
+
+# save file to SharePoint 
+chosenlib$upload_file(
+  dest = str_glue("{base_url}/{slides_folder}/{file_name}"),
+  src = str_glue('output/{file_name}')
+)

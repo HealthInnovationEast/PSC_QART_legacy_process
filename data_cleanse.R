@@ -367,11 +367,13 @@ previous_submissions_data_cleansed <- previous_submissions_prunned |>
   rename(icb = ics)
 
 # write to share point
+file_name <- 'mat_neo_qart_cleansed_upto_2024_25_Q2.csv'
+  
 write.csv(previous_submissions_data_cleansed, 
-          here('output/mat_neo_qart_cleansed_upto_2425_Q2.csv'),
+          here(str_glue('output/{file_name}')),
           row.names = F)
 
 chosenlib$upload_file(
-  dest = str_glue("{base_url}/{master_files_folder}/mat_neo_qart_cleansed_upto_2425_Q2.csv"),
-  src = 'output/mat_neo_qart_cleansed_upto_2425_Q2.csv'
+  dest = str_glue('{base_url}/{master_files_folder}/{file_name}'),
+  src =  str_glue('output/{file_name}')
 )

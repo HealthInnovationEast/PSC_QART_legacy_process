@@ -154,9 +154,6 @@ for (hin in hin_folders) {
   print(glue::glue("Successful data extraction for {hin}. Data retrieved from:"))
   print(glue::glue("{hin_submission_file}"))
 
-  # results <- results |>
-  #   bind_rows(data_combined)
-  
   results <- rbind(results, data_combined)
 }
 

@@ -1,12 +1,3 @@
-library(here)
-library(readxl)
-library(tidyverse)
-library(janitor)
-library(glue)
-library(httr)
-library(jsonlite)
-library(lubridate)
-
 # read latest psc (hin) names
 hin_names <- read.csv(here("lookups", "hin_names.csv")) |>
   arrange(hin_folders)

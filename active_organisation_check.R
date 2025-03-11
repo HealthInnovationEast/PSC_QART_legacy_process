@@ -8,8 +8,8 @@ library(jsonlite)
 library(lubridate)
 
 if (retroactive_fixes){
-  source('psc_name_update.R')
   # below produces submissions_previous_psc_updated (with data up to 2024/25 Q2) 
+  source('psc_name_update.R')
   
   # extract organisation list
   organisations <- submissions_previous_psc_updated |>
@@ -205,6 +205,17 @@ call_by_name <- function(url_end) {
 call_org_links <- apply(distinct_trusts[c('url_end')], 1, call_by_name) |>
   bind_rows()
 
+# NOT SURE IF BELOW IS ALWAYS RUN, need to see in retroactive fixes path
+# {# QA do we have hits with no names
+# qa_no_hits <- call_org_links |>
+#   filter(api_n_hits == 0)  
+# 
+# empty_qa_no_hits <- nrow(qa_no_hits) == 0
+# 
+# if (empty_qa_multiple_succ == F) {
+#   warning("Check qa_no_hits for no returns by name")
+# }}
+
 # QA check results for calls where there was >1 hit
 qa_multiple_hits <- call_org_links |>
   filter(api_n_hits > 1)
@@ -338,7 +349,7 @@ if (empty_qa_multiple_succ == F) {
 qart_quarters <- tibble(
   q_date = seq(
     from = as.Date("2020-04-01"),
-    to = as.Date("2024-09-30"), # TO DO: make object to store value of end date of previous reporting quarter
+    to = previous_quarter_end_date,
     by = "quarter"
   )
 ) |>
@@ -494,13 +505,15 @@ map_psc_trust_icb_quarter <- map_active_trusts_icb_details |>
 write.csv(map_psc_trust_icb_quarter, here("lookups", "psc_lookup.csv"), row.names = F)
 
 # output 2: to be used for retroactive data cleansing
-map_discrepancies <- map_active_trusts_icb_details |>
-  select(
-    latest_psc_name, organisation, organisation_tidy, api_org_code, api_date_end,
-    nhs_quarter, api_current_code_quarter, api_current_org_name_quarter
-  ) |>
-  filter(organisation != organisation_tidy |
-    organisation != api_current_org_name_quarter) |>
-  arrange(latest_psc_name, api_current_org_name_quarter) 
-
-write.csv(map_discrepancies, here("lookups", "discrepancies_lookup.csv"), row.names = F)
+if (retroactive_fixes){
+  map_discrepancies <- map_active_trusts_icb_details |>
+    select(
+      latest_psc_name, organisation, organisation_tidy, api_org_code, api_date_end,
+      nhs_quarter, api_current_code_quarter, api_current_org_name_quarter
+    ) |>
+    filter(organisation != organisation_tidy |
+             organisation != api_current_org_name_quarter) |>
+    arrange(latest_psc_name, api_current_org_name_quarter) 
+  
+  write.csv(map_discrepancies, here("lookups", "discrepancies_lookup.csv"), row.names = F)
+}

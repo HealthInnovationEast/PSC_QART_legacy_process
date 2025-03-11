@@ -3,7 +3,7 @@ library(tidyverse)
 library(Microsoft365R)
 
 location_lookup <- read.csv(here("lookups", "psc_lookup.csv"))
-psc <- unique(location_lookup$latest_psc_name)
+pscs <- unique(location_lookup$latest_psc_name)
 
 # download template file from SharePoint
 master_files_dr <- chosenlib$get_item(glue::glue("{base_url}/{master_files_folder}"))
@@ -15,7 +15,7 @@ template_file$download(dest = here("lookups", str_glue({template_file_name})),
 current_quarter_year <- str_remove_all(reporting_quarter, '20|/')
   
 # loop through locations provided in psc_lookup.csv
-for (i in psc) {
+for (psc in pscs) {
   # grid with icb codes and names
   location_icb <- location_lookup |>
     filter(latest_psc_name == psc) |>
@@ -45,7 +45,6 @@ for (i in psc) {
   # add ICB names to Medicines tab
   wb <- wb_add_data(wb,
     sheet = "Medicines",
-    # x = ?
     x = location_icb,
     start_col = 2,
     start_row = 6,
@@ -54,7 +53,6 @@ for (i in psc) {
 
   wb <- wb_add_data(wb,
     sheet = "Medicines",
-    # x = ?
     x = location_icb,
     start_col = 2,
     start_row = 17,
@@ -66,7 +64,6 @@ for (i in psc) {
   # optimisation grid
   wb <- wb_add_data(wb,
     sheet = "MatNeo",
-    # x = ?
     x = location_icb_trust,
     start_col = 2,
     start_row = 9,
@@ -76,7 +73,6 @@ for (i in psc) {
   # deterioration tools grid
   wb <- wb_add_data(wb,
     sheet = "MatNeo",
-    # x = ?
     x = location_icb_trust,
     start_col = 2,
     start_row = 30,
@@ -86,7 +82,6 @@ for (i in psc) {
   # preterm birth lead engagement
   wb <- wb_add_data(wb,
     sheet = "MatNeo",
-    # x = ?
     x = location_trusts,
     start_col = 3,
     start_row = 62,
@@ -96,7 +91,6 @@ for (i in psc) {
   # PAS score
   wb <- wb_add_data(wb,
     sheet = "MatNeo",
-    # x = ?
     x = location_icb,
     start_col = 3,
     start_row = 82,
@@ -109,10 +103,10 @@ for (i in psc) {
 
   # upload
   print(str_glue("Uploading template to:
-                 {base_url}/{i}"))
+                 {base_url}/{psc}"))
   
   chosenlib$upload_file(
-    dest = str_glue("{base_url}/{i}/{i} QART {current_quarter_year}.xlsx"),
+    dest = str_glue("{base_url}/{psc}/{psc} QART {current_quarter_year}.xlsx"),
     src = "output/empty_template.xlsx"
   )
 
