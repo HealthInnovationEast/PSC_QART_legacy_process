@@ -245,7 +245,7 @@ visualise_line <- function(df, aes_group, aes_colour,
 
 ![](data/matneo_overview.PNG)
 
-## title slide
+##  
 
 ```{r}
 mat_neo_long <- mat_neo_data |>
@@ -270,6 +270,8 @@ aggregate_int(
   )
 ```
 
+##  
+
 ```{r}
 # deploy functions
 aggregate_int(
@@ -283,6 +285,8 @@ aggregate_int(
   )
 ```
 
+##  
+
 ```{r}
 aggregate_int(
   mat_neo_data,
@@ -294,12 +298,16 @@ aggregate_int(
   )
 ```
 
+##  
+
 ```{r}
 aggregate_int(mat_neo_data, expr(quarter == reporting_quarter), normothermia) |>
   visualise_bars(
     normothermia
   )
 ```
+
+##  
 
 ```{r}
 aggregate_int(mat_neo_data, expr(quarter == reporting_quarter), optimal_cord_management) |>
@@ -315,6 +323,8 @@ aggregate_int(mat_neo_data, expr(quarter == reporting_quarter), antibiotics) |>
   )
 ```
 
+##  
+
 ```{r}
 aggregate_int(mat_neo_data, expr(quarter == reporting_quarter), corticosteroids) |>
   visualise_bars(
@@ -329,6 +339,8 @@ aggregate_int(mat_neo_data, expr(quarter == reporting_quarter), magnesium_sulpha
   )
 ```
 
+##  
+
 ```{r}
 aggregate_int(mat_neo_data, expr(quarter == reporting_quarter), caffeine) |>
   visualise_bars(
@@ -336,12 +348,16 @@ aggregate_int(mat_neo_data, expr(quarter == reporting_quarter), caffeine) |>
   )
 ```
 
+##  
+
 ```{r}
 aggregate_int(mat_neo_data, expr(quarter == reporting_quarter), volume_targeted_ventilation) |>
   visualise_bars(
     volume_targeted_ventilation
   )
 ```
+
+##  
 
 ```{r}
 #stage to use as benchmark progress
@@ -391,6 +407,8 @@ visualise_line(
   )
 ```
 
+##  
+
 ```{r}
 spaghetti_data <- bind_rows(
   aggregate_stage(mat_neo_data, magnesium_sulphate),
@@ -420,7 +438,7 @@ visualise_line(
 
 # MatNeoSIP - Deterioration Tools
 
-## temporary title
+##  
 
 ```{r}
 aggregate_int(mat_neo_data, expr(quarter == reporting_quarter), newtt2) |>
@@ -430,12 +448,17 @@ aggregate_int(mat_neo_data, expr(quarter == reporting_quarter), newtt2) |>
   )
 ```
 
+
+##  
+
 ```{r}
 aggregate_int(mat_neo_data, expr(quarter == reporting_quarter), mews) |> visualise_bars(
   mews,
   "MEWS"
 )
 ```
+
+##  
 
 ```{r}
 mat_neo_agg_newtt2_quarter <- mat_neo_data |>
@@ -464,6 +487,8 @@ visualise_bars(
   plot_caption = element_blank()
 )
 ```
+
+##  
 
 ```{r}
 mat_neo_agg_mews_quarter <- mat_neo_data |>
