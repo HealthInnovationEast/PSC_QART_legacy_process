@@ -5,7 +5,7 @@ previous_submissions_data <- submissions_previous_psc_updated |>
   rename("organisation_as_recorded" = organisation) |>
   select(latest_psc_name:mews)
 
-# speficied order of inerventions
+# specified order of interventions
 intervention_order <- c(
   "magnesium_sulphate",
   "corticosteroids", "antibiotics",
@@ -55,7 +55,7 @@ previous_data_name_mistakes <- previous_submissions_data |>
 
 name_corrections <- previous_data_name_mistakes |>
   distinct(latest_psc_name, organisation_as_recorded) |>
-  # bring anmes retrieved from API
+  # bring names retrieved from API
   left_join(discrepancies, by = c(
     "latest_psc_name",
     "organisation_as_recorded"

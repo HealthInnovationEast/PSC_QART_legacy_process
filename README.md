@@ -12,7 +12,7 @@ At the beginning of a new financial year quarter (e.g., 2024/25 Q1) the PSC's wi
 
 -   Wait 3 weeks for PSC submissions.
 
--   Collate all PSC submisisons and check for data completeness.
+-   Collate all PSC submissions and check for data completeness.
 
 -   Process data for calculations (note reporting doesn't go beyond summary statistics).
 
