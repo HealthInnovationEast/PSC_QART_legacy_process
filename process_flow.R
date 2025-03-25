@@ -14,6 +14,7 @@ library(quarto)
 source('config_sharepoint_location.R')
 
 # ----------------- parameters ------------------------
+# make these vars below from a table, so only one input which will be a date
 reporting_quarter <- "2024/25 Q3" # will change very quarter
 #reporting_quarter <- "2024/25 Q4" # TEST 2: no retroactive fixes
 previous_quarter <- "2024/25 Q2"
@@ -25,16 +26,16 @@ master_files_folder <- "1. Master files" # where data files are in SharePoint
 slides_folder <- "2. Slides" # where presentation will be saved in SharePoint
 template_file_name <- "preferred_template.xlsx"
 # below will be used after 2024/25 Q3 to append Q4 data 
-previous_submissions_file_name <- 'mat_neo_qart_all_data_upto_2024_25_Q3.csv' # will change very quarter
+previous_submissions_file_name <- 'mat_neo_qart_all_data_upto_2024_25_Q3.csv' # will change every quarter
 
 # process control
 # needs running once only 
 set_up_folders <- F 
-retroactive_fixes <- T
+#retroactive_fixes <- T
 #retroactive_fixes <- F # TEST 2: no retroactive fixes
 # will consistently need running
 org_name_checks <- T # always T
-prepare_templates <- T #T
+prepare_templates <- T
 process_submissions <- T
 #process_submissions <- F # TEST 2: no retroactive fixes
 # ------------------------------------------------------
@@ -44,6 +45,7 @@ if (set_up_folders){
   source('setup_site_folders.R')
 }         
 
+# --delete
 if (retroactive_fixes & org_name_checks) {
   # below checks matneo submissions up from 2021/22 Q1 to 2014/25 Q2
   # sources 'psc_name_update.R' (which applies HIN name updates)
@@ -56,6 +58,9 @@ if (retroactive_fixes & org_name_checks) {
   # run version that looks at data after 2024/25 Q3 
   source('active_organisation_check.R') 
  }
+## --delete
+source('active_organisation_check.R') #this one here will use the cleansed data 
+
 
 if (prepare_templates) {
   # below uses psc_lookup.csv
