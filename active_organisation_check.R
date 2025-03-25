@@ -1,12 +1,4 @@
-library(here)
-library(readxl)
-library(tidyverse)
-library(janitor)
-library(glue)
-library(httr)
-library(jsonlite)
-library(lubridate)
-
+# script to check legacy status of trusts for all PSC's 
 if (retroactive_fixes){
   # below produces submissions_previous_psc_updated (with data up to 2024/25 Q2) 
   source('psc_name_update.R')
@@ -199,9 +191,6 @@ call_by_name <- function(url_end) {
   )
 }
 
-#call_org_links <- apply(distinct_trusts[, 2], 1, call_by_name) |>
-  #bind_rows()
-
 call_org_links <- apply(distinct_trusts[c('url_end')], 1, call_by_name) |>
   bind_rows()
 
@@ -211,7 +200,7 @@ qa_no_hits <- call_org_links |>
  
 empty_qa_no_hits <- nrow(qa_no_hits) == 0
 
-if (empty_qa_multiple_succ == F) {
+if (empty_qa_no_hits == F) {
   stop("Check qa_no_hits as there have been calls with no return by name")
   }
 
@@ -355,6 +344,7 @@ qart_quarters <- tibble(
   mutate(quarter = lubridate::quarter(q_date, type = "year.quarter", fiscal_start = 4)) |>
   mutate(
     quarter_fy_start = round(quarter - 1),
+    # extract last 4 characters from 'quarter' string (e.g., extracts 21.1 from 2021.1 )
     quarter_fy_end = str_extract((quarter), '(.{4})$'),
     nhs_quarter = paste(quarter_fy_start, quarter_fy_end, sep = "/"),
     nhs_quarter = str_replace(
@@ -508,7 +498,7 @@ map_legacy <- map_active_trusts_icb_details |>
   filter(!is.na(api_date_end)) |>
   select(latest_psc_name, api_org_code, api_org_name, api_date_end, api_succ_code, api_succ_name)
 
-message(print('The following organisation changes are applicable to the list of trust and quarters provided:'))
+message('The following organisation changes are applicable to the list of trust and quarters provided:')
 print(t(map_legacy))
 
 # output 2: to be used for retroactive data cleansing

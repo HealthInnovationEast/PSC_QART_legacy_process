@@ -1,4 +1,16 @@
 library(here)
+library(Microsoft365R)
+library(stringr)
+library(tidyverse)
+library(readxl)
+library(janitor)
+library(glue)
+library(httr)
+library(jsonlite)
+library(lubridate)
+library(openxlsx2)
+library(quarto)
+
 source('config_sharepoint_location.R')
 
 # ----------------- parameters ------------------------

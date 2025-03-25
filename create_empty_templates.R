@@ -1,7 +1,4 @@
-library(openxlsx2)
-library(tidyverse)
-library(Microsoft365R)
-
+# script to create empty excel templates with organisation names for each PSC. Files will be avialbe on sharepoint
 location_lookup <- read.csv(here("lookups", "psc_lookup.csv"))
 pscs <- unique(location_lookup$latest_psc_name)
 

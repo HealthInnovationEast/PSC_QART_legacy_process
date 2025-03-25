@@ -1,7 +1,4 @@
 # run quarto file and save output in output folder
-library(here)
-library(quarto)
-library(glue)
 
 # NICE TO HAVE: validation rule to make sure quarter param is valid?
 

@@ -1,8 +1,4 @@
 # This file will be run once once settled on location
-library(tidyverse)
-library(Microsoft365R)
-library(stringr)
-
 # upload a readme file to a folder with the name of each psc.
 # To create a folder, a file must be uploaded to the folder- which creates the folder.
 

@@ -1,9 +1,4 @@
-library(here)
-library(readxl)
-library(tidyverse)
-library(janitor)
-library(glue)
-library(Microsoft365R)
+# script to find submissions from PSC on sharepoint and collate data for popwer point
 
 hin_folders <- dr$list_files() |>
   select(name) |>
