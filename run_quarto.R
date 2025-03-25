@@ -1,7 +1,12 @@
+# download template file from SharePoint
+master_files_dr <- chosenlib$get_item(glue::glue("{base_url}/{master_files_folder}"))
+
+matneo_overview_file <- master_files_dr$get_item(str_glue('matneo_overview.PNG'))
+
+matneo_overview_file$download(dest = here("data", 'matneo_overview.PNG'), 
+                       overwrite = T)
+
 # run quarto file and save output in output folder
-
-# NICE TO HAVE: validation rule to make sure quarter param is valid?
-
 quarto_render("qart_slides.qmd", 
               execute_params = list(reporting_quarter = reporting_quarter,
                                     master_files_folder = master_files_folder,

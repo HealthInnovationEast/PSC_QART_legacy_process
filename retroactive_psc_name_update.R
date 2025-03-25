@@ -1,3 +1,18 @@
+# previously known as psc_name_update
+master_files_dr <- chosenlib$get_item(glue::glue("{base_url}/1. Master files"))
+
+# download hin names look up
+hin_names_file <- master_files_dr$get_item('hin_names.csv')
+
+hin_names_file$download(dest = here("data", "hin_names.csv"), 
+                        overwrite = T)
+
+# download raw data file from share point (data up to 2024/25 Q2)
+raw_data_file <- master_files_dr$get_item('MatNeoSIP.xlsx')
+
+raw_data_file$download(dest = here("data", "MatNeoSIP.xlsx"), 
+                       overwrite = T)
+
 # read latest psc (hin) names
 hin_names <- read.csv(here("lookups", "hin_names.csv")) |>
   arrange(hin_folders)
@@ -31,3 +46,5 @@ submissions_previous_psc_updated <- submissions_previous_psc_name |>
   relocate(latest_psc_name, 
            .after = psc) |> 
   select(-psc)
+
+source('retroactive_fixes.R')
