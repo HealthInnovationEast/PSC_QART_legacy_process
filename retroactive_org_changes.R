@@ -1,10 +1,67 @@
-# previously known as active_organisation_check
-# script to retroactively correct errors in data up to 2024/15 Q2
+library(here)
+library(Microsoft365R)
+library(stringr)
+library(tidyverse)
+library(readxl)
+library(janitor)
+library(glue)
+library(httr)
+library(jsonlite)
+library(lubridate)
 
-# below calls on submissions_previous_psc_updated (with data up to 2024/25 Q2) and produced in psc_name_update.R
+source('config_sharepoint_location.R')
+
+# script to retroactively correct errors in data up to 2024/15 Q2
+master_files_dr <- chosenlib$get_item(glue::glue("{base_url}/1. Master files"))
+
+# download hin names look up
+hin_names_file <- master_files_dr$get_item('hin_names.csv')
+
+hin_names_file$download(dest = here("lookups", "hin_names.csv"), 
+                        overwrite = T)
+
+# download raw data file from share point (data up to 2024/25 Q2)
+raw_data_file <- master_files_dr$get_item('MatNeoSIP.xlsx')
+
+raw_data_file$download(dest = here("data", "MatNeoSIP.xlsx"), 
+                       overwrite = T)
+
+# read latest psc (hin) names
+hin_names <- read.csv(here("lookups", "hin_names.csv")) |>
+  arrange(hin_folders)
+
+# read previous submission data (i.e., up to 2024/25 Q2)
+previous_submissions_data <- read_excel(here("data", "MatNeoSIP.xlsx"), sheet = "Data") |>
+  clean_names() |>
+  rename(
+    "stage_7_all" = "stage_7",
+    "quarter" = "date"
+  ) |>
+  rename_with(~ str_replace(., "x", "stage_"), starts_with("x"))
+
+previous_submissions_old_psc_name <- previous_submissions_data |>
+  mutate(psc = case_when(psc == "Health Innovation Network" ~ "South London HIN",
+                         psc == "Health Innovation Manchester" ~ "Manchester HIN",
+                         .default = paste0(psc)
+  ))
+
+# replace old psc names with their appropriate HIN name
+psc_old_names <- previous_submissions_old_psc_name |> 
+  distinct(psc) |>
+  arrange(psc)
+
+psc_name_look_up <- data.frame(hin_names, psc_old_names) |>
+  rename('latest_psc_name' = hin_folders,
+         'former_psc_name' = psc)
+
+previous_submissions_psc_name_updated <- previous_submissions_old_psc_name |> 
+  left_join(psc_name_look_up, by = c('psc' = 'former_psc_name')) |>
+  relocate(latest_psc_name, 
+           .after = psc) |> 
+  select(-psc)
 
 # extract organisation list
-organisations <- submissions_previous_psc_updated |>
+organisations <- previous_submissions_psc_name_updated |>
   select(1:4) |>
   # we know of submissions under trust sites instead of trusts names
   filter(!organisation %in% c(
@@ -12,17 +69,18 @@ organisations <- submissions_previous_psc_updated |>
     "Royal Sussex County (RSCH) (UHSX)",
     "Princess Royal (PRH) (UHSX)",
     "Worthing (UHSX)"
-  )) 
+  )) |>
+  distinct(latest_psc_name, organisation) 
 
 # Name fixes
 # ideally, the hard coded replacements below would be replaced with a file or API call
 # The name changes for the concerned organisations below reflect one of 3 events:
 # 1. Incorrect use of a name that's slightly different from legal name
 # (e.g., omitting 'teaching' in 'teaching hospitals)
-# 2. An aesthetic name change (imagine a rebranding)
+# 2. An aesthetic name change (picture a re-branding)
 # 3. A name change following a statutory legal changes (e.g, a merger). For example,
-# org A acquired org B, then org A (as a fused entity) changes name to Org C
-# this means org B is succeeded by org C and org A had a rebrand (which is what
+# org A acquired org B, then org A (as a merged org) changes name to Org C
+# this means org B is succeeded by org C and org A had a re-brand (which is what
 # is represented in the hard coded name change below)
 # consult https://www.england.nhs.uk/publication/<old-organisation-name> for more details
 
@@ -49,8 +107,7 @@ org_names_previous_submissions <- organisations |>
     organisation == "YORK TEACHING HOSPITAL NHS FOUNDATION TRUST" ~
       "YORK AND SCARBOROUGH TEACHING HOSPITALS NHS FOUNDATION TRUST", # name change effective from FY21/22
     .default = paste0(organisation)
-  )) |>
-  distinct(latest_psc_name, organisation, organisation_tidy) 
+  )) 
 
 # API replacement
 trusts <- org_names_previous_submissions |>
@@ -304,11 +361,13 @@ if (empty_qa_multiple_succ == F) {
   warning("Check qa_multiple_succ for multiple successors")
 }
 
-# determine which organisations are considered legacy for respective quarter
+# list of quarters (formatted )
 qart_quarters <- tibble(
   q_date = seq(
+    # from a year before data collection (this will make it clearer to see UNIVERSITY HOSPITALS SUSSEX merger)
     from = as.Date("2020-04-01"),
-    to = previous_quarter_end_date,
+    # up until end of 2024/25 Q2 (i.e., last quarter of previous submisisons)
+    to = as.Date("2024-09-30"),
     by = "quarter"
   )
 ) |>
@@ -325,8 +384,8 @@ qart_quarters <- tibble(
     )
   )
 
+# determine after which quarter the organisation becomes legacy
 call_org_end_dates_quarter_info <- call_org_end_dates |>
-  # determine after which quarter the organisation becomes legacy
   mutate(active_until_quarter = lubridate::quarter(api_date_end,
                                                    type = "year.quarter",
                                                    fiscal_start = 4
@@ -335,8 +394,8 @@ call_org_end_dates_quarter_info <- call_org_end_dates |>
             by = c(active_until_quarter = "quarter")
   )
 
-# we already have info for legacy orgs
-legacy_details <- call_org_end_dates_quarter_info |>
+# bring successor info for legacy orgs
+successor_organisation_details <- call_org_end_dates_quarter_info |>
   filter(!is.na(nhs_quarter)) |>
   select(api_date_end, api_succ_code) |>
   left_join(call_org_end_dates_quarter_info |> select(api_org_code, api_org_name),
@@ -344,9 +403,9 @@ legacy_details <- call_org_end_dates_quarter_info |>
   ) |>
   rename("api_succ_name" = api_org_name)
 
-# determine organisations codes and names relevant for latest reporting quarter
+# determine organisation status (legacy/active) up to 2024/25 Q2
 call_orgs_active_status_quarter <- call_org_end_dates_quarter_info |>
-  left_join(legacy_details, by = c("api_date_end", "api_succ_code")) |>
+  left_join(successor_organisation_details, by = c("api_date_end", "api_succ_code")) |>
   mutate(
     api_current_code_quarter = case_when(is.na(nhs_quarter) ~ api_org_code,
                                          .default = api_succ_code
@@ -356,9 +415,9 @@ call_orgs_active_status_quarter <- call_org_end_dates_quarter_info |>
     )
   )
 
-# left_join results from detailed tables
-# below is a map of active trusts for the latest reporting quarter
-map_active_trusts_quarter <- trusts |>
+# create a map that includes organisations as recorded in raw data plus information from API calls 
+# below is a map of all organisation present in data
+map_trusts_legacy_status <- trusts |>
   left_join(call_org_links, by = "url_end") |>
   left_join(call_orgs_active_status_quarter, by = c(
     "api_org_link",
@@ -374,7 +433,7 @@ map_active_trusts_quarter <- trusts |>
 # Info on relationships:
 # https://www.odsdatasearchandexport.nhs.uk/referenceDataCatalogue/Relationships_571324965.html
 
-current_trust_codes <- map_active_trusts_quarter |>
+current_trust_codes <- map_trusts_legacy_status |>
   distinct(api_current_code_quarter)
 
 call_icb_code <- function(api_current_code_quarter) {
@@ -445,9 +504,8 @@ for (icb in 1:length(all_icbs$Organisations)) {
   call_icb_names[icb, "api_icb_name"] <- api_icb_name
 }
 
-# map of icb details
-# use ICB codes to fetch ICB names so active trusts have all icb details needed
-map_active_trusts_icb_details <- map_active_trusts_quarter |>
+# add ICB codes to get ICB names form previous call so trusts have all ICB details needed
+map_trusts_legacy_status_icb_details <- map_trusts_legacy_status |>
   left_join(call_icb_org_codes, c(
     "api_current_code_quarter",
     "api_current_org_name_quarter"
@@ -455,25 +513,32 @@ map_active_trusts_icb_details <- map_active_trusts_quarter |>
   left_join(call_icb_names, c("api_icb_code"))
 
 # output 1: how organisations names will appear in templates
-map_psc_trust_icb_quarter <- map_active_trusts_icb_details |>
+# this is a map of active orgs from 2024/25 Q2 onwards 
+map_psc_trust_icb_active_orgs <- map_trusts_legacy_status_icb_details |>
   distinct(
     latest_psc_name, api_icb_code, api_icb_name,
     api_current_code_quarter, api_current_org_name_quarter
   ) |> 
   arrange(latest_psc_name, api_icb_name, api_current_org_name_quarter)
 
-write.csv(map_psc_trust_icb_quarter, here("lookups", "psc_lookup.csv"), row.names = F)
+write.csv(map_psc_trust_icb_active_orgs, here("lookups", "psc_icb_trust_lookup.csv"), row.names = F)
+
+# save file on SharePoint 
+chosenlib$upload_file(
+  dest = str_glue("{base_url}/1. Master files/psc_icb_trust_lookup.csv"),
+  src = "lookups/psc_icb_trust_lookup.csv"
+)
 
 # print a message of where organisation changes have occurred 
-map_legacy <- map_active_trusts_icb_details |> 
-  filter(!is.na(api_date_end)) |>
+map_legacy <- map_trusts_legacy_status_icb_details |> 
+  filter(!is.na(nhs_quarter)) |>
   select(latest_psc_name, api_org_code, api_org_name, api_date_end, api_succ_code, api_succ_name)
 
-message('The following organisation changes are applicable to the list of trust and quarters provided:')
+message('The following organisation changes are applicable to the list of trusts up to 2024/25 Q2')
 print(t(map_legacy))
 
 # output 2: to be used for retroactive data cleansing
-map_discrepancies <- map_active_trusts_icb_details |>
+map_discrepancies <- map_trusts_legacy_status_icb_details |>
   select(
     latest_psc_name, organisation, organisation_tidy, api_org_code, api_date_end,
     nhs_quarter, api_current_code_quarter, api_current_org_name_quarter
@@ -482,7 +547,9 @@ map_discrepancies <- map_active_trusts_icb_details |>
            organisation != api_current_org_name_quarter) |>
   arrange(latest_psc_name, api_current_org_name_quarter) 
 
+# save locally
 write.csv(map_discrepancies, here("lookups", "discrepancies_lookup.csv"), row.names = F)
 
-source('data_cleanse.R')
+# proceed to data cleanse procedure
+source('retroactive_data_cleanse.R')
 
