@@ -51,12 +51,12 @@ psc_old_names <- previous_submissions_old_psc_name |>
   arrange(psc)
 
 psc_name_look_up <- data.frame(hin_names, psc_old_names) |>
-  rename('latest_psc_name' = hin_folders,
+  rename('updated_psc_name' = hin_folders,
          'former_psc_name' = psc)
 
 previous_submissions_psc_name_updated <- previous_submissions_old_psc_name |> 
   left_join(psc_name_look_up, by = c('psc' = 'former_psc_name')) |>
-  relocate(latest_psc_name, 
+  relocate(updated_psc_name, 
            .after = psc) |> 
   select(-psc)
 
@@ -70,7 +70,7 @@ organisations <- previous_submissions_psc_name_updated |>
     "Princess Royal (PRH) (UHSX)",
     "Worthing (UHSX)"
   )) |>
-  distinct(latest_psc_name, organisation) 
+  distinct(updated_psc_name, organisation) 
 
 # Name fixes
 # ideally, the hard coded replacements below would be replaced with a file or API call
@@ -85,6 +85,7 @@ organisations <- previous_submissions_psc_name_updated |>
 # consult https://www.england.nhs.uk/publication/<old-organisation-name> for more details
 
 org_names_previous_submissions <- organisations |>
+  # these are hard coded name corrections needed so the API calls run smoothly
   mutate(organisation_tidy = case_when(
     organisation == "UNITED LINCOLNSHIRE HOSPITALS NHS TRUST" ~
       "UNITED LINCOLNSHIRE TEACHING HOSPITALS NHS TRUST", # old templates systematically omitted 'teaching'
@@ -403,14 +404,15 @@ successor_organisation_details <- call_org_end_dates_quarter_info |>
   ) |>
   rename("api_succ_name" = api_org_name)
 
-# determine organisation status (legacy/active) up to 2024/25 Q2
+# determine organisation status (legacy/active) up to 2024/25 Q2 
+# names and codes current up to that point in time
 call_orgs_active_status_quarter <- call_org_end_dates_quarter_info |>
   left_join(successor_organisation_details, by = c("api_date_end", "api_succ_code")) |>
   mutate(
-    api_current_code_quarter = case_when(is.na(nhs_quarter) ~ api_org_code,
+    api_current_code = case_when(is.na(nhs_quarter) ~ api_org_code,
                                          .default = api_succ_code
     ),
-    api_current_org_name_quarter = case_when(is.na(nhs_quarter) ~ api_org_name,
+    api_current_org_name = case_when(is.na(nhs_quarter) ~ api_org_name,
                                              .default = api_succ_name
     )
   )
@@ -434,17 +436,17 @@ map_trusts_legacy_status <- trusts |>
 # https://www.odsdatasearchandexport.nhs.uk/referenceDataCatalogue/Relationships_571324965.html
 
 current_trust_codes <- map_trusts_legacy_status |>
-  distinct(api_current_code_quarter)
+  distinct(api_current_code)
 
-call_icb_code <- function(api_current_code_quarter) {
+call_icb_code <- function(api_current_code) {
   trust_info <- content(GET(paste0(
     "https://directory.spineservices.nhs.uk/ORD/2-0-0/organisations/",
-    api_current_code_quarter
+    api_current_code
   )))
   
-  api_current_org_name_quarter <- trust_info$Organisation$Name
+  api_current_org_name <- trust_info$Organisation$Name
   
-  print(glue::glue("** Getting ICB code for {api_current_org_name_quarter} **"))
+  print(glue::glue("** Getting ICB code for {api_current_org_name} **"))
   
   relationships <- length(trust_info$Organisation$Rels$Rel)
   
@@ -471,8 +473,8 @@ call_icb_code <- function(api_current_code_quarter) {
   
   
   tibble(
-    api_current_code_quarter,
-    api_current_org_name_quarter,
+    api_current_code,
+    api_current_org_name,
     api_icb_code
   )
 }
@@ -507,8 +509,8 @@ for (icb in 1:length(all_icbs$Organisations)) {
 # add ICB codes to get ICB names form previous call so trusts have all ICB details needed
 map_trusts_legacy_status_icb_details <- map_trusts_legacy_status |>
   left_join(call_icb_org_codes, c(
-    "api_current_code_quarter",
-    "api_current_org_name_quarter"
+    "api_current_code",
+    "api_current_org_name"
   )) |>
   left_join(call_icb_names, c("api_icb_code"))
 
@@ -516,10 +518,10 @@ map_trusts_legacy_status_icb_details <- map_trusts_legacy_status |>
 # this is a map of active orgs from 2024/25 Q2 onwards 
 map_psc_trust_icb_active_orgs <- map_trusts_legacy_status_icb_details |>
   distinct(
-    latest_psc_name, api_icb_code, api_icb_name,
-    api_current_code_quarter, api_current_org_name_quarter
+    updated_psc_name, api_icb_code, api_icb_name,
+    api_current_code, api_current_org_name
   ) |> 
-  arrange(latest_psc_name, api_icb_name, api_current_org_name_quarter)
+  arrange(updated_psc_name, api_icb_name, api_current_org_name)
 
 write.csv(map_psc_trust_icb_active_orgs, here("lookups", "psc_icb_trust_lookup.csv"), row.names = F)
 
@@ -532,7 +534,7 @@ chosenlib$upload_file(
 # print a message of where organisation changes have occurred 
 map_legacy <- map_trusts_legacy_status_icb_details |> 
   filter(!is.na(nhs_quarter)) |>
-  select(latest_psc_name, api_org_code, api_org_name, api_date_end, api_succ_code, api_succ_name)
+  select(updated_psc_name, api_org_code, api_org_name, api_date_end, api_succ_code, api_succ_name)
 
 message('The following organisation changes are applicable to the list of trusts up to 2024/25 Q2')
 print(t(map_legacy))
@@ -540,16 +542,33 @@ print(t(map_legacy))
 # output 2: to be used for retroactive data cleansing
 map_discrepancies <- map_trusts_legacy_status_icb_details |>
   select(
-    latest_psc_name, organisation, organisation_tidy, api_org_code, api_date_end,
-    nhs_quarter, api_current_code_quarter, api_current_org_name_quarter
+    updated_psc_name, organisation, organisation_tidy, api_org_code, api_date_end,
+    nhs_quarter, api_current_code, api_current_org_name
   ) |>
+  # IMPORTANT: discrepancies are worked out based on name mis matches 
   filter(organisation != organisation_tidy |
-           organisation != api_current_org_name_quarter) |>
-  arrange(latest_psc_name, api_current_org_name_quarter) 
+           organisation != api_current_org_name) |>
+  arrange(updated_psc_name, api_current_org_name) 
+
+
+# identify discrepancy type by psc
+# carry over are identified as psc's where at least one organisation had an end_date retrieved from API calls
+psc_legacy_carry_overs <- map_discrepancies |>
+  distinct(updated_psc_name, api_date_end) |>
+  filter(!is.na(api_date_end)) |>
+  distinct(updated_psc_name) |>
+  mutate(discrepancy_type = 'legacy-trust-carry-over')
+
+# record discrepancy type in look up
+map_discrepancies_type <- map_discrepancies |>
+  left_join(psc_legacy_carry_overs, by = 'updated_psc_name') |>
+  mutate(discrepancy_type = if_else(is.na(discrepancy_type), 
+                                    # simple organisation name mistakes are identified as the psc's that were not part of the legacy carry over group
+                                    'trust-name-mistake', 
+                                    paste(discrepancy_type)))
 
 # save locally
-write.csv(map_discrepancies, here("lookups", "discrepancies_lookup.csv"), row.names = F)
+write.csv(map_discrepancies_type, here("lookups", "discrepancies_lookup.csv"), row.names = F)
 
 # proceed to data cleanse procedure
 source('retroactive_data_cleanse.R')
-
