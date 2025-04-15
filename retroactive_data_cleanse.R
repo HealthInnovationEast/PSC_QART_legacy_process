@@ -100,6 +100,9 @@ map_potential_carry_over_across_quarters <- discrepancies_carry_overs |>
       "organisation_as_recorded"
     )
   ) |>
+  mutate(api_current_org_name = case_when(is.na(api_current_org_name) ~ paste0(organisation_as_recorded), 
+                                     .default =  api_current_org_name)
+    ) |>
   select(
     # this order will make reading the table easier
     updated_psc_name, ics, organisation_as_recorded,
@@ -116,7 +119,7 @@ map_potential_carry_over_across_quarters <- discrepancies_carry_overs |>
     inactive_during_quarter = case_when(quarter > nhs_quarter ~ T,
       .default = F
     ),
-    name_mismatch = organisation_as_recorded != api_current_org_name
+    current_name_in_use = organisation_as_recorded == api_current_org_name
   )
 
 # the function below will be filtering data based on a combination of PSC and trust names
@@ -160,7 +163,7 @@ identify_polluted_quarters <- function(map = map_potential_carry_over_across_qua
     select(
       updated_psc_name, ics, organisation_as_recorded,
       quarter, api_date_end, nhs_quarter, inactive_during_quarter,
-      name_mismatch
+      current_name_in_use, api_current_org_name
     ) |>
     # then use that map as a look up to extract polluted previous submissions
     left_join(previous_data,
@@ -169,18 +172,25 @@ identify_polluted_quarters <- function(map = map_potential_carry_over_across_qua
     # DECISION RULE: the correct org name during a quarter is based on activity status
     # favouring the name of an active org as shown in ODS
     mutate(valid_org_name_as_recorded = case_when(
-      inactive_during_quarter == T | name_mismatch == T ~ F,
+      #inactive_during_quarter == T | current_name_in_use == T ~ F,
+      inactive_during_quarter == T ~ F,
+      inactive_during_quarter == F & current_name_in_use == F ~ F,
       .default = T),
-      .after = name_mismatch)
+      .after = current_name_in_use)
   
   # work out the list of orgs that will remain for every quarter
   psc_keep_orgs <- psc_org_polluted_data |>
-    filter(valid_org_name_as_recorded == T 
-           #| inactive_during_quarter == F
+    filter(valid_org_name_as_recorded == T |
+             # when rename has already happened 
+             inactive_during_quarter == F & current_name_in_use == F |
+             inactive_during_quarter == F & current_name_in_use == T # name change hadn't taken effect
     ) |>
     mutate(organisation_name_after_cleanse = case_when(
-      valid_org_name_as_recorded == T ~ organisation_as_recorded#,
-      #   inactive_during_quarter == F & name_mismatch == T ~ organisation_as_recorded
+      valid_org_name_as_recorded == T ~ organisation_as_recorded , 
+      # when rename has already happened 
+      inactive_during_quarter == F & current_name_in_use == F ~ api_current_org_name,
+      # if rename hasn't happened during quarter 
+      inactive_during_quarter == F & current_name_in_use == T ~ api_current_org_name
     )) |>
     distinct(updated_psc_name, quarter, organisation_name_after_cleanse)
   
@@ -219,7 +229,7 @@ deduplicate_polluted_data <- function(psc_org_polluted_data){
         #organisation_tidy, 
         #organisation_as_recorded, 
         api_date_end, inactive_during_quarter,
-        name_mismatch, nhs_quarter, valid_org_name_as_recorded
+        current_name_in_use, nhs_quarter, valid_org_name_as_recorded
       )) %>% # need %>% pipe to pass '.' argument in is.na()
       replace(is.na(.), "Stageless") |>
       pivot_longer(
@@ -285,7 +295,7 @@ return_cleansed_data <- function(results_evaluated_all_quarters, psc_keep_orgs){
       names_from = intervention,
       values_from = stage_to_keep
     ) |>
-    # reorder columns to emulate previous_submissions_data order
+    # reorder columns to emulate previous_submissions_data_polluted order
     select(updated_psc_name:quarter, all_of(intervention_order)) |>
     # restore NA values
     mutate(across(all_of(intervention_order), ~ case_when(.x == "Stageless" ~ NA,
@@ -295,7 +305,7 @@ return_cleansed_data <- function(results_evaluated_all_quarters, psc_keep_orgs){
   # join the cleansed results
   psc_data_cleansed <- psc_keep_orgs |>
     left_join(psc_keep_interventions, by = c("updated_psc_name", "quarter")) |>
-    # order below reflects structure in previous_submissions_data
+    # order below reflects structure in previous_submissions_data_polluted
     select(
       updated_psc_name, ics, organisation_name_after_cleanse, quarter,
       all_of(intervention_order)
@@ -303,95 +313,83 @@ return_cleansed_data <- function(results_evaluated_all_quarters, psc_keep_orgs){
 }
 
 
-x = identify_polluted_quarters(
-  map = map_potential_carry_over_across_quarters,
-  previous_data = previous_data_legacy_carry_over,
+# deploy function
+# IMPORTANT: choosing to be overly explicit here whilst we QA this logic. 
+
+# -- kent --
+kent_polluted <- identify_polluted_quarters(
   psc = "(?i)kent",
   orgs = "(?i)brighton|western sussex|university hospitals sussex"
 ) 
 
-y = x$psc_org_polluted_data |>
+kent_cleansed <- kent_polluted$psc_org_polluted_data |>
   deduplicate_polluted_data() %>% # pipe needed to pass '.' below
-  return_cleansed_data(., psc_keep_orgs = x$psc_keep_orgs)
-
-# deploy function
-# IMPORTANT: choosing to be overly explicit here whilst we QA this logic. 
-# Looping might be more appropriate  
-# -- kent --
-kent_results <- my_function(
-  map = map_potential_carry_over_across_quarters,
-  previous_data = previous_data_legacy_carry_over,
-  psc = "(?i)kent",
-  orgs = "(?i)brighton|western sussex|university hospitals sussex"
-)
-
-kent_polluted_data <- kent_results$polluted_data_long_all_quarters
-kent_eval_for_qa <- kent_results$results_evaluated_all_quarters
-kent_cleansed <- kent_results$psc_data_cleansed
+  return_cleansed_data(., psc_keep_orgs = kent_polluted$psc_keep_orgs)
 
 # -- north west coast --
-nwc_results <- my_function(
-  map = map_potential_carry_over_across_quarters,
-  previous_data = previous_data_legacy_carry_over,
+
+nwc_polluted <- identify_polluted_quarters(
   psc = "(?i)north West Coast",
   orgs = "(?i)southport|st helens|mersey"
 )
 
-nwc_polluted_data <- nwc_results$polluted_data_long_all_quarters
-nwc_eval_for_qa <- nwc_results$results_evaluated_all_quarters
-nwc_cleansed <- nwc_results$psc_data_cleansed
+nwc_cleansed <-  nwc_polluted$psc_org_polluted_data |>
+  deduplicate_polluted_data() %>% # pipe needed to pass '.' below
+  return_cleansed_data(., psc_keep_orgs = nwc_polluted$psc_keep_orgs)
 
 # -- south west 1 --
-sw_results_somerset <- my_function(
-  map = map_potential_carry_over_across_quarters,
-  previous_data = previous_data_legacy_carry_over,
+
+sw_somerset_poluted = identify_polluted_quarters(
   psc = "(?i)south West",
   orgs = "(?i)yeovil|somerset"
 )
 
-sw_somerset_polluted_data <- sw_results_somerset$polluted_data_long_all_quarters
-sw_somerset_eval_for_qa <- sw_results_somerset$results_evaluated_all_quarters
-sw_somerset_cleansed <- sw_results_somerset$psc_data_cleansed
+sw_somerset_cleansed = sw_somerset_poluted$psc_org_polluted_data |>
+  deduplicate_polluted_data() %>% # pipe needed to pass '.' below
+  return_cleansed_data(., psc_keep_orgs = sw_somerset_poluted$psc_keep_orgs)
 
 # -- south west 2 --
-sw_results_royal_devon <- my_function(
-  map = map_potential_carry_over_across_quarters,
-  previous_data = previous_data_legacy_carry_over,
+
+sw_royal_devon_poluted = identify_polluted_quarters(
   psc = "(?i)south West",
   orgs = "(?i)northern devon|royal devon"
 )
 
-sw_royal_devon_polluted_data <- sw_results_royal_devon$polluted_data_long_all_quarters
-sw_royal_devon_eval_for_qa <- sw_results_royal_devon$results_evaluated_all_quarters
-sw_royal_devon_cleansed <- sw_results_royal_devon$psc_data_cleansed
+sw_royal_devon_cleansed = sw_royal_devon_poluted$psc_org_polluted_data |>
+  deduplicate_polluted_data() %>% # pipe needed to pass '.' below
+  return_cleansed_data(., psc_keep_orgs = sw_royal_devon_poluted$psc_keep_orgs)
 
 # bind results
 previous_data_legacy_carry_over_corrected <- bind_rows(
   kent_cleansed,
   nwc_cleansed,
   sw_somerset_cleansed,
-  sw_royal_devon_cleansed
-) |>
+  sw_royal_devon_cleansed ) |>
+  left_join( map_discrepancies |> distinct(api_current_org_name, api_current_code),
+             by = c('organisation_name_after_cleanse' = 'api_current_org_name')) |>
+  relocate(api_current_code, .before = organisation_name_after_cleanse) |>
   mutate(
     retroactive_fix = T,
     retroactive_correction = "legacy-trust-carry-over"
   )
 
 # bring all corrections together ----------------------------------------
-rows_to_replace <- discrepancies_name_mistakes |>
-  distinct(updated_psc_name, ics, organisation_as_recorded, quarter) |> 
+rows_to_replace <- previous_data_org_name_corrected |>
+  distinct(updated_psc_name, #ics, 
+           organisation_as_recorded, quarter) |> 
   bind_rows(
     # need to use the polluted dfs here because that contains 
     # the confirmed quarters with a legacy carry over 
-    kent_polluted_data,
-    nwc_polluted_data,
-    sw_somerset_polluted_data,
-    sw_royal_devon_polluted_data)|> 
-  distinct(updated_psc_name, ics, organisation_as_recorded, quarter)
+    kent_polluted$psc_org_polluted_data,
+    nwc_polluted$psc_org_polluted_data,
+    sw_somerset_poluted$psc_org_polluted_data,
+    sw_royal_devon_poluted$psc_org_polluted_data)|> 
+  distinct(updated_psc_name, #ics, 
+           organisation_as_recorded, quarter)
 
 # remove all the rows that have undergone a retroactive correction
-previous_submissions_prunned <- previous_submissions_data |> 
-  anti_join(rows_to_replace, by = c('updated_psc_name', 'ics',
+previous_submissions_prunned <- previous_submissions_data_polluted |> 
+  anti_join(rows_to_replace, by = c('updated_psc_name', #'ics',
                                     'organisation_as_recorded', 'quarter')) 
 
 previous_submissions_data_cleansed <- previous_submissions_prunned |> 
@@ -400,11 +398,12 @@ previous_submissions_data_cleansed <- previous_submissions_prunned |>
     previous_data_org_name_corrected,
     # this one didn't
     previous_data_legacy_carry_over_corrected) |>
-  relocate(organisation_name_after_cleanse, .after = organisation_as_recorded) |>
+  relocate(organisation_name_after_cleanse, api_current_code, .after = organisation_as_recorded) |>
   mutate(organisation_name_after_cleanse = 
            case_when(!is.na(organisation_name_after_cleanse) ~ organisation_name_after_cleanse,
                      is.na(organisation_name_after_cleanse) ~ organisation_as_recorded)) |>
-  rename(icb = ics)
+  rename(icb = ics) 
+# ADD ORG CODES
 
 # write to share point
 file_name <- 'mat_neo_qart_cleansed_upto_2024_25_Q2.csv'
