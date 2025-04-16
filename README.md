@@ -34,19 +34,17 @@ Used in ready to go process:
 
 -   *preferred_template.xlsx* - Excel blueprint file that will be filled out with organisations assigned to each PSC. Custom files are sent out for data collection. File is set to be downloaded from SharePoint in *create_empty_templates.R.*
 
--   *mat_neo_qart_cleansed_upto_2024_25_Q2.csv* - ADD TEXT
+-   *mat_neo_qart_cleansed_upto_2024_25_Q2.csv* - A corrected version of data in *MatNeoSIP.xlsx* which addresses data quality issues explained below.
 
 ## Retroactive Fixes to the data
 
-Retroactive corrections to the data up to 2024/25 Q2 were needed to generate data ready for automation. These corrections addressed DQ issues whereby data were recorded for both legacy and successor organisations several quarters after an organisation change had taken place (**effectively generating a case of duplicated organisations in the data set**). A secondary DQ issue was the use of outdated organisation names. There's no need to re-run the scripts below and they are not be sourced in the master script *process_flow.R* :
+Retroactive corrections to the data up to 2024/25 Q2 were needed to generate data ready for automation. These corrections addressed DQ issues whereby data were recorded for both legacy and successor organisations several quarters after an organisation change had taken place (**effectively generating a case of duplicated organisations in the data set**). A secondary DQ issue was the use of outdated organisation names. There's no need to re-run the scripts below and they are not sourced in the master script *process_flow.R* :
 
--   *retroactive_psc_name_update.R* - Read previous submissions from `MatNeoSIP.xlsx` and up to date HIN names from `hin_names.csv`. The output was a data object (`submissions_previous_psc_updated`) that had previous submissions with updated HIN names.
+-   *retroactive_org_changes.R* - Read previous submissions from `MatNeoSIP.xlsx` and updated HIN names using `hin_names.csv`. More importantly, this script checked the NHS trusts present in the data up to 2024/25 Q2 and determined whether an organisation was legacy via a series of calls to the [ODS API](https://digital.nhs.uk/developer/api-catalogue/organisation-data-service-ord). This script generated 2 output files `psc_icb_trust_lookup.csv` and `discrepancies_lookup.csv`.
 
--   *retroactive_org_changes.R* - Checked the NHS trusts present in the data up to 2024/25 Q2 and determined whether an organisation was legacy via a series of calls to the [ODS API](https://digital.nhs.uk/developer/api-catalogue/organisation-data-service-ord). This script generated 2 output files `psc_icb_trust_lookup.csv` and `discrepancies_lookup.csv`. The former is saved in
+-   *retroactive_data_cleanse.R* - This script used `discrepancies_lookup.csv` to extract data points with an outdated name or where there was a legacy carry over (i.e., where data was recorded simultaneously for both a legacy organisation and its successor).
 
--   *data_cleanse.R* - This script used `discrepancies_lookup.csv` to extract data points with an outdated name or where there was a legacy carry over (i.e., where data was recorded simultaneously for both a legacy organisation and its successor). The name fixes were addressed easily, as it was just replacing outdated names with correct ones.
-
-    The legacy conflicts were more complex as data points from multiple organisations needed to be compared and a value for each intervention had to be chosen. The output of this file was a cleansed version of `MatNeoSIP.xlsx` - i.e., a file with quarterly data from 2021/22 Q1 to 2024/25 Q2 (`mat_neo_qart_cleansed_upto_2425_Q2.csv`). New data will be appended to previous submissions containing these cleansed data.
+    The name fixes were addressed easily, as it was just replacing outdated names with correct ones. The legacy conflicts were more complex as data points from multiple organisations needed to be compared and a value for each intervention had to be chosen. The output of this file was a cleansed version of `MatNeoSIP.xlsx` - i.e., a file with quarterly data from 2021/22 Q1 to 2024/25 Q2 (`mat_neo_qart_cleansed_upto_2425_Q2.csv`). New data will be appended to previous submissions containing these cleansed data.
 
 ## Retroactive SharePoint Set up
 
@@ -60,17 +58,17 @@ These are the scripts that will be run from 2024/25 Q3 onward, and rely on using
 
 -   *config_sharepoint_location.R* - Creates 3 important variables (`site_url`, `chosenlib`, and `base_url`) which will be used in other scripts to navigate around SharePoint. Once a SharePoint location has been selected, these variables should not be changed.
 
--   *active_organisation_check.R* - A simplified version of *retroactive_legacy_status.R.* This script will account for upcoming (as opposed to previous) organisation changes by looking at the trusts present in the ?previous quarter. It will make use of the [ODS API](https://digital.nhs.uk/developer/api-catalogue/organisation-data-service-ord) and will output a new `psc_icb_trust_lookup.csv`.
+-   *active_organisation_check.R* - A simplified version of *retroactive_org_changes.R.* This script will account for upcoming (as opposed to previous) organisation changes by looking at the trusts present in the last PSC submissions (e.g., when looking for changes applicable to 24/25 Q4, it will check list of organisations in 24/25 Q3). It will make use of the [ODS API](https://digital.nhs.uk/developer/api-catalogue/organisation-data-service-ord) and will output a new `psc_icb_trust_lookup.csv`, which will be available in SharePoint.
 
--   *create_empty_templates.R* - Creates excel templates with organisation and ICB names for each PSC, using `psc_icb_trust_lookup.csv` and `preferred_template.xlsx`. Templates are uploaded to the corresponding PSC SharePoint folders generated when *setup_site_folders.R* was first run.
+-   *create_empty_templates.R* - Creates excel templates with organisation and ICB names for each PSC, using `psc_icb_trust_lookup.csv` and `preferred_template.xlsx`. Templates are uploaded to the corresponding PSC SharePoint folders generated via *setup_site_folders.R*.
 
 -   *read_qart_submissions.R* - Goes through every PSC folder, identifies the submitted data (i.e., file name ending in 'returned'), and extracts the MatNeo qart data. Output of this script is a collated data file with data for all trusts in all PSC's, which will be appended to the cleansed data.
 
-    -   [Note]{.underline}: script will also generate a `hin_names.csv` lookup, but this would only be useful if one the HIN's have changed their name, otherwise it's the same version of the one already available in master files. Names are current as of March 2025.
+    -   **Note:** script will also generate a `hin_names.csv` lookup, but this would only be useful if one the HIN's have changed their name, otherwise it's the same version of the one already available in master files. HIN names are current as of April 2025.
 
--   *append_data.R* - Takes file produced in *read_qart_submissions.R* and appends it to (cleansed) previous submissions. The apended data file is uploaded to master files folder in SharePoint.
+-   *append_data.R* - Takes processed submissions file produced in *read_qart_submissions.R* and appends it to (cleansed) previous submissions. The apended data file is uploaded to master files folder in SharePoint.
 
-    -   [Note]{.underline}: Script is currently designed to save a new version of the appended data every quarter.
+    -   **Note:** Script is currently designed to save a new version of the appended data every quarter.
 
 -   *run_quarto.R* - parameterised script to render *qart_slides.qmd*. Parameters are already defined in *process_flow.R*.
 
