@@ -1,6 +1,7 @@
-# this script is sourced from retroactive_org_changes.R
+# this script is sourced in retroactive_org_changes.R
+
 # select relevant variables from data set with polluted data
-# i.e., data where there's legacy carry overs and outdated org names 
+# i.e., the handed-over data where there's legacy carry overs and outdated org names 
 previous_submissions_data_polluted <- previous_submissions_psc_name_updated |>
   rename("organisation_as_recorded" = organisation) |>
   select(updated_psc_name:mews)
@@ -34,37 +35,17 @@ discrepancies_name_mistakes <- discrepancies |>
 name_corrections <- discrepancies_name_mistakes |>
   select(updated_psc_name, organisation_as_recorded, organisation_tidy,
          api_current_code, api_current_org_name, discrepancy_type) |>
-  # IMPORTANT although we made corrections in organisation_tidy before putting the org list through the API,
-  # the api calls highlighted further corrections, so below we decide the correct name 
-  mutate(organisation_name_after_cleanse = case_when(
-    # when the name as recorded originally has **already** been corrected in organisation_tidy, 
-    # and that tidy name matches the API name, then use the API name
-    organisation_as_recorded != organisation_tidy &
-      organisation_tidy == api_current_org_name ~
-      api_current_org_name,
-    # when the recorded name **was** corrected in tidy, but the tidy name **does not** match the API name
-    # then use the name retrieved via API
-    organisation_as_recorded != organisation_tidy &
-      organisation_tidy != api_current_org_name ~
-      api_current_org_name,
-    # when the recorded name was kept as it was (therefore same as the name in tidy),
-    # but that name **was still** an outdated name, use the API name 
-    organisation_as_recorded == organisation_tidy &
-      organisation_tidy != api_current_org_name ~
-      api_current_org_name
-  ))
+  rename('organisation_name_after_cleanse' = api_current_org_name)
 
 # apply name corrections
 previous_data_org_name_corrected <- previous_submissions_data_polluted |> 
-  right_join(name_corrections |>
-               select(-c(organisation_tidy, api_current_org_name)),
-             by = c(
-               "updated_psc_name",
+  right_join(name_corrections |> select(-c(organisation_tidy)),
+             by = c("updated_psc_name",
                 "organisation_as_recorded")
               ) |>
   relocate(api_current_code, 
            organisation_name_after_cleanse, 
-           .after =  "organisation_as_recorded") |>
+           .after = "organisation_as_recorded") |>
   # create flags recording correction applied
   mutate(
     retroactive_fix = T,
@@ -76,8 +57,9 @@ previous_data_org_name_corrected <- previous_submissions_data_polluted |>
 # 2) legacy carry overs ----------------------------------------
 # this problem is a bit complex, we basically have to work out:
 # the quarters where data was reported simultaneously for a legacy organisation AND its successor 
-# whether data for each intervention was identical across legacy and successor 
-# where there are discrepancies, then choose which stage to keep
+# whether data for each intervention was identical across legacy and successor orgs
+# where there are discrepancies between orgs, then choose which stage to keep
+
 discrepancies_carry_overs <- discrepancies |> 
   filter(discrepancy_type == 'legacy-trust-carry-over')
 
@@ -115,16 +97,19 @@ map_potential_carry_over_across_quarters <- discrepancies_carry_overs |>
   arrange(quarter, updated_psc_name) |>
   # determine organisational inaccuracies
   mutate(
-    # was the organisation legacy during a quarter 
+    # was the organisation legacy during a quarter? 
     inactive_during_quarter = case_when(quarter > nhs_quarter ~ T,
       .default = F
     ),
+    # was the organisation using their legal name as of 24/25 Q2
+    # this accounts for points in time where a merger (that resulted in a name change) hadn't occurred 
     current_name_in_use = organisation_as_recorded == api_current_org_name
   )
 
 # the function below will be filtering data based on a combination of PSC and trust names
 # then it will identify which quarters of data were polluted 
-# it will return a cut of the previous submissions filtered by polluted quarter
+# it will return a cut of the previous submissions by polluted quarter
+# it will also return the list of organisations and quarters that will be kept after corrections   
 
 identify_polluted_quarters <- function(map = map_potential_carry_over_across_quarters, 
                                        previous_data = previous_data_legacy_carry_over, 
@@ -134,7 +119,7 @@ identify_polluted_quarters <- function(map = map_potential_carry_over_across_qua
   # map = defaulted to map_potential_carry_over_across_quarters - this is a look up of psc, org, and quarter with potential legacy carry overs
   # previous_data = defaulted to previous_data_legacy_carry_over - this the data to be examined
   # psc = patient safety collaborative filter 
-  # orgs = trust(s) filter
+  # orgs = trusts filter
   
   # filter discrepancies map to specific combination of PSC and orgs 
   map_psc_org_potential_carry_over <- map |>
@@ -144,7 +129,7 @@ identify_polluted_quarters <- function(map = map_potential_carry_over_across_qua
     )
 
   # determine quarters where there was data pollution (not all quarters might have had pollution) 
-  # e.g, the org name in the template was still accurate because the org change hadn't happened
+  # e.g, the org name in the template was still accurate because a merger hadn't happened
   potential_quarters <- unique(map_psc_org_potential_carry_over$quarter)
   legacy_quarter <- unique(map_psc_org_potential_carry_over$nhs_quarter[
     !is.na(map_psc_org_potential_carry_over$nhs_quarter)
@@ -155,7 +140,7 @@ identify_polluted_quarters <- function(map = map_potential_carry_over_across_qua
   message("Identified polluted quarters")
   print(glue::glue("{polluted_quarters}"))
 
-  # extract relevant data points from previous_data_legacy_carry_over
+  # extract data for those quarters
   psc_org_polluted_data <- map_psc_org_potential_carry_over |>
     arrange(quarter) |>
     # pull polluted quarters from potential carry over map
@@ -169,37 +154,43 @@ identify_polluted_quarters <- function(map = map_potential_carry_over_across_qua
     left_join(previous_data,
       by = c("updated_psc_name", "ics", "organisation_as_recorded", "quarter")
     ) |>
-    # DECISION RULE: the correct org name during a quarter is based on activity status
-    # favouring the name of an active org as shown in ODS
+    # DECISION RULE: determine whether the name the organisation was valid for that quarter 
     mutate(valid_org_name_as_recorded = case_when(
-      #inactive_during_quarter == T | current_name_in_use == T ~ F,
+      # name was NOT valid when the organisation was already legacy in that quarter
       inactive_during_quarter == T ~ F,
+      # name was NOT valid when the organisation was active but using a name that differed from the up-to-date name for 24/025 Q2
       inactive_during_quarter == F & current_name_in_use == F ~ F,
       .default = T),
       .after = current_name_in_use)
   
   # work out the list of orgs that will remain for every quarter
   psc_keep_orgs <- psc_org_polluted_data |>
-    filter(valid_org_name_as_recorded == T |
-             # when rename has already happened 
-             inactive_during_quarter == F & current_name_in_use == F |
-             inactive_during_quarter == F & current_name_in_use == T # name change hadn't taken effect
+    filter(
+      # names might be eligible for keeping when it was valid for that quarter
+      # or when the organisation shows as NOT inactive and a name change was upcoming or hadn't happened 
+      valid_org_name_as_recorded == T |
+        inactive_during_quarter == F & current_name_in_use == F |
+        inactive_during_quarter == F & current_name_in_use == T 
     ) |>
+    # here we choose ONE organisation name to keep for a quarter 
     mutate(organisation_name_after_cleanse = case_when(
+      # keep the name if it was valid for that quarter
       valid_org_name_as_recorded == T ~ organisation_as_recorded , 
-      # when rename has already happened 
+      # when the org showed as NOT inactive, choose the api name to account for 
+      # past and upcoming rename changes 
       inactive_during_quarter == F & current_name_in_use == F ~ api_current_org_name,
-      # if rename hasn't happened during quarter 
       inactive_during_quarter == F & current_name_in_use == T ~ api_current_org_name
     )) |>
     distinct(updated_psc_name, quarter, organisation_name_after_cleanse)
   
+  # 2 outputs, one is the polluted data by quarter 
+  # and the other is the list of quarters and organisation to keep  
   return(list('psc_org_polluted_data' = psc_org_polluted_data,
               'psc_keep_orgs' = psc_keep_orgs))
  }
 
 
-# this function will take the cut of data identified via identify_polluted_quarters()
+# next function will take the cut of data identified via identify_polluted_quarters()
 # to examine data for each intervention across organisations 
 # as this has to be done every quarter, we evaluate via loop
 # and return all the results of evaluation in one table 
@@ -226,8 +217,6 @@ deduplicate_polluted_data <- function(psc_org_polluted_data){
     # turn interventions from columns into rows
     polluted_data_long_intervention <- psc_org_polluted_data_quarter |>
       select(-c(
-        #organisation_tidy, 
-        #organisation_as_recorded, 
         api_date_end, inactive_during_quarter,
         current_name_in_use, nhs_quarter, valid_org_name_as_recorded
       )) %>% # need %>% pipe to pass '.' argument in is.na()
@@ -235,10 +224,9 @@ deduplicate_polluted_data <- function(psc_org_polluted_data){
       pivot_longer(
         cols = c(magnesium_sulphate:mews),
         names_to = "intervention"
-      ) #|>
-      #arrange(intervention)
+      )
     
-    # evaluate data across organisation for each intervention 
+    # evaluate data across organisations for each intervention 
     results_polluted_data_evaluated <- polluted_data_long_intervention |>
       # turn organisation names into columns 
       pivot_wider(
@@ -253,8 +241,8 @@ deduplicate_polluted_data <- function(psc_org_polluted_data){
           c_across(all_of(orgs)) == first(c_across(all_of(orgs)))
         ),
         # DECISION RULE: choose which stage value to keep for an intervenetion
-        # favouring the least advanced stage 
-        # this will be stageless [NA value] when data was not recorded against any of the orgs invovled
+        # favouring the **least** advanced stage 
+        # this will be stageless [NA value] when data was not recorded against any of the orgs involved
         # otherwise stageless will be ignored to favor an actual stage recorded  e.g. : min('Stageless', 'Stage 1')
         stage_to_keep = min(c_across(all_of(orgs)))
       )
@@ -265,7 +253,7 @@ deduplicate_polluted_data <- function(psc_org_polluted_data){
     )
   }
   
-  # how bad the problem was across time
+  # how bad the problem was across quarters
   message("Number of interventions with a mismatch across orgs per quarter")
   
   results_table <- results_evaluated_all_quarters |>
@@ -278,15 +266,15 @@ deduplicate_polluted_data <- function(psc_org_polluted_data){
   return(results_evaluated_all_quarters)
   }
 
-# function below will use two tables to return cleansed data
-# table 1 is results_evaluated_all_quarters - which tells us which data point to keep for a quarter and intervention
-# table 2 is psc_keep_orgs which was filtered based on org discrepancies to work out the active organisation for a quarter
-# output will be a table with the correct organisation name for a quarter and de-duplicated intervention data
+# next function below will use two tables to return cleansed data
+# table 1 is results_evaluated_all_quarters - which tells us which intervention values to keep for a quarter
+# table 2 is psc_keep_orgs which tells us whic organisation to keep for a quarter 
+# output will be a table with the corrected organisation name and intervention data for a quarter
 
 return_cleansed_data <- function(results_evaluated_all_quarters, psc_keep_orgs){
-  # results_evaluated_all_quarters = df with tests data equality across organisations 
+  # results_evaluated_all_quarters = df with tests of data equality across organisations 
   # one row per intervention, per quarter - generated via deduplicate_polluted_data()
-  # psc_keep_orgs = table with containing active trust per quarter - generated in identify_polluted_quarters() 
+  # psc_keep_orgs = table containing correclty named active trust per quarter - generated in identify_polluted_quarters() 
   
   # make cleansed intervention data wide again
   psc_keep_interventions <- results_evaluated_all_quarters |>
@@ -314,7 +302,7 @@ return_cleansed_data <- function(results_evaluated_all_quarters, psc_keep_orgs){
 
 
 # deploy function
-# IMPORTANT: choosing to be overly explicit here whilst we QA this logic. 
+# IMPORTANT: choosing to be overly explicit here for ease of QA
 
 # -- kent --
 kent_polluted <- identify_polluted_quarters(
@@ -322,6 +310,9 @@ kent_polluted <- identify_polluted_quarters(
   orgs = "(?i)brighton|western sussex|university hospitals sussex"
 ) 
 
+# final result is a df with data for just university hospitals sussex
+# since brighton and western sussex were legacy since data collection started 
+# and should have never been in the templates 
 kent_cleansed <- kent_polluted$psc_org_polluted_data |>
   deduplicate_polluted_data() %>% # pipe needed to pass '.' below
   return_cleansed_data(., psc_keep_orgs = kent_polluted$psc_keep_orgs)
@@ -333,6 +324,8 @@ nwc_polluted <- identify_polluted_quarters(
   orgs = "(?i)southport|st helens|mersey"
 )
 
+# final df reflects the dissolution of south port and subsequent transfer to st helens 
+# which then changed their name to mersey
 nwc_cleansed <-  nwc_polluted$psc_org_polluted_data |>
   deduplicate_polluted_data() %>% # pipe needed to pass '.' below
   return_cleansed_data(., psc_keep_orgs = nwc_polluted$psc_keep_orgs)
@@ -344,6 +337,7 @@ sw_somerset_poluted = identify_polluted_quarters(
   orgs = "(?i)yeovil|somerset"
 )
 
+# final df reflects acquisition of yeovil by somerset
 sw_somerset_cleansed = sw_somerset_poluted$psc_org_polluted_data |>
   deduplicate_polluted_data() %>% # pipe needed to pass '.' below
   return_cleansed_data(., psc_keep_orgs = sw_somerset_poluted$psc_keep_orgs)
@@ -355,11 +349,13 @@ sw_royal_devon_poluted = identify_polluted_quarters(
   orgs = "(?i)northern devon|royal devon"
 )
 
+# final df reflects the acquisition of northern devon by royal devon and exeter 
+# which then changed their name to royal devon university healthcare
 sw_royal_devon_cleansed = sw_royal_devon_poluted$psc_org_polluted_data |>
   deduplicate_polluted_data() %>% # pipe needed to pass '.' below
   return_cleansed_data(., psc_keep_orgs = sw_royal_devon_poluted$psc_keep_orgs)
 
-# bind results
+# bind cleansed results
 previous_data_legacy_carry_over_corrected <- bind_rows(
   kent_cleansed,
   nwc_cleansed,
@@ -370,13 +366,14 @@ previous_data_legacy_carry_over_corrected <- bind_rows(
   relocate(api_current_code, .before = organisation_name_after_cleanse) |>
   mutate(
     retroactive_fix = T,
-    retroactive_correction = "legacy-trust-carry-over"
+    discrepancy_type = "legacy-trust-carry-over"
   )
 
 # bring all corrections together ----------------------------------------
+
+# find the rows to be removed from original data set (i.e., the polluted rows)
 rows_to_replace <- previous_data_org_name_corrected |>
-  distinct(updated_psc_name, #ics, 
-           organisation_as_recorded, quarter) |> 
+  distinct(updated_psc_name, organisation_as_recorded, quarter) |> 
   bind_rows(
     # need to use the polluted dfs here because that contains 
     # the confirmed quarters with a legacy carry over 
@@ -384,26 +381,30 @@ rows_to_replace <- previous_data_org_name_corrected |>
     nwc_polluted$psc_org_polluted_data,
     sw_somerset_poluted$psc_org_polluted_data,
     sw_royal_devon_poluted$psc_org_polluted_data)|> 
-  distinct(updated_psc_name, #ics, 
-           organisation_as_recorded, quarter)
+  distinct(updated_psc_name, 
+           organisation_as_recorded, quarter) |>
+  arrange(updated_psc_name)
 
 # remove all the rows that have undergone a retroactive correction
 previous_submissions_prunned <- previous_submissions_data_polluted |> 
-  anti_join(rows_to_replace, by = c('updated_psc_name', #'ics',
-                                    'organisation_as_recorded', 'quarter')) 
+  anti_join(rows_to_replace, by = c('updated_psc_name', 'organisation_as_recorded', 'quarter')) |>
+  # add org codes to remaining data using map produced in API calls
+  left_join(map_psc_trust_icb_active_orgs |> select(api_current_code, api_current_org_name),
+            by = c('organisation_as_recorded' = 'api_current_org_name')) |>
+  relocate(api_current_code, .before = organisation_as_recorded)
 
+# produce final data frame with cleansed data
 previous_submissions_data_cleansed <- previous_submissions_prunned |> 
   bind_rows(
     # this data df kept col organisation_as_recorded
     previous_data_org_name_corrected,
     # this one didn't
     previous_data_legacy_carry_over_corrected) |>
-  relocate(organisation_name_after_cleanse, api_current_code, .after = organisation_as_recorded) |>
+  relocate(api_current_code, organisation_name_after_cleanse, .after = organisation_as_recorded) |>
   mutate(organisation_name_after_cleanse = 
            case_when(!is.na(organisation_name_after_cleanse) ~ organisation_name_after_cleanse,
                      is.na(organisation_name_after_cleanse) ~ organisation_as_recorded)) |>
   rename(icb = ics) 
-# ADD ORG CODES
 
 # write to share point
 file_name <- 'mat_neo_qart_cleansed_upto_2024_25_Q2.csv'
@@ -411,6 +412,8 @@ file_name <- 'mat_neo_qart_cleansed_upto_2024_25_Q2.csv'
 write.csv(previous_submissions_data_cleansed, 
           here(str_glue('output/{file_name}')),
           row.names = F)
+
+master_files_folder <- '1. Master files'
 
 chosenlib$upload_file(
   dest = str_glue('{base_url}/{master_files_folder}/{file_name}'),
