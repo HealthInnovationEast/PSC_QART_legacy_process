@@ -48,7 +48,7 @@ Retroactive corrections to the data up to 2024/25 Q2 were needed to generate dat
 
 ## Retroactive SharePoint Set up
 
--   *setup_site_folders.R* - Created folders for each PSC in the chosen SharePoint location to save excel templates and collected data. As the SharePoint location has now been chosen, it will not need re-running.
+-   *retroactive_setup_site_folders.R* - Created folders for each PSC in the chosen SharePoint location to save excel templates and collected data. As the SharePoint location has now been chosen, it will not need re-running.
 
 ## Ready to go process
 

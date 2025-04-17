@@ -1,6 +1,7 @@
 # This file will be run once once settled on location
 # upload a readme file to a folder with the name of each psc.
 # To create a folder, a file must be uploaded to the folder- which creates the folder.
+source('config_sharepoint_location.R')
 
 # read latest psc (hin) names
 hin_names <- read.csv(here("lookups", "hin_names.csv")) |>
