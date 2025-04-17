@@ -105,7 +105,7 @@ map_potential_carry_over_across_quarters <- discrepancies_carry_overs |>
     inactive_during_quarter = case_when(quarter > nhs_quarter ~ T,
       .default = F
     ),
-    # was the organisation using their legal name as of 24/25 Q2
+    # was the organisation using their legal name as of 24/25 Q3
     # this accounts for points in time where a merger (that resulted in a name change) hadn't occurred 
     current_name_in_use = organisation_as_recorded == api_current_org_name
   )
@@ -164,7 +164,7 @@ identify_polluted_quarters <- function(map = map_potential_carry_over_across_qua
     mutate(valid_org_name_as_recorded = case_when(
       # name was NOT valid when the organisation was already legacy in that quarter
       inactive_during_quarter == T ~ F,
-      # name was NOT valid when the organisation was active but using a name that differed from the up-to-date name for 24/025 Q2
+      # name was NOT valid when the organisation was active but using a name that differed from the up-to-date name for 24/025 Q3
       inactive_during_quarter == F & current_name_in_use == F ~ F,
       .default = T),
       .after = current_name_in_use)
@@ -420,7 +420,7 @@ previous_submissions_data_cleansed <- previous_submissions_prunned |>
            case_when(!is.na(organisation_name_after_cleanse) ~ organisation_name_after_cleanse,
                      is.na(organisation_name_after_cleanse) ~ organisation_as_recorded)) 
 # write to share point
-file_name <- 'mat_neo_qart_cleansed_upto_2024_25_Q2.csv'
+file_name <- 'mat_neo_qart_cleansed_upto_2024_25_Q3.csv'
   
 write.csv(previous_submissions_data_cleansed, 
           here(str_glue('output/{file_name}')),

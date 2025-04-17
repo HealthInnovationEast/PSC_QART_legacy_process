@@ -11,7 +11,7 @@ library(lubridate)
 
 source('config_sharepoint_location.R')
 
-# script to retroactively correct errors in data up to 2024/15 Q2
+# script to retroactively correct errors in data up to 2024/25 Q3
 master_files_dr <- chosenlib$get_item(glue::glue("{base_url}/1. Master files"))
 
 # download hin names look up
@@ -20,7 +20,7 @@ hin_names_file <- master_files_dr$get_item('hin_names.csv')
 hin_names_file$download(dest = here("lookups", "hin_names.csv"), 
                         overwrite = T)
 
-# download raw data file from share point (data up to 2024/25 Q2)
+# download raw data file from share point (data up to 2024/25 Q3)
 raw_data_file <- master_files_dr$get_item('MatNeoSIP.xlsx')
 
 raw_data_file$download(dest = here("data", "MatNeoSIP.xlsx"), 
@@ -30,7 +30,7 @@ raw_data_file$download(dest = here("data", "MatNeoSIP.xlsx"),
 hin_names <- read.csv(here("lookups", "hin_names.csv")) |>
   arrange(hin_folders)
 
-# read previous submission data (i.e., up to 2024/25 Q2)
+# read previous submission data (i.e., up to 2024/25 Q3)
 previous_submissions_data <- read_excel(here("data", "MatNeoSIP.xlsx"), sheet = "Data") |>
   clean_names() |>
   rename(
@@ -362,13 +362,13 @@ if (empty_qa_multiple_succ == F) {
   warning("Check qa_multiple_succ for multiple successors")
 }
 
-# list of quarters (formatted )
+# list of quarters (formatted)
 qart_quarters <- tibble(
   q_date = seq(
     # from a year before data collection (this will make it clearer to see UNIVERSITY HOSPITALS SUSSEX merger)
     from = as.Date("2020-04-01"),
-    # up until end of 2024/25 Q2 (i.e., last quarter of previous submisisons)
-    to = as.Date("2024-09-30"),
+    # up until end of 2024/25 Q3
+    to = as.Date("2024-12-31"),
     by = "quarter"
   )
 ) |>
@@ -404,7 +404,7 @@ successor_organisation_details <- call_org_end_dates_quarter_info |>
   ) |>
   rename("api_succ_name" = api_org_name)
 
-# determine organisation status (legacy/active) up to 2024/25 Q2 
+# determine organisation status (legacy/active) up to 2024/25 Q3 
 # names and codes current up to that point in time
 call_orgs_active_status_quarter <- call_org_end_dates_quarter_info |>
   left_join(successor_organisation_details, by = c("api_date_end", "api_succ_code")) |>
@@ -515,7 +515,7 @@ map_trusts_legacy_status_icb_details <- map_trusts_legacy_status |>
   left_join(call_icb_names, c("api_icb_code"))
 
 # output 1: how organisations names will appear in templates
-# this is a map of active orgs from 2024/25 Q2 onwards 
+# this is a map of active orgs for 2024/25 Q4  
 map_psc_trust_icb_active_orgs <- map_trusts_legacy_status_icb_details |>
   distinct(
     updated_psc_name, api_icb_code, api_icb_name,
@@ -534,9 +534,11 @@ chosenlib$upload_file(
 # print a message of where organisation changes have occurred 
 map_legacy <- map_trusts_legacy_status_icb_details |> 
   filter(!is.na(nhs_quarter)) |>
-  select(updated_psc_name, api_org_code, api_org_name, api_date_end, api_succ_code, api_succ_name)
+  select(updated_psc_name, api_org_code, api_org_name, api_date_end, api_succ_code, api_succ_name) |>
+  # if a change took place during 24/25 Q3, we ignore it because that change affects data from Q4 onward
+  filter(api_date_end < as.Date("2024-09-30"))
 
-message('The following organisation changes are applicable to the list of trusts up to 2024/25 Q2')
+message('The following organisation changes are applicable up to 2024/25 Q3')
 print(t(map_legacy))
 
 # output 2: to be used for retroactive data cleansing
