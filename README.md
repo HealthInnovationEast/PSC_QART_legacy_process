@@ -25,7 +25,7 @@ All files mentioned here are available [here](https://nhs.sharepoint.com/sites/M
 Used for retroactive steps:
 
 -   *readme.txt* - this file is the readme file that is pasted in each site folder when *setup_site_folders.R* is run.
--   *MatNeoSIP.xlsx* - Handed over file with several tabs where most of the process used to take place. The quarterly data from 2021/22 Q1 to 2024/25 Q2 is in 'Data' tab. 'QART info' was used to calculate aggregations on the data. The remaining tabs were dedicated to make the plots for the presentation.
+-   *MatNeoSIP.xlsx* - Handed over file with several tabs where most of the process used to take place. The quarterly data from 2021/22 Q1 to 2024/25 Q3 is in 'Data' tab. 'QART info' was used to calculate aggregations on the data. The remaining tabs were dedicated to make the plots for the presentation.
 -   *hin_names.csv* - Look up of up to date HIN names. It would require updating if at least one of the HIN's changes their name. Names are current as of March 2025.
 
 Used in ready to go process:
@@ -34,7 +34,9 @@ Used in ready to go process:
 
 -   *preferred_template.xlsx* - Excel blueprint file that will be filled out with organisations assigned to each PSC. Custom files are sent out for data collection. File is set to be downloaded from SharePoint in *create_empty_templates.R.*
 
--   *mat_neo_qart_cleansed_upto_2024_25_Q2.csv* - A corrected version of data in *MatNeoSIP.xlsx* which addresses data quality issues explained below.
+    -   **VERY IMPORTANT NOTE:** You will have to make sure every quarter that you go into this file and update the intro tab to show the correct reporting quarter. Do this before creating templates for a new reporting quarter.
+
+-   *mat_neo_qart_cleansed_upto_2024_25_Q3.csv* - A corrected version of data in *MatNeoSIP.xlsx* which addresses data quality issues explained below.
 
 ## Retroactive Fixes to the data
 
@@ -52,13 +54,13 @@ Retroactive corrections to the data up to 2024/25 Q2 were needed to generate dat
 
 ## Ready to go process
 
-These are the scripts that will be run from 2024/25 Q3 onward, and rely on using the cleansed data and future submissions from PSC's:
+These are the scripts that will be run from 2024/25 Q4 onward, and rely on using the cleansed data and future submissions from PSC's:
 
 -   *process_flow.R* - This is the master script and sources the scripts below in a order of execution based on a few parameters. This script includes steps that only need running once and will leave the process fit for iteration from 2024/25 Q3 onwards.
 
 -   *config_sharepoint_location.R* - Creates 3 important variables (`site_url`, `chosenlib`, and `base_url`) which will be used in other scripts to navigate around SharePoint. Once a SharePoint location has been selected, these variables should not be changed.
 
--   *active_organisation_check.R* - A simplified version of *retroactive_org_changes.R.* This script will account for upcoming (as opposed to previous) organisation changes by looking at the trusts present in the last PSC submissions (e.g., when looking for changes applicable to 24/25 Q4, it will check list of organisations in 24/25 Q3). It will make use of the [ODS API](https://digital.nhs.uk/developer/api-catalogue/organisation-data-service-ord) and will output a new `psc_icb_trust_lookup.csv`, which will be available in SharePoint.
+-   *active_organisation_check.R* - A simplified version of *retroactive_org_changes.R.* The purpose of this script is to update the organisation list before we send templates to the PSC's. This means that the script looks at the organisation list in the previous quarter (e.g., 2024/25 Q3), to prepare the list for the present reporting quarter (e.g., 2024/25 Q4). It will make use of the [ODS API](https://digital.nhs.uk/developer/api-catalogue/organisation-data-service-ord) and will output a new `psc_icb_trust_lookup.csv`, which will be available in SharePoint.
 
 -   *create_empty_templates.R* - Creates excel templates with organisation and ICB names for each PSC, using `psc_icb_trust_lookup.csv` and `preferred_template.xlsx`. Templates are uploaded to the corresponding PSC SharePoint folders generated via *setup_site_folders.R*.
 
