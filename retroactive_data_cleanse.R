@@ -94,7 +94,7 @@ map_potential_carry_over_across_quarters <- discrepancies_carry_overs |>
     organisation_as_recorded,
     quarter, 
     # these 3 below correspond to the API info of the predecessor orgs
-    api_org_code, api_date_end, nhs_quarter, 
+    api_org_code, api_date_end, nhs_inactive_from_quarter, 
     # these 2 correspond to the successor info
     api_current_code, api_current_org_name
   ) |>
@@ -102,7 +102,7 @@ map_potential_carry_over_across_quarters <- discrepancies_carry_overs |>
   # determine organisational inaccuracies
   mutate(
     # was the organisation legacy during a quarter? 
-    inactive_during_quarter = case_when(quarter > nhs_quarter ~ T,
+    inactive_during_quarter = case_when(quarter >= nhs_inactive_from_quarter ~ T,
       .default = F
     ),
     # was the organisation using their legal name as of 24/25 Q3
@@ -135,12 +135,12 @@ identify_polluted_quarters <- function(map = map_potential_carry_over_across_qua
   # determine quarters where there was data pollution (not all quarters might have had pollution) 
   # e.g, the org name in the template was still accurate because a merger hadn't happened
   potential_quarters <- unique(map_psc_org_potential_carry_over$quarter)
-  legacy_quarter <- unique(map_psc_org_potential_carry_over$nhs_quarter[
-    !is.na(map_psc_org_potential_carry_over$nhs_quarter)
+  legacy_quarter <- unique(map_psc_org_potential_carry_over$nhs_inactive_from_quarter[
+    !is.na(map_psc_org_potential_carry_over$nhs_inactive_from_quarter)
   ])
 
-  # DECISION RULE: quarters are polluted starting a quarter after an organisation became legacy 
-  polluted_quarters <- potential_quarters[which(potential_quarters > legacy_quarter)]
+  # DECISION RULE: quarters are polluted starting from the quarter an organisation became legacy 
+  polluted_quarters <- potential_quarters[which(potential_quarters >= legacy_quarter)]
   message("Identified polluted quarters")
   print(glue::glue("{polluted_quarters}"))
 
@@ -152,7 +152,7 @@ identify_polluted_quarters <- function(map = map_potential_carry_over_across_qua
     select(
       updated_psc_name, #ics, 
       organisation_as_recorded,
-      quarter, api_date_end, nhs_quarter, inactive_during_quarter,
+      quarter, api_date_end, nhs_inactive_from_quarter, inactive_during_quarter,
       current_name_in_use, api_current_org_name
     ) |>
     # then use that map as a look up to extract polluted previous submissions
@@ -224,7 +224,7 @@ deduplicate_polluted_data <- function(psc_org_polluted_data){
     polluted_data_long_intervention <- psc_org_polluted_data_quarter |>
       select(-c(
         api_date_end, inactive_during_quarter,
-        current_name_in_use, nhs_quarter, valid_org_name_as_recorded
+        current_name_in_use, nhs_inactive_from_quarter, valid_org_name_as_recorded
       )) %>% # need %>% pipe to pass '.' argument in is.na()
       replace(is.na(.), "Stageless") |>
       pivot_longer(
@@ -393,32 +393,38 @@ rows_to_replace <- previous_data_org_name_corrected |>
            organisation_as_recorded, quarter) |>
   arrange(updated_psc_name)
 
-# remove all the rows that have undergone a retroactive correction
+# separate the unchanged data from the changed data
 previous_submissions_prunned <- previous_submissions_data_polluted |> 
+  # remove all the rows that have undergone a retroactive correction
   anti_join(rows_to_replace, by = c('updated_psc_name', 'organisation_as_recorded', 'quarter')) |>
   # add org codes and ICB info to remaining data using map produced in API calls
-  left_join(map_psc_trust_icb_active_orgs |> select(api_current_code, api_current_org_name, api_icb_code, api_icb_name),
-            by = c('organisation_as_recorded' = 'api_current_org_name')) |>
-  relocate(api_icb_code, api_icb_name, api_current_code, .before = organisation_as_recorded)
+  # because we're working with unchanged data we use organisation names as originally recorded
+  left_join(map_trusts_legacy_status_icb_details |> distinct(organisation, api_org_code, api_icb_code, api_icb_name),
+            by = c('organisation_as_recorded' = 'organisation')) |>
+  relocate(api_icb_code, api_icb_name, api_org_code, 
+           .before = organisation_as_recorded)
 
-previous_submissions_corrected <- bind_rows(
+# bring all retroactive corrections together
+previous_submissions_all_corrected <- bind_rows(
   # this data df kept col organisation_as_recorded
   previous_data_org_name_corrected,
   # this one didn't
   previous_data_legacy_carry_over_corrected) |>
-  # add ICB info
-  left_join(map_psc_trust_icb_active_orgs |> select(api_current_code, api_current_org_name, api_icb_code, api_icb_name),
+  # add ICB info from lookup generated after determining legacy status 
+  left_join(map_psc_trust_icb_active_orgs |> distinct(api_current_code, api_current_org_name, api_icb_code, api_icb_name),
             by = c('organisation_name_after_cleanse' = 'api_current_org_name',
-                   'api_current_code')) |>
-  relocate(api_icb_code, api_icb_name, .before = organisation_as_recorded)
+                   'api_current_code'
+                    )) |>
+  rename('api_org_code' = api_current_code) |>
+  relocate(api_icb_code, api_icb_name, api_org_code, .before = organisation_as_recorded)
 
 # produce final data frame with cleansed data
 previous_submissions_data_cleansed <- previous_submissions_prunned |> 
-  bind_rows(previous_submissions_corrected) |>
+  bind_rows(previous_submissions_all_corrected) |>
   relocate(organisation_name_after_cleanse, .after = organisation_as_recorded) |>
-  mutate(organisation_name_after_cleanse = 
-           case_when(!is.na(organisation_name_after_cleanse) ~ organisation_name_after_cleanse,
-                     is.na(organisation_name_after_cleanse) ~ organisation_as_recorded)) 
+   mutate(organisation_name_after_cleanse = 
+            case_when(!is.na(organisation_name_after_cleanse) ~ organisation_name_after_cleanse,
+                      is.na(organisation_name_after_cleanse) ~ organisation_as_recorded)) 
 # write to share point
 file_name <- 'mat_neo_qart_cleansed_upto_2024_25_Q3.csv'
   

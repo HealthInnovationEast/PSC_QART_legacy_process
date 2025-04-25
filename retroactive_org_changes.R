@@ -362,42 +362,35 @@ if (empty_qa_multiple_succ == F) {
   warning("Check qa_multiple_succ for multiple successors")
 }
 
-# list of quarters (formatted)
-qart_quarters <- tibble(
-  q_date = seq(
-    # from a year before data collection (this will make it clearer to see UNIVERSITY HOSPITALS SUSSEX merger)
-    from = as.Date("2020-04-01"),
-    # up until end of 2024/25 Q3
-    to = as.Date("2024-12-31"),
-    by = "quarter"
-  )
-) |>
-  mutate(quarter = lubridate::quarter(q_date, type = "year.quarter", fiscal_start = 4)) |>
-  mutate(
-    quarter_fy_start = round(quarter - 1),
-    # extract last 4 characters from 'quarter' string (e.g., extracts 21.1 from 2021.1 )
-    quarter_fy_end = str_extract((quarter), '(.{4})$'),
-    nhs_quarter = paste(quarter_fy_start, quarter_fy_end, sep = "/"),
-    nhs_quarter = str_replace(
-      nhs_quarter,
-      fixed("."),
-      " Q"
-    )
-  )
-
 # determine after which quarter the organisation becomes legacy
 call_org_end_dates_quarter_info <- call_org_end_dates |>
-  mutate(active_until_quarter = lubridate::quarter(api_date_end,
-                                                   type = "year.quarter",
-                                                   fiscal_start = 4
-  )) |>
-  left_join(qart_quarters |> select(quarter, nhs_quarter),
-            by = c(active_until_quarter = "quarter")
-  )
+  mutate(
+    # if a change took place during 24/25 Q3, we ignore it because that change affects data from Q4 onward
+    # so we limit to end of Q2
+    api_succ_code = case_when(api_date_end > as.Date('2024-09-30') ~ NA, .default = api_succ_code),
+    api_date_end = case_when(api_date_end > as.Date('2024-09-30') ~ NA, .default = api_date_end),
+    # calculate inactivity time point
+    inactive_from_date = ymd(api_date_end) + days(1),
+    inactive_from_quarter = lubridate::quarter(inactive_from_date,
+                                               type = "year.quarter",
+                                               fiscal_start = 4),
+    quarter_fy_start = round(inactive_from_quarter - 1),
+    # extract last 4 characters from 'quarter' string (e.g., extracts 21.1 from 2021.1 )
+    quarter_fy_end = str_extract((inactive_from_quarter), '(.{4})$'),
+    nhs_inactive_from_quarter = str_c(quarter_fy_start, quarter_fy_end, sep = "/"),
+    nhs_inactive_from_quarter = str_replace(
+      nhs_inactive_from_quarter,
+      fixed("."),
+      " Q") ) |>
+  # remove dummy columns
+  select(-c(quarter_fy_start, quarter_fy_end)) |>
+  relocate(inactive_from_date, inactive_from_quarter, 
+           nhs_inactive_from_quarter, .before = api_succ_code) 
+
 
 # bring successor info for legacy orgs
 successor_organisation_details <- call_org_end_dates_quarter_info |>
-  filter(!is.na(nhs_quarter)) |>
+  filter(!is.na(nhs_inactive_from_quarter)) |>
   select(api_date_end, api_succ_code) |>
   left_join(call_org_end_dates_quarter_info |> select(api_org_code, api_org_name),
             by = c("api_succ_code" = "api_org_code")
@@ -409,10 +402,10 @@ successor_organisation_details <- call_org_end_dates_quarter_info |>
 call_orgs_active_status_quarter <- call_org_end_dates_quarter_info |>
   left_join(successor_organisation_details, by = c("api_date_end", "api_succ_code")) |>
   mutate(
-    api_current_code = case_when(is.na(nhs_quarter) ~ api_org_code,
+    api_current_code = case_when(is.na(nhs_inactive_from_quarter) ~ api_org_code,
                                          .default = api_succ_code
     ),
-    api_current_org_name = case_when(is.na(nhs_quarter) ~ api_org_name,
+    api_current_org_name = case_when(is.na(nhs_inactive_from_quarter) ~ api_org_name,
                                              .default = api_succ_name
     )
   )
@@ -515,7 +508,7 @@ map_trusts_legacy_status_icb_details <- map_trusts_legacy_status |>
   left_join(call_icb_names, c("api_icb_code"))
 
 # output 1: how organisations names will appear in templates
-# this is a map of active orgs for 2024/25 Q4  
+# this is a map of active orgs for 2024/25 Q3 
 map_psc_trust_icb_active_orgs <- map_trusts_legacy_status_icb_details |>
   distinct(
     updated_psc_name, api_icb_code, api_icb_name,
@@ -533,10 +526,8 @@ chosenlib$upload_file(
 
 # print a message of where organisation changes have occurred 
 map_legacy <- map_trusts_legacy_status_icb_details |> 
-  filter(!is.na(nhs_quarter)) |>
-  select(updated_psc_name, api_org_code, api_org_name, api_date_end, api_succ_code, api_succ_name) |>
-  # if a change took place during 24/25 Q3, we ignore it because that change affects data from Q4 onward
-  filter(api_date_end < as.Date("2024-09-30"))
+  filter(!is.na(nhs_inactive_from_quarter)) |>
+  select(updated_psc_name, api_org_code, api_org_name, api_date_end, api_succ_code, api_succ_name) 
 
 message('The following organisation changes are applicable up to 2024/25 Q3')
 print(t(map_legacy))
@@ -545,13 +536,12 @@ print(t(map_legacy))
 map_discrepancies <- map_trusts_legacy_status_icb_details |>
   select(
     updated_psc_name, organisation, organisation_tidy, api_org_code, api_date_end,
-    nhs_quarter, api_current_code, api_current_org_name
+    nhs_inactive_from_quarter, api_current_code, api_current_org_name
   ) |>
   # IMPORTANT: discrepancies are worked out based on name mis matches 
   filter(organisation != organisation_tidy |
            organisation != api_current_org_name) |>
   arrange(updated_psc_name, api_current_org_name) 
-
 
 # identify discrepancy type by psc
 # carry over are identified as psc's where at least one organisation had an end_date retrieved from API calls
