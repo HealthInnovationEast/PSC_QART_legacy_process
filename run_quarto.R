@@ -8,8 +8,9 @@ matneo_overview_file$download(dest = here("data", 'matneo_overview.PNG'),
 
 # run quarto file and save output in output folder
 quarto_render("qart_slides.qmd", 
-              execute_params = list(reporting_quarter = reporting_quarter,
+              execute_params = list(reporting_quarter = reporting_quarter_string,
                                     master_files_folder = master_files_folder,
+                                    # below parameter is generated in read_qart_submissions.R
                                     quarter_string = quarter_string
                                     )
               )
