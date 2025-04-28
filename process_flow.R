@@ -23,7 +23,7 @@ stage_of_process <- "prepare_templates"
 reporting_quarter_end_date <- ymd('2025-03-31') 
 reporting_quarter_string <- quarter(reporting_quarter_end_date, 
                                     fiscal_start = 4,
-                                    type = 'year_start/end') #USE THIS IN ORG CHECK SCRIPTS 
+                                    type = 'year_start/end')
 previous_quarter_end_date <- reporting_quarter_end_date %m-% months(3)
 previous_quarter_string <- quarter(previous_quarter_end_date, 
                                    fiscal_start = 4,
