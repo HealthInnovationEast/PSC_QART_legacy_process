@@ -55,9 +55,12 @@ if (stage_of_process == "prepare_templates") {
 } 
 
 if (stage_of_process == "process_submissions") {
+  # goes into sharepoint and collates submitted data for every PSC
   source('read_qart_submissions.R')
+  # appends colalted data to previous submissions
   source('append_data.R')
-  source('run_quarto.R') # which runs qart_slides.qmd
+  # uses appended data to produce power point slide
+  source('run_quarto.R') # runs qart_slides.qmd
 }
 
 
