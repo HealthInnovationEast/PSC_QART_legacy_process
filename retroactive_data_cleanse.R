@@ -422,9 +422,14 @@ previous_submissions_all_corrected <- bind_rows(
 previous_submissions_data_cleansed <- previous_submissions_prunned |> 
   bind_rows(previous_submissions_all_corrected) |>
   relocate(organisation_name_after_cleanse, .after = organisation_as_recorded) |>
-   mutate(organisation_name_after_cleanse = 
-            case_when(!is.na(organisation_name_after_cleanse) ~ organisation_name_after_cleanse,
-                      is.na(organisation_name_after_cleanse) ~ organisation_as_recorded)) 
+  # select final version of org name
+  mutate(organisation_name_after_cleanse = case_when(
+    !is.na(organisation_name_after_cleanse) ~ organisation_name_after_cleanse,
+    is.na(organisation_name_after_cleanse) ~ organisation_as_recorded)
+    ) |>
+  select(-organisation_as_recorded) |>
+  rename(organisation_name_verified = organisation_name_after_cleanse)
+
 # write to share point
 file_name <- 'mat_neo_qart_cleansed_upto_2024_25_Q3.csv'
   

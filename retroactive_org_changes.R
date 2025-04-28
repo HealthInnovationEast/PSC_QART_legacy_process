@@ -245,7 +245,7 @@ org_calls <- call_org_links |>
 # Function below uses the links extracted in the first API call to determine
 # legacy status and succession history (if applicable) by checking the date types
 # stored against an organisation
-# we extract the date the organisation became active.
+# we extract the date the organisation became inactive.
 # If deemed a legacy organisation, we also extract end date and organisation code of successor
 # the extraction logic below is backed up by API documentation:
 # https://www.odsdatasearchandexport.nhs.uk/referenceDataCatalogue/ODS-Date-Concepts_620601026.html#:~:text=%2Dmm%2Ddd.-,Type%20%2D%20Legal%20vs%20Operational,need%20of%20systems%20and%20services.
@@ -365,27 +365,21 @@ if (empty_qa_multiple_succ == F) {
 # determine after which quarter the organisation becomes legacy
 call_org_end_dates_quarter_info <- call_org_end_dates |>
   mutate(
-    # if a change took place during 24/25 Q3, we ignore it because that change affects data from Q4 onward
-    # so we limit to end of Q2
-    api_succ_code = case_when(api_date_end > as.Date('2024-09-30') ~ NA, .default = api_succ_code),
-    api_date_end = case_when(api_date_end > as.Date('2024-09-30') ~ NA, .default = api_date_end),
     # calculate inactivity time point
     inactive_from_date = ymd(api_date_end) + days(1),
-    inactive_from_quarter = lubridate::quarter(inactive_from_date,
-                                               type = "year.quarter",
-                                               fiscal_start = 4),
-    quarter_fy_start = round(inactive_from_quarter - 1),
-    # extract last 4 characters from 'quarter' string (e.g., extracts 21.1 from 2021.1 )
-    quarter_fy_end = str_extract((inactive_from_quarter), '(.{4})$'),
-    nhs_inactive_from_quarter = str_c(quarter_fy_start, quarter_fy_end, sep = "/"),
-    nhs_inactive_from_quarter = str_replace(
-      nhs_inactive_from_quarter,
-      fixed("."),
-      " Q") ) |>
-  # remove dummy columns
-  select(-c(quarter_fy_start, quarter_fy_end)) |>
-  relocate(inactive_from_date, inactive_from_quarter, 
-           nhs_inactive_from_quarter, .before = api_succ_code) 
+    # if a change took place after 24/25 Q3, we ignore it because that change affects data from Q4 onward
+    api_succ_code = case_when(inactive_from_date > as.Date('2024-12-31') ~ NA,
+                              .default = api_succ_code),
+    api_date_end = case_when(inactive_from_date > as.Date('2024-12-31') ~ NA,
+                             .default = api_date_end),
+    inactive_from_date = case_when(inactive_from_date > as.Date('2024-12-31') ~ NA,
+                                   .default = inactive_from_date),
+    nhs_inactive_from_quarter = case_when(!is.na(inactive_from_date) ~ quarter(inactive_from_date, 
+                                                                               fiscal_start = 4,
+                                                                               type = 'year_start/end')
+                                          )) |>
+  relocate(inactive_from_date, nhs_inactive_from_quarter,
+           .before = api_succ_code)
 
 
 # bring successor info for legacy orgs
