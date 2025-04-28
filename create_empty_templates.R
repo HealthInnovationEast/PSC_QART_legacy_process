@@ -11,7 +11,7 @@ template_file$download(dest = here("lookups", str_glue({template_file_name})),
                        overwrite = T)
 
 # file friendly naming string for saving results
-current_quarter_year <- str_remove_all(reporting_quarter, '20|/')
+current_quarter_year <- str_remove_all(reporting_quarter_string, '20|/')
   
 # loop through locations provided in psc_lookup.csv
 for (psc in pscs) {
