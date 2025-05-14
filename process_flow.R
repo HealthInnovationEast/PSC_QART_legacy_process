@@ -17,7 +17,7 @@ source('config_sharepoint_location.R')
 
 # this is the stage of the task we want execute
 # either "prepare_templates" or "process_submissions"
-stage_of_process <- "prepare_templates" 
+stage_of_process <- "process_submissions" 
 
 # set dates by setting end of reporting quarter (mind that latest data will be lagged by 1 quarter)
 reporting_quarter_end_date <- ymd('2025-03-31') 
@@ -57,7 +57,7 @@ if (stage_of_process == "prepare_templates") {
 if (stage_of_process == "process_submissions") {
   # goes into sharepoint and collates submitted data for every PSC
   source('read_qart_submissions.R')
-  # appends colalted data to previous submissions
+  # appends collated data to previous submissions
   source('append_data.R')
   # uses appended data to produce power point slide
   source('run_quarto.R') # runs qart_slides.qmd
