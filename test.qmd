@@ -73,287 +73,293 @@ mat_neo_data <- read.csv(here(str_glue('data/{mat_neo_data_file}'))) |>
 
 
 ```{r, include = F}
-# data wrangling - potential looped function process
-df=mat_neo_data
-hins=unique(df$updated_psc_name)
-```
-
-
-```{r, include = F}
 # attempt 1 - faceted time series showing stage per quarter by trust
 # (having all trusts in one plot doesn't work as some follow identical progress journeys)
 
-hin_name = "Imperial College Health Partners"
+# NOTE:  commenting out as it has not been decided whether this chart will be used
 
-hin_df <- df |>
-  filter(updated_psc_name == hin_name) |>
-  pivot_longer(cols = magnesium_sulphate:mews,
-               names_to = "intervention_name",
-               values_to = "reported_stage"
-               )
 
-interventions = unique(hin_df$intervention_name)
-intervention = "maternal_breast_milk"
-intervention_df <- hin_df |>
-  filter(intervention_name == intervention) |>
-  mutate(stage_numeric = str_extract(reported_stage, '[0-9]'))
-
-plot <- ggplot(intervention_df |> filter(!is.na(stage_numeric)),
-         aes(x = quarter, y = stage_numeric, group = organisation_name_verified)) +
-  geom_line(colour = '#0e668b', size = 1) +
-  labs(x =NULL, 
-         y =NULL, 
-         title = str_glue('{hin_name} - Progression journey of {intervention}'),
-         subtitle = str_glue('Data from 2021/22 Q1 to {reporting_quarter}')
-           )+
-  #facet_grid(rows = vars(api_org_code)) +
-  facet_wrap(~ organisation_name_verified ,
-             ncol = 3,
-             labeller = labeller(organisation_name_verified = label_wrap_gen(width = 25))
-               )+ 
-  theme_minimal() +
-  theme(panel.grid.major.y = element_blank(),
-          axis.text.x = element_text(angle = 90,
-                                     # centre text under tick
-                                     vjust = 0.30),
-          legend.position = 'none',
-          legend.title = element_blank()
-          )
-  
-print(plot)
+# data wrangling - potential looped function process
+# df=mat_neo_data
+# hins=unique(df$updated_psc_name)
+# 
+# hin_name = "Imperial College Health Partners"
+# 
+# hin_df <- df |>
+#   filter(updated_psc_name == hin_name) |>
+#   pivot_longer(cols = magnesium_sulphate:mews,
+#                names_to = "intervention_name",
+#                values_to = "reported_stage"
+#                )
+# 
+# interventions = unique(hin_df$intervention_name)
+# intervention = "maternal_breast_milk"
+# intervention_df <- hin_df |>
+#   filter(intervention_name == intervention) |>
+#   mutate(stage_numeric = str_extract(reported_stage, '[0-9]'))
+# 
+# plot <- ggplot(intervention_df |> filter(!is.na(stage_numeric)),
+#          aes(x = quarter, y = stage_numeric, group = organisation_name_verified)) +
+#   geom_line(colour = '#0e668b', size = 1) +
+#   labs(x =NULL, 
+#          y =NULL, 
+#          title = str_glue('{hin_name} - Progression journey of {intervention}'),
+#          subtitle = str_glue('Data from 2021/22 Q1 to {reporting_quarter}')
+#            )+
+#   #facet_grid(rows = vars(api_org_code)) +
+#   facet_wrap(~ organisation_name_verified ,
+#              ncol = 3,
+#              labeller = labeller(organisation_name_verified = label_wrap_gen(width = 25))
+#                )+ 
+#   theme_minimal() +
+#   theme(panel.grid.major.y = element_blank(),
+#           axis.text.x = element_text(angle = 90,
+#                                      # centre text under tick
+#                                      vjust = 0.30),
+#           legend.position = 'none',
+#           legend.title = element_blank()
+#           )
+#   
+# print(plot)
 ```
 
 
 ```{r, fig.height=8, fig.width=12, include = F}
-for(hin in hins) {
-  hin_name = hin
-  
-  hin_df <- df |>
-  filter(updated_psc_name == hin_name) |>
-  pivot_longer(cols = magnesium_sulphate:mews,
-               names_to = "intervention_name",
-               values_to = "reported_stage"
-               )
-  
-  interventions = unique(hin_df$intervention_name)
-  intervention = "maternal_breast_milk"
-  
-  intervention_df <- hin_df |>
-    filter(intervention_name == intervention) |>
-    mutate(stage_numeric = str_extract(reported_stage, '[0-9]'))
-  
-  plot <- ggplot(intervention_df |> filter(!is.na(stage_numeric)),
-         aes(x = quarter, y = stage_numeric, group = organisation_name_verified)) +
-  geom_line(colour = '#0e668b', size = 1) +
-  labs(x =NULL, 
-         y =NULL, 
-         title = str_glue('{hin_name} - Progression journey of {intervention}'),
-         subtitle = str_glue('Data from 2021/22 Q1 to {reporting_quarter}')
-           )+
-  #facet_grid(rows = vars(api_org_code)) +
-  facet_wrap(~ organisation_name_verified ,
-             ncol = 3,
-             labeller = labeller(organisation_name_verified = label_wrap_gen(width = 30))
-               )+ 
-  theme_minimal() +
-  theme(panel.grid.major.y = element_blank(),
-          axis.text.x = element_text(angle = 90,
-                                     # centre text under tick
-                                     vjust = 0.30),
-          legend.position = 'none',
-          legend.title = element_blank()
-          )
-  
-  print(plot)
-  }
+# for(hin in hins) {
+#   hin_name = hin
+#   
+#   hin_df <- df |>
+#   filter(updated_psc_name == hin_name) |>
+#   pivot_longer(cols = magnesium_sulphate:mews,
+#                names_to = "intervention_name",
+#                values_to = "reported_stage"
+#                )
+#   
+#   interventions = unique(hin_df$intervention_name)
+#   intervention = "maternal_breast_milk"
+#   
+#   intervention_df <- hin_df |>
+#     filter(intervention_name == intervention) |>
+#     mutate(stage_numeric = str_extract(reported_stage, '[0-9]'))
+#   
+#   plot <- ggplot(intervention_df |> filter(!is.na(stage_numeric)),
+#          aes(x = quarter, y = stage_numeric, group = organisation_name_verified)) +
+#   geom_line(colour = '#0e668b', size = 1) +
+#   labs(x =NULL, 
+#          y =NULL, 
+#          title = str_glue('{hin_name} - Progression journey of {intervention}'),
+#          subtitle = str_glue('Data from 2021/22 Q1 to {reporting_quarter}')
+#            )+
+#   #facet_grid(rows = vars(api_org_code)) +
+#   facet_wrap(~ organisation_name_verified ,
+#              ncol = 3,
+#              labeller = labeller(organisation_name_verified = label_wrap_gen(width = 30))
+#                )+ 
+#   theme_minimal() +
+#   theme(panel.grid.major.y = element_blank(),
+#           axis.text.x = element_text(angle = 90,
+#                                      # centre text under tick
+#                                      vjust = 0.30),
+#           legend.position = 'none',
+#           legend.title = element_blank()
+#           )
+#   
+#   print(plot)
+#   }
 ```
 
 
 
-progression chart: connected dots
-```{r, fig.width=12, fig.length=10}
-hin_name = "Kent Surrey Sussex"
-
-hin_df <- df |>
-  filter(updated_psc_name == hin_name) |>
-  pivot_longer(cols = magnesium_sulphate:mews,
-               names_to = "intervention_name",
-               values_to = "reported_stage"
-               )
-
-interventions = unique(hin_df$intervention_name)
-intervention = "maternal_breast_milk"
-intervention_df <- hin_df |>
-  filter(intervention_name == intervention) |>
-  mutate(stage_numeric = str_extract(reported_stage, '[0-9]'))
-
-
-# remove site data
-if (hin_name == "Kent Surrey Sussex"){
-  intervention_df <- intervention_df |>
-    filter(!is.na(api_org_code))
-}
-
-# re order trusts to show succession history in graph 
-if (hin_name == "North West Coast"){
-  all_orgs <- unique(intervention_df$organisation_name_verified) 
-  orgs_mergers <- c('SOUTHPORT AND ORMSKIRK HOSPITAL NHS TRUST',
-                    'ST HELENS AND KNOWSLEY TEACHING HOSPITALS NHS TRUST',
-                    'MERSEY AND WEST LANCASHIRE TEACHING HOSPITALS NHS TRUST'
-                    )
-  orgs_no_mergers <- all_orgs[!all_orgs %in% orgs_mergers]
-  
-  intervention_df <- intervention_df |>
-    mutate(organisation_name_verified = factor(organisation_name_verified, 
-                                               levels = c(orgs_mergers, orgs_no_mergers))
-           )
-} 
-
-
-if (hin_name == "South West"){
-  all_orgs <- unique(intervention_df$organisation_name_verified) 
-  orgs_mergers <- c('YEOVIL DISTRICT HOSPITAL NHS FOUNDATION TRUST',
-                    'SOMERSET NHS FOUNDATION TRUST',
-                    'NORTHERN DEVON HEALTHCARE NHS TRUST',
-                    'ROYAL DEVON AND EXETER NHS FOUNDATION TRUST',
-                    'ROYAL DEVON UNIVERSITY HEALTHCARE NHS FOUNDATION TRUST'
-                    )
-  orgs_no_mergers <- all_orgs[!all_orgs %in% orgs_mergers]
-  
-  intervention_df <- intervention_df |>
-    mutate(organisation_name_verified = factor(organisation_name_verified, 
-                                               levels = c(orgs_mergers, orgs_no_mergers))
-           )
-}
-
-ggplot(intervention_df, 
-       aes(x = quarter, y = organisation_name_verified )
-       ) +
-  geom_line(aes(group = organisation_name_verified , colour = reported_stage), 
-            size = 2 
-            ) + #can't specify different linetype
-  geom_point(aes(group = organisation_name_verified , fill = reported_stage
-                 ),
-             size = 4.5,
-             colour = 'white',
-             pch = 21
-             # default shape, circle
-             # shape = 23 #diamond - doesn't look good
-             #shape = 15 #square
-             ) +
-  labs(x =NULL, 
-       y =NULL, 
-       title = str_glue('{hin_name} - Progression chart for {intervention}'),
-       subtitle = str_glue('Trust level data reproted by the PSC up to {reporting_quarter}')
-         ) +
-  scale_y_discrete(labels = function(y) str_wrap(y, width = 30)) +
-  scale_colour_manual(values = my_colours) +
-  scale_fill_manual(values = my_colours) +
-  theme_minimal() +
-  theme(panel.grid.major.y = element_blank(),
-        axis.text.x = element_text(angle = 90, vjust = 0.30),
-        legend.position = 'bottom',
-        legend.title = element_blank()
-        ) +
-  guides(size = 'none', 
-         colour = guide_legend(nrow = 2, byrow = T)
-         )
-```
-
-```{r, fig.width=12, fig.length=10}
-for(hin in hins) {
-  hin_name = hin
-  
+```{r}
+# plotting function
+progression_plot <- function(df, hin_name, intervention) {
+  # filter data to one psc and make long
   hin_df <- df |>
     filter(updated_psc_name == hin_name) |>
-    pivot_longer(cols = magnesium_sulphate:mews,
-                 names_to = "intervention_name",
-                 values_to = "reported_stage"
+    pivot_longer(
+      cols = magnesium_sulphate:mews,
+      names_to = "intervention_name",
+      values_to = "reported_stage"
     )
 
-  interventions = unique(hin_df$intervention_name)
-  intervention = "maternal_breast_milk"
+  # then filter down to one intervention only
   intervention_df <- hin_df |>
-      filter(intervention_name == intervention) |>
-      mutate(stage_numeric = str_extract(reported_stage, '[0-9]'))
-  
-  
-  # remove site data
-  if (hin_name == "Kent Surrey Sussex"){
-      intervention_df <- intervention_df |>
-          filter(!is.na(api_org_code))
+    filter(intervention_name == intervention) |>
+    mutate(stage_numeric = str_extract(reported_stage, "[0-9]"))
+
+  # handle special PSC cases
+  # remove site data fro Kent
+  if (hin_name == "Kent Surrey Sussex") {
+    intervention_df <- intervention_df |>
+      filter(!is.na(api_org_code))
   }
-  
-  # re order trusts to show succession history in graph 
-  if (hin_name == "North West Coast"){
-      all_orgs <- unique(intervention_df$organisation_name_verified) 
-      orgs_mergers <- c('SOUTHPORT AND ORMSKIRK HOSPITAL NHS TRUST',
-                        'ST HELENS AND KNOWSLEY TEACHING HOSPITALS NHS TRUST',
-                        'MERSEY AND WEST LANCASHIRE TEACHING HOSPITALS NHS TRUST'
-      )
-      orgs_no_mergers <- all_orgs[!all_orgs %in% orgs_mergers]
-      
-      intervention_df <- intervention_df |>
-          mutate(organisation_name_verified = factor(organisation_name_verified, 
-                                                     levels = c(orgs_mergers, orgs_no_mergers))
-          )
-  } 
-  
-  
-  if (hin_name == "South West"){
-      all_orgs <- unique(intervention_df$organisation_name_verified) 
-      orgs_mergers <- c('YEOVIL DISTRICT HOSPITAL NHS FOUNDATION TRUST',
-                        'SOMERSET NHS FOUNDATION TRUST',
-                        'NORTHERN DEVON HEALTHCARE NHS TRUST',
-                        'ROYAL DEVON AND EXETER NHS FOUNDATION TRUST',
-                        'ROYAL DEVON UNIVERSITY HEALTHCARE NHS FOUNDATION TRUST'
-      )
-      orgs_no_mergers <- all_orgs[!all_orgs %in% orgs_mergers]
-      
-      intervention_df <- intervention_df |>
-          mutate(organisation_name_verified = factor(organisation_name_verified, 
-                                                     levels = c(orgs_mergers, orgs_no_mergers))
-          )
+
+  # re order trusts to show succession history in graph in NWC and SW
+  if (hin_name == "North West Coast") {
+    all_orgs <- unique(intervention_df$organisation_name_verified)
+    orgs_mergers <- c(
+      "SOUTHPORT AND ORMSKIRK HOSPITAL NHS TRUST",
+      "ST HELENS AND KNOWSLEY TEACHING HOSPITALS NHS TRUST",
+      "MERSEY AND WEST LANCASHIRE TEACHING HOSPITALS NHS TRUST"
+    )
+    orgs_no_mergers <- all_orgs[!all_orgs %in% orgs_mergers]
+
+    intervention_df <- intervention_df |>
+      mutate(organisation_name_verified = factor(organisation_name_verified,
+        levels = c(orgs_mergers, orgs_no_mergers)
+      ))
   }
+
+
+  if (hin_name == "South West") {
+    all_orgs <- unique(intervention_df$organisation_name_verified)
+    orgs_mergers <- c(
+      "YEOVIL DISTRICT HOSPITAL NHS FOUNDATION TRUST",
+      "SOMERSET NHS FOUNDATION TRUST",
+      "NORTHERN DEVON HEALTHCARE NHS TRUST",
+      "ROYAL DEVON AND EXETER NHS FOUNDATION TRUST",
+      "ROYAL DEVON UNIVERSITY HEALTHCARE NHS FOUNDATION TRUST"
+    )
+    orgs_no_mergers <- all_orgs[!all_orgs %in% orgs_mergers]
+
+    intervention_df <- intervention_df |>
+      mutate(organisation_name_verified = factor(organisation_name_verified,
+        levels = c(orgs_mergers, orgs_no_mergers)
+      ))
+  }
+
+  # prepare for graphing 
   
-  plot <- ggplot(intervention_df, 
-         aes(x = quarter, y = organisation_name_verified )
+  # clean intervention name string
+  intervention_string <- deparse(intervention)
+
+  intervention_title <- intervention_string |>
+    str_remove_all('~|"') |> # 1 remove ~ and " added by deparse
+    str_replace_all("_", " ") |> # 2 replace _ with blank space
+    str_to_title() |> # 3 capitalise clean string into title
+    str_replace('Of', 'of') |>
+    str_replace('Newtt2', 'NEWTT2') |>
+    str_replace('Mews', 'MEWS')
+  # 
+  # if (intervention_title ==  |  intervention_title == 'mews'){
+  #   intervention_title <- str_to_upper(intervention_title)
+  #   print(intervention_title)
+  # }
+    
+  # custom colour palette
+  my_colours <- c(
+    "Stage 7 - Sustained" = "#440154FF",
+    "Stage 6 - Spread" = "#443A83FF",
+    "Stage 5 - Adoption" = "#31688EFF",
+    "Stage 4 - Testing or Implementation" = "#21908CFF",
+    "Stage 3 - Decision" = "#35B779FF",
+    "Stage 2 - Interest" = "#8FD744FF",
+    "Stage 1 - Knowledge" = "#FDE725FF"
+  )
+
+  plot <- ggplot(
+    intervention_df,
+    aes(x = quarter, y = organisation_name_verified)
   ) +
-      geom_line(aes(group = organisation_name_verified , colour = reported_stage), 
-                size = 2 
-      ) + #can't specify different linetype
-      geom_point(aes(group = organisation_name_verified , fill = reported_stage
-      ),
+    geom_line(aes(group = organisation_name_verified, colour = reported_stage),
+      linewidth = 2
+    ) +
+    geom_point(aes(group = organisation_name_verified, fill = reported_stage),
       size = 4.5,
-      colour = 'white',
+      colour = "white",
       pch = 21
-      # default shape, circle
-      # shape = 23 #diamond - doesn't look good
-      #shape = 15 #square
-      ) +
-      labs(x =NULL, 
-           y =NULL, 
-           title = str_glue('{hin_name} - Progression chart for {intervention}'),
-           subtitle = str_glue('Trust level data reproted by the PSC up to {reporting_quarter}')
-      ) +
-      scale_y_discrete(labels = function(y) str_wrap(y, width = 30)) +
-      scale_colour_manual(values = my_colours) +
-      scale_fill_manual(values = my_colours) +
-      theme_minimal() +
-      theme(panel.grid.major.y = element_blank(),
-            axis.text.x = element_text(angle = 90, vjust = 0.30),
-            legend.position = 'bottom',
-            legend.title = element_blank()
-      ) +
-      guides(size = 'none', 
-             colour = guide_legend(nrow = 2, byrow = T)
-      )
+    ) +
+    labs(
+      x = NULL,
+      y = NULL,
+      title = str_glue("{hin_name} - Progression chart of {intervention_title}"),
+      subtitle = str_glue("Trust level data reported by the PSC up to {reporting_quarter}")
+    ) +
+    scale_y_discrete(labels = function(y) str_wrap(y, width = 30)) +
+    scale_colour_manual(values = my_colours) +
+    scale_fill_manual(values = my_colours) +
+    theme_minimal() +
+    theme(
+      panel.grid.major.y = element_blank(),
+      axis.text.x = element_text(angle = 90, vjust = 0.30),
+      legend.position = "bottom",
+      legend.title = element_blank()
+    ) +
+    guides(
+      size = "none",
+      colour = guide_legend(nrow = 2, byrow = T)
+    )
   print(plot)
-  }
+}
+```
+
+# MatNeoSIP - Optimisation (Progression Journeys)
+
+```{r, fig.width=12, fig.length=10}
+hin_name = "North West Coast"
+
+progression_plot(df = mat_neo_data, 
+                 hin_name = hin_name, 
+                 intervention = "place_of_birth")
+```
+
+```{r, fig.width=12, fig.length=10}
+progression_plot(df = mat_neo_data, 
+                 hin_name = hin_name, 
+                 intervention = "maternal_breast_milk")
+```
+
+```{r, fig.width=12, fig.length=10}
+progression_plot(df = mat_neo_data, 
+                 hin_name = hin_name, 
+                 intervention = "normothermia")
+```
+
+```{r, fig.width=12, fig.length=10}
+progression_plot(df = mat_neo_data, 
+                 hin_name = hin_name, 
+                 intervention = "optimal_cord_management")
+```
+
+```{r, fig.width=12, fig.length=10}
+progression_plot(df = mat_neo_data, 
+                 hin_name = hin_name, 
+                 intervention = "antibiotics")
+```
+
+```{r, fig.width=12, fig.length=10}
+progression_plot(df = mat_neo_data, 
+                 hin_name = hin_name, 
+                 intervention = "corticosteroids")
+```
+
+```{r, fig.width=12, fig.length=10}
+progression_plot(df = mat_neo_data, 
+                 hin_name = hin_name, 
+                 intervention = "magnesium_sulphate")
+```
+
+```{r, fig.width=12, fig.length=10}
+progression_plot(df = mat_neo_data, 
+                 hin_name = hin_name, 
+                 intervention = "caffeine")
+```
+
+```{r, fig.width=12, fig.length=10}
+progression_plot(df = mat_neo_data, 
+                 hin_name = hin_name, 
+                 intervention = "volume_targeted_ventilation")
 ```
 
 
+```{r, fig.width=12, fig.length=10}
+progression_plot(df = mat_neo_data, 
+                 hin_name = hin_name, 
+                 intervention = "newtt2")
+```
 
-
-
-
+```{r, fig.width=12, fig.length=10}
+progression_plot(df = mat_neo_data, 
+                 hin_name = hin_name, 
+                 intervention = "mews")
+```
