@@ -1,6 +1,4 @@
 ---
-title: "NatPatSIP - PSC Progression Journeys"
-author: "Patient Safety Analysis Team"
 format: 
   pptx:
     reference-doc: template.pptx
@@ -11,6 +9,8 @@ params:
   master_files_folder: '1. Master files'
   quarter_string: '24_25_Q3'
   hin_name: 'Yorkshire & Humber'
+title: "NatPatSIP - `r params$hin_name` Progression Journeys"
+author: "Patient Safety Analysis Team"
 ---
 
 ```{r setup, include=FALSE}
@@ -259,7 +259,7 @@ progression_plot <- function(df, hin_name, intervention) {
     labs(
       x = NULL,
       y = NULL,
-      title = str_glue("{hin_name} - Progression Chart of {intervention_title}"),
+      title = str_glue("{hin_name} - Progression of {intervention_title}"),
       subtitle = str_glue("Trust level data reported by the PSC up to {reporting_quarter}")
     ) +
     scale_y_discrete(labels = function(y) str_wrap(y, width = 30)) +
