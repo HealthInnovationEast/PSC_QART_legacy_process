@@ -1,5 +1,5 @@
 ---
-title: "NatPatSIP - PSC Presentation"
+title: "NatPatSIP - PSC Progression Journeys"
 author: "Patient Safety Analysis Team"
 format: 
   pptx:
@@ -10,6 +10,7 @@ params:
   reporting_quarter: '2024/25 Q3'
   master_files_folder: '1. Master files'
   quarter_string: '24_25_Q3'
+  hin_name: 'Yorkshire & Humber'
 ---
 
 ```{r setup, include=FALSE}
@@ -32,26 +33,16 @@ library(Microsoft365R)
 source('config_sharepoint_location.R')
 
 
-# already defined in other scripts but placing here for experimental running
-reporting_quarter_end_date <- ymd('2024-12-31') 
-reporting_quarter_string <- quarter(reporting_quarter_end_date, 
-                                    fiscal_start = 4,
-                                    type = 'year_start/end')
-previous_quarter_end_date <- reporting_quarter_end_date %m-% months(3)
-previous_quarter_string <- quarter(previous_quarter_end_date, 
-                                   fiscal_start = 4,
-                                   type = 'year_start/end')
+# params
+reporting_quarter <- params$reporting_quarter
+master_files_folder <- params$master_files_folder
+quarter_string <- params$quarter_string
+hin_name <- params$hin_name
 
-quarter_string <- reporting_quarter_string |>
-  str_replace_all("/| ", "_")
-
-reporting_quarter = reporting_quarter_string
-master_files_folder = master_files_folder
-quarter_string = quarter_string
-
+# go into share point and download latest data
 master_files_dr <- chosenlib$get_item(glue::glue("{base_url}/{master_files_folder}"))
-# date upload 
 
+# data upload 
 mat_neo_data_file <- master_files_dr$list_files() |> 
   select(name) |> 
   filter(str_detect(name, 
@@ -70,7 +61,6 @@ mat_neo_identified_data$download(dest = here("data", str_glue({mat_neo_data_file
 mat_neo_data <- read.csv(here(str_glue('data/{mat_neo_data_file}'))) |>
   mutate(updated_psc_name = str_remove_all(updated_psc_name, ' HIN'))
 ```
-
 
 ```{r, include = F}
 # attempt 1 - faceted time series showing stage per quarter by trust
@@ -123,8 +113,7 @@ mat_neo_data <- read.csv(here(str_glue('data/{mat_neo_data_file}'))) |>
 # print(plot)
 ```
 
-
-```{r, fig.height=8, fig.width=12, include = F}
+```{r, fig.height=9, fig.width=14, include = F}
 # for(hin in hins) {
 #   hin_name = hin
 #   
@@ -167,8 +156,6 @@ mat_neo_data <- read.csv(here(str_glue('data/{mat_neo_data_file}'))) |>
 #   print(plot)
 #   }
 ```
-
-
 
 ```{r}
 # plotting function
@@ -272,7 +259,7 @@ progression_plot <- function(df, hin_name, intervention) {
     labs(
       x = NULL,
       y = NULL,
-      title = str_glue("{hin_name} - Progression chart of {intervention_title}"),
+      title = str_glue("{hin_name} - Progression Chart of {intervention_title}"),
       subtitle = str_glue("Trust level data reported by the PSC up to {reporting_quarter}")
     ) +
     scale_y_discrete(labels = function(y) str_wrap(y, width = 30)) +
@@ -293,72 +280,93 @@ progression_plot <- function(df, hin_name, intervention) {
 }
 ```
 
-# MatNeoSIP - Optimisation (Progression Journeys)
+# MatNeoSIP - Optimisation
 
-```{r, fig.width=12, fig.length=10}
-hin_name = "North West Coast"
+## 
 
+```{r, fig.width=14, fig.height=9}
 progression_plot(df = mat_neo_data, 
                  hin_name = hin_name, 
                  intervention = "place_of_birth")
 ```
 
-```{r, fig.width=12, fig.length=10}
+## 
+
+```{r, fig.width=14, fig.height=9}
 progression_plot(df = mat_neo_data, 
                  hin_name = hin_name, 
                  intervention = "maternal_breast_milk")
 ```
 
-```{r, fig.width=12, fig.length=10}
+## 
+
+```{r, fig.width=14, fig.height=9}
 progression_plot(df = mat_neo_data, 
                  hin_name = hin_name, 
                  intervention = "normothermia")
 ```
 
-```{r, fig.width=12, fig.length=10}
+## 
+
+```{r, fig.width=14, fig.height=9}
 progression_plot(df = mat_neo_data, 
                  hin_name = hin_name, 
                  intervention = "optimal_cord_management")
 ```
 
-```{r, fig.width=12, fig.length=10}
+## 
+
+```{r, fig.width=14, fig.height=9}
 progression_plot(df = mat_neo_data, 
                  hin_name = hin_name, 
                  intervention = "antibiotics")
 ```
 
-```{r, fig.width=12, fig.length=10}
+## 
+
+```{r, fig.width=14, fig.height=9}
 progression_plot(df = mat_neo_data, 
                  hin_name = hin_name, 
                  intervention = "corticosteroids")
 ```
 
-```{r, fig.width=12, fig.length=10}
+## 
+
+```{r, fig.width=14, fig.height=9}
 progression_plot(df = mat_neo_data, 
                  hin_name = hin_name, 
                  intervention = "magnesium_sulphate")
 ```
 
-```{r, fig.width=12, fig.length=10}
+## 
+
+```{r, fig.width=14, fig.height=9}
 progression_plot(df = mat_neo_data, 
                  hin_name = hin_name, 
                  intervention = "caffeine")
 ```
 
-```{r, fig.width=12, fig.length=10}
+## 
+
+```{r, fig.width=14, fig.height=9}
 progression_plot(df = mat_neo_data, 
                  hin_name = hin_name, 
                  intervention = "volume_targeted_ventilation")
 ```
 
+# MatNeoSIP - Deterioration Tools
 
-```{r, fig.width=12, fig.length=10}
+## 
+
+```{r, fig.width=14, fig.height=9}
 progression_plot(df = mat_neo_data, 
                  hin_name = hin_name, 
                  intervention = "newtt2")
 ```
 
-```{r, fig.width=12, fig.length=10}
+## 
+
+```{r, fig.width=14, fig.height=9}
 progression_plot(df = mat_neo_data, 
                  hin_name = hin_name, 
                  intervention = "mews")

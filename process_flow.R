@@ -60,7 +60,7 @@ if (stage_of_process == "process_submissions") {
   # appends collated data to previous submissions
   source('append_data.R')
   # uses appended data to produce power point slide
-  source('run_quarto.R') # runs qart_slides.qmd
+  source('run_quarto.R') # runs qart_slides.qmd AND progression_slides.qmd
 }
 
 
