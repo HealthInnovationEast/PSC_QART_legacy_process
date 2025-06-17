@@ -31,12 +31,7 @@ chosenlib$upload_file(
 
 ### presentation 2 - progression journeys
 
-#hins <- hin_folders |> str_remove(' HIN')
-
-hins <- c("North West Coast",
-          "South West",
-          "Kent Surrey Sussex",
-          "Yorkshire & Humber")
+hins <- hin_folders |> str_remove(' HIN')
 
 for (hin in hins){
   # run quarto file and save output in output folder
