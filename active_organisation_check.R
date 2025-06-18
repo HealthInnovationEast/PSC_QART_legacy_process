@@ -4,7 +4,7 @@
 # i.e., to account for changes in orgs applicable from 2024/25 Q4 and after
 
 
-# download data from SharePoint
+# download previously submitted data from SharePoint
 master_files_dr <- chosenlib$get_item(glue::glue("{base_url}/{master_files_folder}"))
 previous_data_file <- master_files_dr$get_item(str_glue({previous_submissions_file_name}))
 previous_data_file$download(dest = here("output", str_glue({previous_submissions_file_name})), 
@@ -122,6 +122,11 @@ call_by_org_code <- function(api_org_code) {
     print(glue::glue("Retrieved {api_date_type} Date Info"))
   }
   
+  # this is useful for quarters where theyere have not been any mergers 
+  # so code doesn't break when in call_org_end_dates
+  if (is.null(api_date_end)){
+    api_date_end <- NA
+  } 
   
   tibble(
     api_org_code,
@@ -165,6 +170,8 @@ call_org_end_dates_quarter_info <- call_org_end_dates |>
     # we ignore it because that change doesn't affect the data yet
     api_succ_code = case_when(inactive_from_date > reporting_quarter_end_date ~ NA,
                               .default = api_succ_code),
+    # make sure type is character so left join in successor_organisation_details won't break
+    api_succ_code = as.character(api_succ_code),
     api_date_end = case_when(inactive_from_date > reporting_quarter_end_date ~ NA,
                              .default = api_date_end),
     inactive_from_date = case_when(inactive_from_date > reporting_quarter_end_date ~ NA,
@@ -178,6 +185,7 @@ call_org_end_dates_quarter_info <- call_org_end_dates |>
 
 
 # bring successor info for legacy orgs
+# note this object will be empty when no org changes have occurred between 2 quarters
 successor_organisation_details <- call_org_end_dates_quarter_info |>
   filter(!is.na(nhs_inactive_from_quarter)) |>
   select(api_date_end, api_succ_code) |>
@@ -308,9 +316,11 @@ if (empty_qa_multiple_succ == F) {
       select(previous_quarter_icb_name, api_icb_name,
              previous_quarter_org_name , api_current_org_name)
     )
+} else {
+  message("There have been no organisation changes between now an the previous quarter")
 }
 
-# final df |>
+# final output
 map_psc_trust_icb_active_orgs_final <- map_psc_trust_icb_active_orgs |>
   select(updated_psc_name, 
          api_icb_code, api_icb_name,
@@ -332,5 +342,10 @@ map_legacy <- call_orgs_legacy_status_quarter |>
             by = 'api_org_code') |>
   select(updated_psc_name, api_org_code, api_org_name, api_date_end, api_succ_code, api_succ_name) 
 
-message(str_glue('The following organisation changes are applicable up to {reporting_quarter_string}'))
-print(t(map_legacy))
+if (nrow(map_legacy) > 0){
+  message(str_glue('The following organisation changes are applicable up to {reporting_quarter_string}'))
+  print(t(map_legacy))
+} else {
+  message("There have been no organisation changes between now an the previous quarter")
+}
+
