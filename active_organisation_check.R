@@ -2,6 +2,15 @@
 
 # here we evaluate the organisation names for quarters after retroactive changes have been applied 
 # i.e., to account for changes in orgs applicable from 2024/25 Q4 and after
+
+
+# download data from SharePoint
+master_files_dr <- chosenlib$get_item(glue::glue("{base_url}/{master_files_folder}"))
+previous_data_file <- master_files_dr$get_item(str_glue({previous_submissions_file_name}))
+previous_data_file$download(dest = here("output", str_glue({previous_submissions_file_name})), 
+                       overwrite = T)
+
+# upload data 
 org_names_previous_submissions <- read.csv(
   here(str_glue('output/{previous_submissions_file_name}'))
   ) |>
@@ -40,7 +49,7 @@ call_by_org_code <- function(api_org_code) {
   api_org_name <- trust_info$Organisation$Name
   api_org_date <- trust_info$Organisation$Date
   
-  print(glue::glue("** Getting mapping for {api_org_name} **"))
+  print(glue::glue("** Getting mapping for {api_org_code} - {api_org_name} **"))
   
   date_elements <- as.numeric(length(api_org_date))
   

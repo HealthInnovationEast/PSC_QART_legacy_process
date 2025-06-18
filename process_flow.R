@@ -17,10 +17,10 @@ source('config_sharepoint_location.R')
 
 # this is the stage of the task we want execute
 # either "prepare_templates" or "process_submissions"
-stage_of_process <- "process_submissions" 
+stage_of_process <- "prepare_templates" 
 
 # set dates by setting end of reporting quarter (mind that latest data will be lagged by 1 quarter)
-reporting_quarter_end_date <- ymd('2025-03-31') 
+reporting_quarter_end_date <- ymd('2025-06-30') 
 reporting_quarter_string <- quarter(reporting_quarter_end_date, 
                                     fiscal_start = 4,
                                     type = 'year_start/end')
@@ -30,7 +30,7 @@ previous_quarter_string <- quarter(previous_quarter_end_date,
                                    type = 'year_start/end')
 
 # file below will be used to append new submissions data from PSC
-previous_submissions_file_name <- 'mat_neo_qart_cleansed_upto_2024_25_Q3.csv' 
+previous_submissions_file_name <- 'mat_neo_qart_all_data_upto_2024_25_Q4.csv' 
 
 # ----------------- code below stays **fixed** 
 
@@ -45,7 +45,7 @@ if (str_detect(previous_submissions_file_name, quarter_check) == FALSE) {
 
 master_files_folder <- "1. Master files" # where data files are in SharePoint
 slides_folder <- "2. Slides" # where presentation will be saved in SharePoint
-template_file_name <- "preferred_template.xlsx"
+template_file_name <- "preferred_template_2526_changes.xlsx"
 
 if (stage_of_process == "prepare_templates") {
   # will produce a new version of psc_icb_trust_lookup.csv to account for org changes (if there have been any)
