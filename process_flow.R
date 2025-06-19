@@ -50,6 +50,9 @@ template_file_name <- "preferred_template_2526_changes.xlsx"
 if (stage_of_process == "prepare_templates") {
   # will produce a new version of psc_icb_trust_lookup.csv to account for org changes (if there have been any)
   source('active_organisation_check.R') 
+  # EXPERIMENTAL: there's been a request to add trust sites for new template
+  # eventually this should be incorporated in active_organisation_check.R
+  source('trust_site_codes.R')
   # IMPORTANT: make sure you have updated the reporting quarter in the intro tab
   source('create_empty_templates.R')
 } 
