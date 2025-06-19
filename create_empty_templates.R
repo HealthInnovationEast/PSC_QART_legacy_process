@@ -1,42 +1,59 @@
 message('Creating templates...')
 
 # script to create empty excel templates with organisation names for each PSC. 
-location_lookup <- read.csv(here("lookups", "psc_icb_trust_lookup.csv")) # created via active_organisation_check.R  
-pscs <- unique(location_lookup$updated_psc_name)
 
 # download template file from SharePoint
-master_files_dr <- chosenlib$get_item(glue::glue("{base_url}/{master_files_folder}"))
 template_file <- master_files_dr$get_item(str_glue({template_file_name}))
 template_file$download(dest = here("lookups", str_glue({template_file_name})), 
                        overwrite = T)
 
 # file friendly naming string for saving results
 current_quarter_year <- str_remove_all(reporting_quarter_string, '20|/')
-  
+
+# for testing one template
+# pscs = pscs[pscs %in% c('Kent Surrey Sussex HIN')]
+
 # loop through locations provided in psc_lookup.csv
 for (psc in pscs) {
+  # grid with trust code, site code, trust name, site name
+  location_trust_sites <- psc_icb_trust_site_lookup |>
+    filter(updated_psc_name == psc) |>
+    select(api_current_code, api_current_org_name,
+           trust_site_code, api_site_name) |>
+    # this is to avoid printing string '#N/A' for empty cells
+    mutate(across(where(is.character), ~replace_na(., ' ')))
+  
   # grid with icb codes and names
-  location_icb <- location_lookup |>
+  location_icb <- psc_icb_trust_site_lookup |>
     filter(updated_psc_name == psc) |>
     distinct(api_icb_code, api_icb_name)
 
-  # grid with icb code, icb name, trust code, and trust name
-  location_icb_trust <- location_lookup |>
+  # grid with icb code, trust code, icb name, and trust name
+  location_icb_trust <- psc_icb_trust_site_lookup |>
     filter(updated_psc_name == psc) |>
     # choosing this order to accommodate most aesthetic width of cells in template
-    select(
+    distinct(
       api_icb_code, api_current_code,
       api_icb_name, api_current_org_name
     )
 
   # grid with trust code and trust name
-  location_trusts <- location_lookup |>
+  location_trusts <- psc_icb_trust_site_lookup |>
     filter(updated_psc_name == psc) |>
     # choosing this order to accommodate most aesthetic width of cells in template
-    select(api_current_code, api_current_org_name)
+    distinct(api_current_code, api_current_org_name)
 
   # load template excel file
   wb <- openxlsx2::wb_load(here("lookups", str_glue({template_file_name})))
+  
+  # add trust and sites to Martha's Rule tab
+  wb <- wb_add_data(wb,
+    sheet = "Martha's Rule",
+    x = location_trust_sites,
+    start_col = 2,
+    start_row = 8,
+    col_names = FALSE
+  )
   
   # add ICB names to Medicines tab
   wb <- wb_add_data(wb,
@@ -44,14 +61,6 @@ for (psc in pscs) {
     x = location_icb,
     start_col = 2,
     start_row = 6,
-    col_names = FALSE
-  )
-
-  wb <- wb_add_data(wb,
-    sheet = "Medicines",
-    x = location_icb,
-    start_col = 2,
-    start_row = 17,
     col_names = FALSE
   )
 
@@ -91,6 +100,53 @@ for (psc in pscs) {
     start_col = 3,
     start_row = 82,
     col_names = FALSE
+  )
+  
+  ## CULTURE PROGRAMME
+  
+  # moments numbers
+  wb <- wb_add_data(wb,
+    sheet = "MOMENTS Numbers",
+    x = location_trusts,
+    start_col = 2,
+    start_row = 6,
+    col_names = FALSE
+  )
+  
+  # plt eng't with psc
+  wb <- wb_add_data(wb,
+    sheet = "PLT Engagement with PSC",
+    x = location_trusts,
+    start_col = 5,
+    start_row = 5,
+    col_names = FALSE
+  )
+  
+  # plt eng't with cc
+  wb <- wb_add_data(wb,
+    sheet = "PLT Engagement with CCs",
+    x = location_trusts,
+    start_col = 5,
+    start_row = 5,
+    col_names = FALSE
+  )
+  
+  # cc eng't with PSC
+  wb <- wb_add_data(wb,
+                    sheet = "CC Engagement with PSC",
+                    x = location_trusts,
+                    start_col = 5,
+                    start_row = 5,
+                    col_names = FALSE
+  )
+  
+  # cc numbers
+  wb <- wb_add_data(wb,
+                    sheet = "Culture Coach Numbers",
+                    x = location_trusts,
+                    start_col = 2,
+                    start_row = 6,
+                    col_names = FALSE
   )
 
   wb_save(wb,

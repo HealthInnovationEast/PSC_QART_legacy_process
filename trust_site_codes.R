@@ -1,3 +1,5 @@
+message('Adding trust site codes...')
+
 # bring psc-icb-trust lookup created via active_Organisation_check.R  
 psc_icb_trust_lookup <- read.csv(here("lookups", "psc_icb_trust_lookup.csv")) 
 pscs <- unique(psc_icb_trust_lookup$updated_psc_name)
@@ -70,7 +72,16 @@ call_by_site_code <- function(trust_site_code) {
 call_parent_codes <- apply(site_lookup_parsed |> select(trust_site_code), 1, call_by_site_code) |>
   bind_rows() 
 
-# psc_icb_trust_lookup |>
-#   left_join(site_lookup_parsed, by = c('api_current_code' = 'trust_code_derived')) |>
-#   View()
+# join api information back to original look up
+psc_icb_trust_site_lookup <- psc_icb_trust_lookup |>
+  left_join(call_parent_codes, by = c('api_current_code' = 'api_parent_code')) |>
+  arrange(updated_psc_name, api_icb_name, api_current_org_name, api_site_name)
 
+
+# save work locally and on sharepoint
+write.csv(psc_icb_trust_site_lookup, here("lookups", "psc_icb_trust_site_lookup.csv"), row.names = F)
+
+chosenlib$upload_file(
+  dest = str_glue("{base_url}/1. Master files/psc_icb_trust_site_lookup.csv"),
+  src = "lookups/psc_icb_trust_site_lookup.csv"
+)

@@ -324,8 +324,7 @@ if (empty_qa_multiple_succ == F) {
 map_psc_trust_icb_active_orgs_final <- map_psc_trust_icb_active_orgs |>
   select(updated_psc_name, 
          api_icb_code, api_icb_name,
-         api_current_code, api_current_org_name) |>
-  arrange(updated_psc_name, api_icb_name, api_current_org_name)
+         api_current_code, api_current_org_name) 
 
 write.csv(map_psc_trust_icb_active_orgs_final, here("lookups", "psc_icb_trust_lookup.csv"), row.names = F)
 
