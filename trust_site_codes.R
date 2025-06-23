@@ -11,10 +11,34 @@ site_lookup_file$download(dest = here("lookups", str_glue({site_lookup_file_name
                             overwrite = T)
 
 # upload look up
-site_lookup <- read_excel(here("lookups", str_glue({site_lookup_file_name})),
+sites_phase_1 <- read_excel(here("lookups", str_glue({site_lookup_file_name})),
+                            sheet = 'PHASE 1 SITES') |>
+  clean_names() |>
+  mutate(phase = 1)
+
+sites_phase_2 <- read_excel(here("lookups", str_glue({site_lookup_file_name})),
                           sheet = 'PHASE 2 SITES',
                           n_max = 63) |>
-  clean_names()
+  clean_names() |>
+  mutate(phase = 2)
+
+# the codes below have DQ concerns
+unclear_phase2_sites <- c('RTGX1',# invalid code, doesn't exist in API
+                    'NQTA5', # independent sector, closed organisation
+                    'N6J7V', # used to identify a hospital in west midlands, but code is for Sussex
+                    'RCB55' # name assgiend to code corresponds to wrong trust site 
+                    )
+
+# affected_pscs 
+sites_phase_2 |>
+  filter(ods_code %in% unclear_phase2_sites) |>
+  select(psc)
+
+sites_phase_2_parsed <- sites_phase_2 |>
+  filter(!ods_code %in% unclear_phase2_sites) 
+
+# combine phase 1 and 2 
+site_lookup <- bind_rows(sites_phase_1, sites_phase_2_parsed)
 
 # wrangle to allow left join to psc_icb_trust_lookup
 site_lookup_parsed <- site_lookup |>
@@ -23,10 +47,7 @@ site_lookup_parsed <- site_lookup |>
          name_of_site,
          trust_site_code = ods_code, 
          to_grey_out = starts_with('will_be')
-         ) |>
-  filter(trust_site_code != 'RTGX1', # invalid code, doesn't exist in API
-         trust_site_code != 'NQTA5' # independent sector, closed organisation
-         )
+         ) 
 
 # use site codes in an API call
 call_by_site_code <- function(trust_site_code) {
@@ -72,16 +93,72 @@ call_by_site_code <- function(trust_site_code) {
 call_parent_codes <- apply(site_lookup_parsed |> select(trust_site_code), 1, call_by_site_code) |>
   bind_rows() 
 
-# join api information back to original look up
-psc_icb_trust_site_lookup <- psc_icb_trust_lookup |>
-  left_join(call_parent_codes, by = c('api_current_code' = 'api_parent_code')) |>
-  arrange(updated_psc_name, api_icb_name, api_current_org_name, api_site_name)
+# are all the nhs trusts for these sites included in qart already ? 
+no_psc_returns <- call_parent_codes |>
+  left_join(psc_icb_trust_lookup, by = c('api_parent_code' = 'api_current_code')) |>
+  filter(is.na(updated_psc_name)) 
 
+# get trust names, start, and end dates using function developed in active_orgsanisation_check.R 
+call_org_names_and_dates <- apply(no_psc_returns |> distinct(api_parent_code), 1, call_by_org_code) |>
+  bind_rows() |>
+  relocate(api_date_end, .after = api_date_start) |>
+  mutate(api_date_start = ymd(api_date_start),
+         api_date_end = ymd(api_date_end))
+
+new_trusts_succession_history <- call_org_names_and_dates |>
+  # put trust names back
+  left_join(no_psc_returns, by = c('api_org_code' = 'api_parent_code')) |>
+  # remove unnecessary vars
+  select(-c(updated_psc_name, api_icb_code, api_icb_name, api_current_org_name))|>
+  # work out trust code and name after org changes
+  mutate(api_org_current_code = if_else(!is.na(api_succ_code), api_succ_code, api_org_code),
+         api_org_current_name = if_else(is.na(api_succ_code), api_org_name, NA)) |>
+  # get names for post merger trusts
+  left_join(psc_icb_trust_lookup |> select(api_current_code, api_current_org_name), 
+            by = c('api_org_current_code' = 'api_current_code')) |>
+  mutate(api_org_current_name = if_else(is.na(api_succ_code), 
+                                        api_org_current_name, api_current_org_name)) 
+
+
+new_trusts_psc_info <- new_trusts_succession_history |>
+  select(api_parent_code = api_org_current_code, 
+         api_current_org_name = api_org_current_name, 
+         trust_site_code, api_site_name) |>
+  left_join(site_lookup |> select(psc, ods_code), by = c('trust_site_code' = 'ods_code')) |>
+  mutate(updated_psc_name = case_when(psc == 'Eastern' ~ 'Eastern HIN',
+                         psc == 'HIN Manchester' ~ 'Manchester HIN',
+                         psc == 'HIN South London' ~ 'South London HIN',
+                         psc == 'KSS' ~ 'Kent Surrey Sussex HIN',
+                         psc == 'North West Coast' ~ 'North West Coast HIN',
+                         psc == 'UCLP' ~ 'UCLPartners HIN',
+                         psc == 'West Midlands' ~ 'West Midlands HIN',
+                         psc == 'West Mids' ~ 'West Midlands HIN',
+                         psc == 'Y&H' ~ 'Yorkshire & Humber HIN'
+                         ),
+         .before = api_parent_code
+         ) |>
+  select(-psc)
+
+# add info
+psc_trust_site_lookup <- call_parent_codes  |>
+  left_join(psc_icb_trust_lookup, by = c('api_parent_code' = 'api_current_code')) |>
+  # removing icb info as this look up it won't be shown for Martha's rule
+  select(-contains('icb')) |>
+  filter(!is.na(updated_psc_name)) |>
+  bind_rows(new_trusts_psc_info) |>
+  # bring phase info
+  left_join(site_lookup_parsed |> select(trust_site_code, phase, to_grey_out), by = 'trust_site_code') |>
+  # col order
+  select(updated_psc_name, api_parent_code, api_current_org_name, 
+         trust_site_code, api_site_name,
+         phase, to_grey_out) |>
+  # row order
+  arrange(updated_psc_name, api_current_org_name, api_site_name)
 
 # save work locally and on sharepoint
-write.csv(psc_icb_trust_site_lookup, here("lookups", "psc_icb_trust_site_lookup.csv"), row.names = F)
+write.csv(psc_trust_site_lookup, here("lookups", "psc_trust_site_lookup.csv"), row.names = F)
 
 chosenlib$upload_file(
-  dest = str_glue("{base_url}/1. Master files/psc_icb_trust_site_lookup.csv"),
-  src = "lookups/psc_icb_trust_site_lookup.csv"
+  dest = str_glue("{base_url}/1. Master files/psc_trust_site_lookup.csv"),
+  src = "lookups/psc_trust_site_lookup.csv"
 )
