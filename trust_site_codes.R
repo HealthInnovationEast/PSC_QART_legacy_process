@@ -29,7 +29,7 @@ unclear_phase2_sites <- c('RTGX1',# invalid code, doesn't exist in API
                     'RCB55' # name assgiend to code corresponds to wrong trust site 
                     )
 
-# affected_pscs 
+# affected_pscs  
 sites_phase_2 |>
   filter(ods_code %in% unclear_phase2_sites) |>
   select(psc)

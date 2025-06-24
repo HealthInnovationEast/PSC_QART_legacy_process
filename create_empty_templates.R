@@ -11,25 +11,27 @@ template_file$download(dest = here("lookups", str_glue({template_file_name})),
 current_quarter_year <- str_remove_all(reporting_quarter_string, '20|/')
 
 # for testing one template
-# pscs = pscs[pscs %in% c('Kent Surrey Sussex HIN')]
+# pscs = pscs[pscs %in% c('Yorkshire & Humber HIN')]
 
 # loop through locations provided in psc_lookup.csv
 for (psc in pscs) {
-  # grid with trust code, site code, trust name, site name
-  location_trust_sites <- psc_icb_trust_site_lookup |>
+  # grid with trust code, site code, trust name, site name 
+  # generated in trust_site_codes.R
+  location_trust_sites <- psc_trust_site_lookup |>
     filter(updated_psc_name == psc) |>
-    select(api_current_code, api_current_org_name,
-           trust_site_code, api_site_name) |>
+    select(api_parent_code, api_current_org_name,
+           trust_site_code, api_site_name, phase) |>
     # this is to avoid printing string '#N/A' for empty cells
     mutate(across(where(is.character), ~replace_na(., ' ')))
   
+  # all other grids geenrated 
   # grid with icb codes and names
-  location_icb <- psc_icb_trust_site_lookup |>
+  location_icb <- psc_icb_trust_lookup |>
     filter(updated_psc_name == psc) |>
     distinct(api_icb_code, api_icb_name)
 
   # grid with icb code, trust code, icb name, and trust name
-  location_icb_trust <- psc_icb_trust_site_lookup |>
+  location_icb_trust <- psc_icb_trust_lookup |>
     filter(updated_psc_name == psc) |>
     # choosing this order to accommodate most aesthetic width of cells in template
     distinct(
@@ -38,7 +40,7 @@ for (psc in pscs) {
     )
 
   # grid with trust code and trust name
-  location_trusts <- psc_icb_trust_site_lookup |>
+  location_trusts <- psc_icb_trust_lookup |>
     filter(updated_psc_name == psc) |>
     # choosing this order to accommodate most aesthetic width of cells in template
     distinct(api_current_code, api_current_org_name)
