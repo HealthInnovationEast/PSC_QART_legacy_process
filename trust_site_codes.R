@@ -17,28 +17,12 @@ sites_phase_1 <- read_excel(here("lookups", str_glue({site_lookup_file_name})),
   mutate(phase = 1)
 
 sites_phase_2 <- read_excel(here("lookups", str_glue({site_lookup_file_name})),
-                          sheet = 'PHASE 2 SITES',
-                          n_max = 63) |>
+                          sheet = 'PHASE 2 SITES') |>
   clean_names() |>
   mutate(phase = 2)
 
-# the codes below have DQ concerns
-unclear_phase2_sites <- c('RTGX1',# invalid code, doesn't exist in API
-                    'NQTA5', # independent sector, closed organisation
-                    'N6J7V', # used to identify a hospital in west midlands, but code is for Sussex
-                    'RCB55' # name assgiend to code corresponds to wrong trust site 
-                    )
-
-# affected_pscs  
-sites_phase_2 |>
-  filter(ods_code %in% unclear_phase2_sites) |>
-  select(psc)
-
-sites_phase_2_parsed <- sites_phase_2 |>
-  filter(!ods_code %in% unclear_phase2_sites) 
-
 # combine phase 1 and 2 
-site_lookup <- bind_rows(sites_phase_1, sites_phase_2_parsed)
+site_lookup <- bind_rows(sites_phase_1, sites_phase_2)
 
 # wrangle to allow left join to psc_icb_trust_lookup
 site_lookup_parsed <- site_lookup |>

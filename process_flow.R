@@ -65,5 +65,3 @@ if (stage_of_process == "process_submissions") {
   # uses appended data to produce power point slide
   source('run_quarto.R') # runs qart_slides.qmd AND progression_slides.qmd
 }
-
-

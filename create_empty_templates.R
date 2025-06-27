@@ -11,7 +11,7 @@ template_file$download(dest = here("lookups", str_glue({template_file_name})),
 current_quarter_year <- str_remove_all(reporting_quarter_string, '20|/')
 
 # for testing one template
-# pscs = pscs[pscs %in% c('Yorkshire & Humber HIN')]
+#pscs = pscs[pscs %in% c('North West Coast HIN')]
 
 # loop through locations provided in psc_lookup.csv
 for (psc in pscs) {
