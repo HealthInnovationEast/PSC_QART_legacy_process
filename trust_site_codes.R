@@ -140,7 +140,7 @@ psc_trust_site_lookup <- call_parent_codes  |>
   arrange(updated_psc_name, api_current_org_name, api_site_name)
 
 psc_trust_site_lookup<- psc_trust_site_lookup %>%
-  mutate(updated_psc_name = if_else(trust_site_code == "RD816", "Eastern", updated_psc_name))
+  mutate(updated_psc_name = if_else(trust_site_code == "RD816", "Eastern HIN", updated_psc_name))
 
 # save work locally and on sharepoint
 write.csv(psc_trust_site_lookup, here("lookups", "psc_trust_site_lookup.csv"), row.names = F)
