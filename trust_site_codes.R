@@ -5,7 +5,7 @@ psc_icb_trust_lookup <- read.csv(here("lookups", "psc_icb_trust_lookup.csv"))
 pscs <- unique(psc_icb_trust_lookup$updated_psc_name)
 
 # download look up provided by improvement team
-site_lookup_file_name <- '20250618 Site list for QART template.xlsx'
+site_lookup_file_name <- '20250710 Site list for QART template.xlsx'
 site_lookup_file <- master_files_dr$get_item(str_glue({site_lookup_file_name}))
 site_lookup_file$download(dest = here("lookups", str_glue({site_lookup_file_name})), 
                             overwrite = T)

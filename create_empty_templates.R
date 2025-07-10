@@ -24,6 +24,12 @@ for (psc in pscs) {
     # this is to avoid printing string '#N/A' for empty cells
     mutate(across(where(is.character), ~replace_na(., ' ')))
   
+  sites_to_grey <- psc_trust_site_lookup |>
+    filter(updated_psc_name == psc) %>% select(to_grey_out) %>% 
+    pull(to_grey_out)
+  rows_to_grey_out <- which(str_detect(sites_to_grey,"Yes"))
+  
+  
   # all other grids geenrated 
   # grid with icb codes and names
   location_icb <- psc_icb_trust_lookup |>
@@ -56,6 +62,17 @@ for (psc in pscs) {
     start_row = 8,
     col_names = FALSE
   )
+  
+  
+  #greying out step
+  for (x in rows_to_grey_out ){
+  wb <- wb_add_fill(wb,
+              sheet = "Martha's Rule",
+               dims =  wb_dims(rows= 8 + x - 1,
+                               cols= 2:6),
+               color = wb_color("grey")
+                )
+  }
   
   # add ICB names to Medicines tab
   wb <- wb_add_data(wb,
