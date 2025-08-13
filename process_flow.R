@@ -17,7 +17,7 @@ source('config_sharepoint_location.R')
 
 # this is the stage of the task we want execute
 # either "prepare_templates" or "process_submissions"
-stage_of_process <- "prepare_templates" 
+stage_of_process <- "process_submissions" 
 
 # set dates by setting end of reporting quarter (mind that latest data will be lagged by 1 quarter)
 reporting_quarter_end_date <- ymd('2025-06-30') 

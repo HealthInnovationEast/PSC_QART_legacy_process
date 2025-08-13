@@ -31,27 +31,27 @@ chosenlib$upload_file(
 
 ### presentation 2 - progression journeys
 
-hins <- hin_folders |> str_remove(' HIN')
-
-for (hin in hins){
-  # run quarto file and save output in output folder
-  quarto_render("progression_slides.qmd", 
-                execute_params = list(reporting_quarter = reporting_quarter_string,
-                                      master_files_folder = master_files_folder,
-                                      # below parameter is generated in read_qart_submissions.R
-                                      quarter_string = quarter_string,
-                                      hin_name = hin
-                )
-  )
-  
-  file_name <- glue::glue("matneo_qart_{hin}_progression_slides_{quarter_string}.pptx")
-  
-  # move the quarto report into the output folder and change name
-  file.rename('progression_slides.pptx', here(glue::glue('output/{file_name}')))
-  
-  # save file to SharePoint 
-  chosenlib$upload_file(
-    dest = str_glue("{base_url}/{slides_folder}/{file_name}"),
-    src = str_glue('output/{file_name}')
-  )
-}
+# hins <- hin_folders |> str_remove(' HIN')
+# 
+# for (hin in hins){
+#   # run quarto file and save output in output folder
+#   quarto_render("progression_slides.qmd", 
+#                 execute_params = list(reporting_quarter = reporting_quarter_string,
+#                                       master_files_folder = master_files_folder,
+#                                       # below parameter is generated in read_qart_submissions.R
+#                                       quarter_string = quarter_string,
+#                                       hin_name = hin
+#                 )
+#   )
+#   
+#   file_name <- glue::glue("matneo_qart_{hin}_progression_slides_{quarter_string}.pptx")
+#   
+#   # move the quarto report into the output folder and change name
+#   file.rename('progression_slides.pptx', here(glue::glue('output/{file_name}')))
+#   
+#   # save file to SharePoint 
+#   chosenlib$upload_file(
+#     dest = str_glue("{base_url}/{slides_folder}/{file_name}"),
+#     src = str_glue('output/{file_name}')
+#   )
+# }
