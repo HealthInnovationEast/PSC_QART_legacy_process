@@ -92,8 +92,7 @@ aggregate_stage <- function(df, intervention, stage = "Stage 7") {
 }
 
 # 2 visualise line plots
-visualise_line <- function(df, aes_group, aes_colour,
-                           hline_colour, annotate_x, annotate_y, subtitle_string) {
+visualise_line <- function(df, aes_group, aes_colour, subtitle_string) {
   ggplot(
     data = df,
     aes(quarter,
@@ -102,25 +101,14 @@ visualise_line <- function(df, aes_group, aes_colour,
       colour = !!aes_colour
     )
   ) +
-    geom_hline(
-      yintercept = 0.65,
-      linetype = "dashed",
-      colour = hline_colour
-    ) +
     scale_y_continuous(
       labels = scales::percent_format(),
       limits = c(0, 1)
-    ) +
-    annotate(
-      geom = "text",
-      x = annotate_x,
-      y = annotate_y,
-      label = "Target for FY 2024/25 (i.e., 65%)"
-    ) +
+     ) +
     labs(
       title = "Adoption of optimisation interventions across NHS Trusts",
       subtitle = subtitle_string,
-      caption = glue::glue("Data reported by the PSC's for {reporting_quarter}")
+      caption = glue::glue("Data reported by the PSC's up to {reporting_quarter}")
     ) +
     theme_classic() +
     theme(
@@ -164,10 +152,65 @@ visualise_line(
   df = spaghetti_data,
   aes_group = expr(intervention),
   aes_colour = expr(intervention),
-  hline_colour = "black",
-  annotate_x = "2023/24 Q4",
-  annotate_y = 0.8,
   subtitle_string = "Percentage of organisations reporting all implementation stages at level 7, by intervention"
+) +
+  geom_line() +
+  geom_point(size = 2) +
+  ggsci::scale_colour_jco()
+```
+
+## 
+
+```{r}
+spaghetti_data <- bind_rows(
+  aggregate_stage(mat_neo_data, newtt2, stage = "Stage 3"),
+  aggregate_stage(mat_neo_data, mews, stage = "Stage 3")
+)
+
+visualise_line(
+  df = spaghetti_data,
+  aes_group = expr(intervention),
+  aes_colour = expr(intervention),
+  subtitle_string = "Percentage of organisations reporting deterioration tool use at stage 3"
+) +
+  geom_line() +
+  geom_point(size = 2) +
+  ggsci::scale_colour_jco()
+```
+
+
+## 
+
+```{r}
+spaghetti_data <- bind_rows(
+  aggregate_stage(mat_neo_data, newtt2, stage = "Stage 5"),
+  aggregate_stage(mat_neo_data, mews, stage = "Stage 5")
+)
+
+visualise_line(
+  df = spaghetti_data,
+  aes_group = expr(intervention),
+  aes_colour = expr(intervention),
+  subtitle_string = "Percentage of organisations reporting deterioration tool use at stage 5"
+) +
+  geom_line() +
+  geom_point(size = 2) +
+  ggsci::scale_colour_jco()
+```
+
+## 
+
+```{r}
+spaghetti_data <- bind_rows(
+  aggregate_stage(mat_neo_data, newtt2, stage = "Stage 7"),
+  aggregate_stage(mat_neo_data, mews, stage = "Stage 7")
+)
+
+visualise_line(
+  df = spaghetti_data,
+  aes_group = expr(intervention),
+  aes_colour = expr(intervention),
+  subtitle_string = "Percentage of organisations reporting deterioration tool use at stage 7"
 ) +
   geom_line() +
   geom_point(size = 2) +
