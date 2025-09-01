@@ -32,6 +32,9 @@ previous_quarter_string <- quarter(previous_quarter_end_date,
 # file below will be used to append new submissions data from PSC
 previous_submissions_file_name <- 'mat_neo_qart_all_data_upto_2024_25_Q4.csv' 
 
+# file with list of Martha's rule phase 2 sites supported by nshe
+marthas_phase_2_nhse_submission <- 'Marthas Rule phase 2 sites supported by natps team 2526 Q1_Returned'
+
 # ----------------- code below stays **fixed** 
 
 # validation rule for dates

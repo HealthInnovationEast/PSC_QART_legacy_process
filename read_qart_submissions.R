@@ -1,5 +1,58 @@
-# script to find submissions from PSC on sharepoint and collate data for power point
+# script to find submissions from PSC on sharepoint and collate data for data processing outputs 
 
+# first go to master files folder and download martha's rule data submitted by nhse improvement team
+message('Fetching phase 2 site submissions by NHSE improvement team')
+
+master_files_location <- dr$list_files() |>
+  select(name) |>
+  filter(str_detect(name, "(?i)master files"))
+
+master_files_folder <- chosenlib$get_item(glue::glue("{base_url}/{master_files_location}"))
+
+master_files <- master_files_folder$list_files()
+
+marthas_nhse_submission_file <- master_files |>
+  select(name) |>
+  # submissions must be saved with returned ending on file name
+  filter(str_detect(name, marthas_phase_2_nhse_submission))
+
+if (nrow(marthas_nhse_submission_file) == 0) {
+  stop(glue::glue("file not found in location '{master_files_location}':\n file name provided: '{marthas_nhse_submission_file}'"))
+}
+
+marthas_nhse_submission <- master_files_folder$get_item(marthas_nhse_submission_file)
+
+# download file 
+path <- here('data', str_glue('{marthas_nhse_submission_file}'))
+
+marthas_nhse_submission$download(
+  dest = path,
+  overwrite = T
+)
+
+# read martha's data submitted by nhse 
+# note that we will to append addtional data from PSC's in loops
+data_marthas_nhse <- read_excel(
+  path = path, 
+  sheet = 1,
+  range = "A7:M42"
+) |> clean_names() |>
+  # removing decorative column
+  select(-'x10') |>
+  mutate(nhse_natps_submisison = TRUE)
+
+# name reparation 
+names(data_marthas_nhse) <- c('updated_psc_name', 'trust_code', 'name_of_trust', 
+                         'site_code', 'name_of_site', 'phase',
+                         'adults_patient_check_in', 
+                         'adults_independent_clinical_review', 
+                         'adults_escalation_available_to_patient_carers',
+                         'paediatric_patient_check_in', 
+                         'paediatric_independent_clinical_review', 
+                         'paediatric_escalation_available_to_patient_carers',
+                         'nhse_natps_submisison')
+
+# navigate sharepoint to hin locations
 hin_folders <- dr$list_files() |>
   select(name) |>
   filter(str_detect(name, "HIN$")) |>
@@ -16,8 +69,11 @@ write.csv(hin_names,
           row.names = F
 )
 
-# empty data frame to save submissions
-results <- tibble()
+# empty data frames to save submissions
+results_marthas <- tibble()
+results_mat_neo <- tibble()
+
+#hin_folders = 'Yorkshire & Humber HIN'
 
 for (hin in hin_folders) {
   # identify submission
@@ -57,15 +113,55 @@ for (hin in hin_folders) {
     dest = tf,
     overwrite = T
   )
+  
+  # read martha's rule data
+  data_marthas <- read_excel(
+    path = tf, sheet = "Martha's Rule",
+    range = "B7:M30" 
+  ) |> 
+    clean_names() |>
+    # no data in this column, used for better print out in excel doc
+    select(-'x9') 
+  
+  names(data_marthas) <- c('trust_code', 'name_of_trust', 
+                           'site_code', 'name_of_site', 'phase',
+                           'adults_patient_check_in', 
+                           'adults_independent_clinical_review', 
+                           'adults_escalation_available_to_patient_carers',
+                           'paediatric_patient_check_in', 
+                           'paediatric_independent_clinical_review', 
+                           'paediatric_escalation_available_to_patient_carers')
+  
+  data_marthas_tidy <- data_marthas |>
+    filter(!is.na(adults_patient_check_in)) |>
+    mutate(updated_psc_name = hin, .before = trust_code) |>
+    bind_rows(data_marthas_nhse |> filter(updated_psc_name == hin))
+  
+  # check there's info for all codes
+  site_code_check <- data_marthas |> 
+    filter(!site_code %in% data_marthas_tidy$site_code) 
+  
+  incomplete_sites <- site_code_check |> 
+    select(site_code, name_of_site) |> 
+    as.character() |>
+    paste(collapse = '-')
+  
+  if (nrow(site_code_check) > 0) {
+    warning(str_glue('Data still not provided for sites above {incomplete_sites}'))
+    #stop('Data still not provided for sites above')
+  }
+  
+  # append extracted data to list
+  results_marthas <- bind_rows(results_marthas, data_marthas_tidy)
 
-  # read
-  data <- read_excel(
+  # read matneo data
+  data_mat_neo <- read_excel(
     path = tf, sheet = "MatNeo",
     range = "B7:N44"
   )
 
   # cut 1 opt data
-  data_opt <- data[1:16, ]
+  data_opt <- data_mat_neo[1:16, ]
 
   data_opt[1, 1] <- "api_icb_code"
   data_opt[1, 2] <- "api_org_code"
@@ -84,7 +180,7 @@ for (hin in hin_folders) {
   }
 
   # cut 2 newtt2 data
-  data_nwwtt2_mews <- data[21:46, 1:8]
+  data_nwwtt2_mews <- data_mat_neo[21:46, 1:8]
 
   nwwtt2_location <- data.frame(which(data_nwwtt2_mews == "NEWTT 2", arr.ind = T))
   # validation
@@ -158,23 +254,24 @@ for (hin in hin_folders) {
   print(glue::glue("Successful data extraction for {hin}. Data retrieved from:"))
   print(glue::glue("{hin_submission_file}"))
 
-  results <- rbind(results, data_combined)
+  results_mat_neo <- rbind(results_mat_neo, data_combined)
+  
 }
 
-if (length(unique(results$updated_psc_name)) != 15){
+if (length(unique(results_mat_neo$updated_psc_name)) != 15){
   stop('Data not appended correctly')
 }
 
 # number of organisations using the deterioration tools
 # these numbers are used for an impact slide produced by improvement team
 # our role is to provide an udpate on these figures
-orgs_newtt2 <- results |>
+orgs_newtt2 <- results_mat_neo |>
   filter(str_detect(Newtt2, '(?i)stage (4|5|6|7)')) 
 
 print(str_glue("Number of organisations using NEWTT2:
                {length(unique(orgs_newtt2$organisation_name_verified))}"))
 
-orgs_mews <- results |>
+orgs_mews <- results_mat_neo |>
   filter(str_detect(Mews, '(?i)stage (4|5|6|7)')) 
 
 print(str_glue("Number of organisations using MEWS:
@@ -187,7 +284,7 @@ quarter_string <- reporting_quarter_string |>
 time_stamp_ext <- format(Sys.time(), "%Y_%m_%d_%H%M%S.csv")
 reporting_quarter_submissions_path <- glue::glue("output/psc_submissions_{quarter_string}_processed_{time_stamp_ext}")
 
-write.csv(results,
+write.csv(results_mat_neo,
   file = here(reporting_quarter_submissions_path),
   row.names = F
 )
