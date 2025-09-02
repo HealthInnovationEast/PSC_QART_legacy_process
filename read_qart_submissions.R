@@ -3,13 +3,9 @@
 # first go to master files folder and download martha's rule data submitted by nhse improvement team
 message('Fetching phase 2 site submissions by NHSE improvement team')
 
-master_files_location <- dr$list_files() |>
-  select(name) |>
-  filter(str_detect(name, "(?i)master files"))
+master_files_location <- chosenlib$get_item(glue::glue("{base_url}/{master_files_folder}"))
 
-master_files_folder <- chosenlib$get_item(glue::glue("{base_url}/{master_files_location}"))
-
-master_files <- master_files_folder$list_files()
+master_files <- master_files_location$list_files()
 
 marthas_nhse_submission_file <- master_files |>
   select(name) |>
@@ -20,7 +16,7 @@ if (nrow(marthas_nhse_submission_file) == 0) {
   stop(glue::glue("file not found in location '{master_files_location}':\n file name provided: '{marthas_nhse_submission_file}'"))
 }
 
-marthas_nhse_submission <- master_files_folder$get_item(marthas_nhse_submission_file)
+marthas_nhse_submission <- master_files_location$get_item(marthas_nhse_submission_file)
 
 # download file 
 path <- here('data', str_glue('{marthas_nhse_submission_file}'))
@@ -39,6 +35,7 @@ data_marthas_nhse <- read_excel(
 ) |> clean_names() |>
   # removing decorative column
   select(-'x10') |>
+  # flag 
   mutate(nhse_natps_submisison = TRUE)
 
 # name reparation 
@@ -73,11 +70,11 @@ write.csv(hin_names,
 results_marthas <- tibble()
 results_mat_neo <- tibble()
 
-#hin_folders = 'Yorkshire & Humber HIN'
+#hin_folders = 'Manchester HIN'
 
 for (hin in hin_folders) {
   # identify submission
-  print(glue::glue("** Checking data for {hin} **"))
+  message(glue::glue("** Checking data for {hin} **"))
 
   hin_dir <- chosenlib$get_item(glue::glue("{base_url}/{hin}"))
 
@@ -115,13 +112,16 @@ for (hin in hin_folders) {
   )
   
   # read martha's rule data
+  message("Reading Martha's Rule submissions")
+  
   data_marthas <- read_excel(
     path = tf, sheet = "Martha's Rule",
     range = "B7:M30" 
   ) |> 
     clean_names() |>
     # no data in this column, used for better print out in excel doc
-    select(-'x9') 
+    select(-'x9') |>
+    remove_empty("rows")
   
   names(data_marthas) <- c('trust_code', 'name_of_trust', 
                            'site_code', 'name_of_site', 'phase',
@@ -133,7 +133,8 @@ for (hin in hin_folders) {
                            'paediatric_escalation_available_to_patient_carers')
   
   data_marthas_tidy <- data_marthas |>
-    filter(!is.na(adults_patient_check_in)) |>
+    #filter(!is.na(adults_patient_check_in) & !is.na(paediatric_patient_check_in)) |>
+    filter(if_any(matches('adults|paediatric'), ~!is.na(.))) |>
     mutate(updated_psc_name = hin, .before = trust_code) |>
     bind_rows(data_marthas_nhse |> filter(updated_psc_name == hin))
   
@@ -147,7 +148,7 @@ for (hin in hin_folders) {
     paste(collapse = '-')
   
   if (nrow(site_code_check) > 0) {
-    warning(str_glue('Data still not provided for sites above {incomplete_sites}'))
+    warning(str_glue('{hin}: MR data missing for {incomplete_sites}'))
     #stop('Data still not provided for sites above')
   }
   
@@ -155,6 +156,8 @@ for (hin in hin_folders) {
   results_marthas <- bind_rows(results_marthas, data_marthas_tidy)
 
   # read matneo data
+  message("Reading MatNeo submissions")
+  
   data_mat_neo <- read_excel(
     path = tf, sheet = "MatNeo",
     range = "B7:N44"
@@ -258,7 +261,9 @@ for (hin in hin_folders) {
   
 }
 
-if (length(unique(results_mat_neo$updated_psc_name)) != 15){
+if (length(unique(results_marthas$updated_psc_name)) != 15 & 
+    length(unique(results_mat_neo$updated_psc_name)) != 15
+    ){
   stop('Data not appended correctly')
 }
 
@@ -277,14 +282,22 @@ orgs_mews <- results_mat_neo |>
 print(str_glue("Number of organisations using MEWS:
                {length(unique(orgs_mews$organisation_name_verified))}"))
 
-# write combined data
+# write quarterly data files
 quarter_string <- reporting_quarter_string |>
   str_replace_all("/| ", "_")
 
 time_stamp_ext <- format(Sys.time(), "%Y_%m_%d_%H%M%S.csv")
-reporting_quarter_submissions_path <- glue::glue("output/psc_submissions_{quarter_string}_processed_{time_stamp_ext}")
+marthas_submissions_path <- glue::glue("output/marthas_psc_submissions_{quarter_string}_processed_{time_stamp_ext}")
+mat_neo_opt_submissions_path <- glue::glue("output/mat_neo_optimisation_psc_submissions_{quarter_string}_processed_{time_stamp_ext}")
 
-write.csv(results_mat_neo,
-  file = here(reporting_quarter_submissions_path),
+write.csv(results_marthas,
+  file = here(marthas_submissions_path),
   row.names = F
 )
+
+write.csv(results_mat_neo,
+          file = here(mat_neo_opt_submissions_path),
+          row.names = F
+)
+
+message(glue::glue('Data files with data for {reporting_quarter_string} have been produced'))
