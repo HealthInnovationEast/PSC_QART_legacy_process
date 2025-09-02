@@ -9,7 +9,7 @@ matneo_overview_file$download(dest = here("data", 'matneo_overview.PNG'),
 ### presentation 1 - share of stages across trusts by PSC
 
 # run quarto file and save output in output folder
-quarto_render("qart_slides.qmd", 
+quarto_render("mat_neo_qart_slides.qmd", 
               execute_params = list(reporting_quarter = reporting_quarter_string,
                                     master_files_folder = master_files_folder,
                                     # below parameter is generated in read_qart_submissions.R
@@ -20,7 +20,7 @@ quarto_render("qart_slides.qmd",
 file_name <- glue::glue("matneo_qart_slides_{quarter_string}.pptx")
 
 # move the quarto report into the output folder and change name
-file.rename('qart_slides.pptx', here(glue::glue('output/{file_name}')))
+file.rename('mat_neo_qart_slides.pptx', here(glue::glue('output/{file_name}')))
 
 # save file to SharePoint 
 chosenlib$upload_file(
