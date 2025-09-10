@@ -1,0 +1,355 @@
+---
+title: "NatPatSIP - Martha's Rule Quarterly Presentation"
+author: "Patient Safety Analysis Team"
+format: 
+   html:  
+     embed-resources: true
+     df-print: kable
+     toc: true
+     toc-location: left
+     number-sections: true
+execute:
+  echo: false
+  warning: false
+params: 
+  reporting_quarter: '2024/25 Q6'
+  master_files_folder: '1. Master files'
+  quarter_string: '25_26_Q1'
+  marthas_data_file: 'marthas_psc_submissions_2025_26_Q1_processed_2025_09_08_184653.csv'
+---
+
+
+```{r}
+# read in required packages
+library(here)
+library(tidyverse)
+library(janitor)
+library(lubridate)
+library(ggplot2)
+library(readxl)
+library(forcats)
+library(scales)
+library(ggsci)
+library(viridis)
+library(Microsoft365R)
+
+source('config_sharepoint_location.R')
+
+
+# params
+reporting_quarter <- params$reporting_quarter
+master_files_folder <- params$master_files_folder
+quarter_string <- params$quarter_string
+marthas_data_file <- params$marthas_data_file
+
+# bring site look up with postcode info and get geo inpho
+site_postcode_list <- read.csv(here('lookups', 'psc_trust_site_lookup.csv')) |>
+  select(trust_site_code, api_site_postcode) 
+
+library(PostcodesioR)
+
+postcodes_lookup_table <- lapply(unique(site_postcode_list$api_site_postcode), PostcodesioR::postcode_lookup) |>
+  bind_rows() |>
+  right_join(site_postcode_list, by = c('postcode' = 'api_site_postcode'))
+```
+
+
+```{r}
+# NOTE block below is a place holder that willcoemi n place in 2526 Q2
+# go into share point and download latest data
+#master_files_dr <- chosenlib$get_item(glue::glue("{base_url}/{master_files_folder}"))
+
+# marthas_data_file <- master_files_dr$list_files() |> 
+#   select(name) |> 
+#   filter(str_detect(name, 
+#                     # below parameter is generated in read_qart_submissions.R
+#                     quarter_string)
+#          ) |>
+#   as.vector() |>
+#   unlist() |> 
+#   unname()
+# 
+# marthas_identified_data <- master_files_dr$get_item(str_glue({marthas_data_file}))
+# 
+# marthas_identified_data$download(dest = here("data", str_glue({marthas_data_file})), 
+#                        overwrite = T)
+
+# marthas_data <- read.csv(here(str_glue('data/{marthas_data_file}'))) |>
+#   mutate(updated_psc_name = str_remove_all(updated_psc_name, 'HIN'))
+
+marthas_data_raw <- read.csv(here(str_glue('output/{marthas_data_file}'))) |>
+  mutate(updated_psc_name = str_remove_all(updated_psc_name, ' HIN')) 
+
+marthas_data_postcode  <- marthas_data_raw |>
+  left_join(postcodes_lookup_table, by = c('site_code' = 'trust_site_code')) |>
+  relocate(postcode, .after = name_of_site)
+
+# postcode review
+#marthas_data_postcode |>
+  #filter(is.na(postcode)) 
+```
+
+## Note
+
+The visualisations and breakdowns below are experimental and for internal use only.
+
+## Distribution of sites, by phase 
+
+Missing data for two phase 2 sites here: 
+
+- RGD03 - Leeds General Infirmary
+- RAN01 - The Royal National Orthopaedic Hospital (Stanmore)
+
+Are we missing one phase 2 site?
+
+```{r}
+# free styling aggregations and visualisations
+library(kableExtra)
+
+marthas_data_to_aggregate <- marthas_data_raw |>
+  rename('PSC' = updated_psc_name,
+         'Phase' = phase)
+
+marthas_data_to_aggregate |>
+  tabyl(Phase, sort = T) |> 
+  rename('Count' = n, 'Percent' = percent) |> 
+  mutate(Percent = label_percent(accuracy = 0.1)(Percent)) |>
+  kable(align = 'lll')
+```
+
+
+
+```{r}
+library(sf)
+library(rnaturalearth)
+library(rnaturalearthdata)
+# Get United Kingdom boundaries at 1:10m scale
+uk <- ne_states(country = "United Kingdom", returnclass = "sf")
+
+# Filter for England
+england <- uk %>% filter(geonunit == "England")
+
+# outilinee of england
+england_outline <- england %>%
+  summarise(geometry = st_union(geometry))
+
+# make data sf
+trust_sites_sf <- sf::st_as_sf(marthas_data_postcode , coords = c('longitude', 'latitude'),
+                      crs = 4326)
+```
+
+
+```{r, fig.height=8,fig.width=8}
+ggplot() +
+  geom_sf(data = england_outline, fill = "white", color = "black") +
+  geom_sf(data = trust_sites_sf, 
+          aes(colour = factor(phase)),
+          size = 2,
+          alpha = 0.7
+          ) +
+  labs(title = "Martha's Rule sites in England, by phase")+
+  scale_colour_manual(values = c('#003087', '#41B6E6'),
+                      labels = c("Phase 1", "Phase 2")  # Custom legend labels
+                    ) +
+  theme_minimal()  +
+  theme(axis.text = element_blank(),
+        panel.grid = element_blank(),
+        legend.title = element_blank()
+        )
+```
+
+## Share of sites by PSC
+
+::: {.panel-tabset}
+
+### Table 
+
+```{r}
+# maybe make this into a bar plot, 2 shades of clue for each phase that make up the totality of sites 
+share_of_sites <- marthas_data_to_aggregate |>
+  tabyl(PSC, Phase) |>
+  rename('Phase 1' = `1`,
+         'Phase 2' = `2`
+         ) 
+
+share_of_sites_long <- share_of_sites |>
+  pivot_longer(cols = starts_with('Phase'), 
+               names_to = 'Phase', 
+               values_to = 'Number of sites')
+
+#share of site table 
+share_of_sites_table <- share_of_sites |>
+  adorn_totals('both') |>
+  mutate(Percent = label_percent(accuracy = 0.1)(Total/210))
+
+share_of_sites_table |> 
+  kable(align = 'llll')
+
+```
+
+### Plot
+
+```{r, fig.height=7,fig.width=10}
+share_of_sites_for_plot <- share_of_sites_long |>
+  left_join(share_of_sites_table |> select(PSC, Percent), by = 'PSC')
+
+share_of_sites_perc_labels <- share_of_sites_for_plot |>
+  group_by(PSC) |> 
+  summarise('Number of sites' = sum(`Number of sites`), Percent = first(Percent)) |>
+  ungroup()
+
+ggplot(data = share_of_sites_for_plot,
+       aes(x = `Number of sites`, y = forcats::fct_rev(PSC)
+           )
+       ) +
+  geom_bar(aes( fill = forcats::fct_rev(Phase)),stat = 'identity', alpha = 0.7) +
+  geom_text(data = share_of_sites_perc_labels,
+            aes(x = `Number of sites`, 
+                y = forcats::fct_rev(PSC), 
+                label = Percent
+                ),
+            hjust = -0.1,
+            position=position_dodge2(width=0.9),
+            size = 4.5
+            ) +
+  scale_x_continuous(expand = expansion(mult = c(0.02,0.11))) +
+  scale_fill_manual(values = c('#41B6E6', '#003087')) +
+  theme_minimal() +
+  theme(axis.title.y = element_blank(),
+        axis.title.x = element_text(color = "black", size = 13),
+        axis.text.x = element_text(color = "black", size = 13),
+        axis.text.y = element_text(color = "black", size = 13),
+        panel.grid.minor.x = element_blank(),
+        axis.ticks = element_line(color = "grey"),
+        legend.title = element_blank())
+```
+
+:::
+
+## Adult questions 
+
+### Question 1
+
+#### National overview
+
+Lot of the data in the middle stages for either phase, even though sites in phase 1 are assumed to have been in the programme longer (check this assumption)
+
+::: {.panel-tabset}
+
+#### Plot
+
+```{r, fig.height=7,fig.width=10}
+national_by_phase <- marthas_data_to_aggregate |>
+  mutate(Phase = as.character(Phase)) |>
+  # exclude these from percetnage calcualtion
+  filter(adults_patient_check_in != 'No adult patients'#,
+         #Phase == '1'
+         ) |>
+  group_by(Phase, adults_patient_check_in) |>
+  summarise(number_of_sites = n()) |>
+  group_by(Phase) |>
+  mutate(group_size_by_phase = sum(number_of_sites)) |>
+  arrange(adults_patient_check_in)
+
+ggplot(data = national_by_phase,
+       aes(y = number_of_sites,
+           x = factor(adults_patient_check_in)
+           )
+       ) +
+  geom_bar(aes(fill = fct_rev(factor(Phase))),
+           stat = 'identity',
+           alpha = 0.7,
+           position = position_dodge()) +
+  labs(x = "Stage",
+       y = "Number of sites",
+       #fill = "Phase"
+       title = "Stages of adoption of component 1 across Martha's rule sites, by phase",
+       )+
+  scale_fill_manual(values = c('#41B6E6', '#003087'),
+                    name = "Phase",  # Custom legend title
+                    labels = c("Phase 2", "Phase 1")  # Custom legend labels
+                    )+
+  scale_x_discrete(labels = label_wrap(25)) +
+  theme_minimal() +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_text(color = "black", size = 13),
+        axis.text.x = element_text(color = "black", size = 13,
+                                   angle = 90),
+        axis.text.y = element_text(color = "black", size = 13),
+        panel.grid.minor.x = element_blank(),
+        axis.ticks = element_line(color = "grey"),
+        legend.title = element_blank())
+```
+
+#### Table 
+
+Note, fewer sites here (203) than overall, given there are sites with no adult units 
+```{r}
+national_all_phases <- marthas_data_to_aggregate |>
+  # exclude these from percetnage calcualtion
+  filter(adults_patient_check_in != 'No adult patients') |>
+  tabyl(adults_patient_check_in) |>
+  rename('Number of sites' = n, 'Percent' = percent, 'Stage' = adults_patient_check_in) |> 
+  adorn_totals('row') |>
+  mutate(Percent = label_percent(accuracy = 0.1)(Percent)) 
+
+national_all_phases
+```
+
+
+#### Reports at or below stage 2
+```{r}
+marthas_data_to_aggregate |>
+  mutate(Phase = as.character(Phase)) |>
+  filter(adults_patient_check_in != 'No adult patients',
+         str_detect(adults_patient_check_in, '(?i)stage (0|1|2)')) |>
+  select(PSC, site_code, name_of_site, Phase, adults_patient_check_in) |>
+  arrange(adults_patient_check_in, Phase, PSC) |>
+  kable()
+```
+
+:::  
+
+## All adult data 
+
+<div style="width: 80vw;">
+
+```{r}
+library(DT)
+
+# not sure this is helpful
+stages <- c('Stage 0 - No contact', 'Stage 1 - Knowledge', 'Stage 2 - Interest')
+
+marthas_data_to_aggregate |>
+  select(PSC, site_code, name_of_site, Phase, matches('adults'))|>
+  DT::datatable(options = list(pageLength = 21)) |>
+  DT::formatStyle(
+    columns = c('adults_patient_check_in', 'adults_independent_clinical_review',
+                'adults_escalation_available_to_patient_carers'),
+    backgroundColor = styleEqual(
+      levels = stages,
+      c('red', 'tomato', 'orange')
+    )
+  )
+```
+
+</div>
+
+<div style="width: 75vw;">
+
+## All paediatric data 
+```{r}
+marthas_data_to_aggregate |>
+  select(PSC, site_code, name_of_site, Phase, matches('paediatric'))|>
+  DT::datatable(options = list(pageLength = 21)) |>
+  DT::formatStyle(
+    columns = c('paediatric_patient_check_in', 'paediatric_independent_clinical_review',
+                'paediatric_escalation_available_to_patient_carers'),
+    backgroundColor = styleEqual(
+      levels = stages,
+      c('red', 'tomato', 'orange')
+    )
+  )
+```
+
+</div>
