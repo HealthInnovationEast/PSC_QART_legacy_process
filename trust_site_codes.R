@@ -41,6 +41,7 @@ call_by_site_code <- function(trust_site_code) {
   )))
   
   api_site_name <- site_info$Organisation$Name
+  api_site_postcode <- site_info$Organisation$GeoLoc$Location$PostCode
   
   print(glue::glue("** Getting parent code for {trust_site_code} - {api_site_name}  **"))
   
@@ -70,15 +71,16 @@ call_by_site_code <- function(trust_site_code) {
   tibble(
     trust_site_code,
     api_site_name,
+    api_site_postcode,
     api_parent_code
   )
 }
 
-call_parent_codes <- apply(site_lookup_parsed |> select(trust_site_code), 1, call_by_site_code) |>
+call_site_postcode_and_parent_codes <- apply(site_lookup_parsed |> select(trust_site_code), 1, call_by_site_code) |>
   bind_rows() 
 
 # are all the nhs trusts for these sites included in qart already ? 
-no_psc_returns <- call_parent_codes |>
+no_psc_returns <- call_site_postcode_and_parent_codes |>
   left_join(psc_icb_trust_lookup, by = c('api_parent_code' = 'api_current_code')) |>
   filter(is.na(updated_psc_name)) 
 
@@ -107,7 +109,7 @@ new_trusts_succession_history <- call_org_names_and_dates |>
 new_trusts_psc_info <- new_trusts_succession_history |>
   select(api_parent_code = api_org_current_code, 
          api_current_org_name = api_org_current_name, 
-         trust_site_code, api_site_name) |>
+         trust_site_code, api_site_name, api_site_postcode) |>
   left_join(site_lookup |> select(psc, ods_code), by = c('trust_site_code' = 'ods_code')) |>
   mutate(updated_psc_name = case_when(psc == 'Eastern' ~ 'Eastern HIN',
                          psc == 'HIN Manchester' ~ 'Manchester HIN',
@@ -124,7 +126,7 @@ new_trusts_psc_info <- new_trusts_succession_history |>
   select(-psc)
 
 # add info
-psc_trust_site_lookup <- call_parent_codes  |>
+psc_trust_site_lookup <- call_site_postcode_and_parent_codes  |>
   left_join(psc_icb_trust_lookup, by = c('api_parent_code' = 'api_current_code')) |>
   # removing icb info as this look up it won't be shown for Martha's rule
   select(-contains('icb')) |>
@@ -134,12 +136,13 @@ psc_trust_site_lookup <- call_parent_codes  |>
   left_join(site_lookup_parsed |> select(trust_site_code, phase, to_grey_out), by = 'trust_site_code') |>
   # col order
   select(updated_psc_name, api_parent_code, api_current_org_name, 
-         trust_site_code, api_site_name,
+         trust_site_code, api_site_name, api_site_postcode,
          phase, to_grey_out) |>
   # row order
   arrange(updated_psc_name, api_current_org_name, api_site_name)
 
-psc_trust_site_lookup<- psc_trust_site_lookup %>%
+# NOTE this line should be removed from 2526 Q2
+psc_trust_site_lookup <- psc_trust_site_lookup %>%
   mutate(updated_psc_name = if_else(trust_site_code == "RD816", "Eastern HIN", updated_psc_name))
 
 # save work locally and on sharepoint

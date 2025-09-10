@@ -1,7 +1,11 @@
-# retrieve previous submissions data
+# retrieve martha's rule submissions
+# place holder as the process of fetching previous data and appending new data is not yet in place
+# this will be ready for 2526 Q2
+
+# retrieve previous matneo submissions data
 previous_mat_neo_submissions_cleansed <- read.csv(here(str_glue('output/{previous_mat_neo_submissions_file_name}')))
 
-message('Previous submissions have data up to ', max(previous_mat_neo_submissions_cleansed$quarter))
+message('Previous MatNeo submissions have data up to ', max(previous_mat_neo_submissions_cleansed$quarter))
 
 # collated data from psc produced in read_quart_submissions.R
 reporting_quarter_mat_neo_submissions <- read.csv(here(mat_neo_opt_submissions_path)) |>
@@ -15,6 +19,11 @@ all_submissions <- previous_mat_neo_submissions_cleansed |>
   bind_rows(reporting_quarter_mat_neo_submissions) 
 
 # write to share point
+message("Saving updated Martha's Rule data to SharePoint")
+
+
+message('Saving updated MatNeo data to SharePoint')
+
 write.csv(all_submissions, 
           str_glue("output/mat_neo_qart_all_data_upto_{quarter_string}.csv"),
           row.names = F)

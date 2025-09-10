@@ -35,12 +35,15 @@ previous_mat_neo_submissions_file_name <- 'mat_neo_qart_all_data_upto_2024_25_Q4
 # file with list of Martha's rule phase 2 sites supported by nshe
 marthas_phase_2_nhse_submission <- 'Marthas Rule phase 2 sites supported by natps team 2526 Q1_Returned'
 
+# NOTE this object will need changing in 2526 Q2 to reflect appendign data to previous submissions
+marthas_data_file <- 'marthas_psc_submissions_2025_26_Q1_processed_2025_09_08_184653.csv'
+
 # ----------------- code below stays **fixed** 
 
 # validation rule for dates
 quarter_check <- str_replace_all(previous_quarter_string, '/| ', '_')
 
-if (str_detect(previous_submissions_file_name, quarter_check) == FALSE) {
+if (str_detect(previous_mat_neo_submissions_file_name, quarter_check) == FALSE) {
   stop('Previous_quarter_string was not set correctly. Check value for reporting_quarter_end_date')
 } else {
   message('Dates set correctly')
