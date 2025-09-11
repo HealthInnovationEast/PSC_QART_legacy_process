@@ -32,6 +32,10 @@ library(scales)
 library(ggsci)
 library(viridis)
 library(Microsoft365R)
+library(ggplot2) # likert plots
+library(ggstats)# likert plots
+library(kableExtra) # tables 
+library(DT) # sortable tables
 
 source('config_sharepoint_location.R')
 
@@ -83,10 +87,6 @@ marthas_data_raw <- read.csv(here(str_glue('output/{marthas_data_file}'))) |>
 marthas_data_postcode  <- marthas_data_raw |>
   left_join(postcodes_lookup_table, by = c('site_code' = 'trust_site_code')) |>
   relocate(postcode, .after = name_of_site)
-
-# postcode review
-#marthas_data_postcode |>
-  #filter(is.na(postcode)) 
 ```
 
 ## Note
@@ -104,8 +104,6 @@ Are we missing one phase 2 site?
 
 ```{r}
 # free styling aggregations and visualisations
-library(kableExtra)
-
 marthas_data_to_aggregate <- marthas_data_raw |>
   rename('PSC' = updated_psc_name,
          'Phase' = phase)
@@ -308,6 +306,58 @@ marthas_data_to_aggregate |>
   kable()
 ```
 
+:::
+
+#### PSC Overview
+
+PSC breakdown of responses, by stage
+
+::: {.panel-tabset}
+
+#### Plot
+
+```{r}
+psc_all_phases <- marthas_data_to_aggregate |>
+  # exclude these from percetnage calcualtion
+  filter(adults_patient_check_in != 'No adult patients') |>
+  select(PSC, site_code, adults_patient_check_in) |>
+  mutate(stage_numeric = str_extract(adults_patient_check_in, '\\b[0-7]\\b'),
+         stage_numeric = factor(stage_numeric))
+
+#psc_all_phases
+
+psc_all_phases_likert <- psc_all_phases |>
+  select(-adults_patient_check_in) |>
+  pivot_wider(names_from = PSC,
+              values_from = stage_numeric)
+
+#psc_all_phases_likert
+
+gglikert(psc_all_phases_likert |> 
+           # drop so we can graph by PSC correctly
+           select(-site_code)
+         )
+```
+
+#### Table
+```{r}
+psc_all_phases_table <- marthas_data_to_aggregate |>
+  # exclude these from percetnage calcualtion
+  filter(adults_patient_check_in != 'No adult patients') |>
+  group_by(PSC, adults_patient_check_in, .drop = F) |>
+  summarise(n_sites = n()) |>
+  ungroup() |>
+  group_by(PSC) |>
+  mutate(total_n_psc_sites = sum(n_sites),
+         Percent = n_sites/total_n_psc_sites,
+         Percent = label_percent(accuracy = 0.1)(Percent)
+         ) |>
+  ungroup()
+
+psc_all_phases_table |> 
+  DT::datatable(options = list(pageLength = 10))
+```
+
 :::  
 
 ## All adult data 
@@ -315,8 +365,6 @@ marthas_data_to_aggregate |>
 <div style="width: 80vw;">
 
 ```{r}
-library(DT)
-
 # not sure this is helpful
 stages <- c('Stage 0 - No contact', 'Stage 1 - Knowledge', 'Stage 2 - Interest')
 
