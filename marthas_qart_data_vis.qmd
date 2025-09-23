@@ -20,7 +20,6 @@ params:
 
 
 ```{r}
-# read in required packages
 library(here)
 library(tidyverse)
 library(janitor)
@@ -32,10 +31,13 @@ library(scales)
 library(ggsci)
 library(viridis)
 library(Microsoft365R)
-library(ggplot2) # likert plots
-library(ggstats)# likert plots
-library(kableExtra) # tables 
-library(DT) # sortable tables
+# likert plots
+library(ggplot2) 
+library(ggstats)
+# tables 
+library(kableExtra) 
+# sortable tables
+library(DT) 
 # post code and mapping libraries
 library(PostcodesioR)
 library(sf)
@@ -43,7 +45,6 @@ library(rnaturalearth)
 library(rnaturalearthdata)
 
 source('config_sharepoint_location.R')
-
 
 # params
 reporting_quarter <- params$reporting_quarter
@@ -385,39 +386,80 @@ below_stage_x(df = marthas_data_to_aggregate,
 
 **Figure :** Breakdown of adoption states for component 1 in adults, by PSC
 
-```{r, fig.height=10,fig.width=11}
-likert_component <- function(df, component, exclude){
+
+```{r}
+# this will allow colours to remain fixed by stage, even when we split vis by phase
+fixed_colours <- setNames(
+  object = c("#D73027", "#F46D43", "#FDAE61", "#FEE08B", "#D9EF8B", "#A6D96A", "#66BD63", "#1A9850"),
+  nm = c('Stage 0 - No contact', 'Stage 1 - Knowledge', 'Stage 2 - Interest', 'Stage 3 - Decision',
+         'Stage 4 - Testing or Implementation', 'Stage 5 - Adoption', 'Stage 6 - Spread', 
+         'Stage 7 - Sustained')
+  )
+
+# graph each component as a likert scale
+likert_component <- function(df, component, exclude, by_phase = NULL){
   
   component <- enquo(component)
   
-  psc_all_phases <- df |>
-    # exclude these from percentage calculation
-    filter(!!component != exclude) |>
-    select(PSC, name_site_code, !!component) |>
-    # note change from quoted component to local component
-    mutate(component = factor(!!component))
+  if (is.null(by_phase)) {
+    psc_all_phases <- df |>
+      select(PSC, name_site_code, !!component) |>
+      # exclude these from percentage calculation
+      filter(!!component != exclude) |>
+      # note change from quoted component to local component
+      mutate(component = factor(!!component))
 
-  psc_all_phases_likert <- psc_all_phases |>
+    psc_for_likert <- psc_all_phases
+    } else if (by_phase == 'Phase 1') {
+      psc_phase_1 <- df |>
+        # exclude these from percentage calculation
+        filter(!!component != exclude,
+               Phase == '1') |>
+        select(PSC, name_site_code, !!component) |>
+        # note change from quoted component to local component
+        mutate(component = factor(!!component))
+      
+      psc_for_likert <- psc_phase_1
+    } else if (by_phase == 'Phase 2') {
+      psc_phase_2 <- df |>
+        # exclude these from percentage calculation
+        filter(!!component != exclude,
+               Phase == '2') |>
+        select(PSC, name_site_code, !!component) |>
+        # note change from quoted component to local component
+        mutate(component = factor(!!component))
+      
+      psc_for_likert <- psc_phase_2
+      }
+  
+  psc_for_likert
+
+  psc_all_phases_likert <- psc_for_likert |>
     select(-!!component) |>
     pivot_wider(names_from = PSC,
                 values_from = component)
-  
-  plot <- gglikert(psc_all_phases_likert |> 
+
+  plot <- gglikert(psc_all_phases_likert |>
              # drop so we can graph by PSC correctly
              select(-name_site_code),
              # exclude second set of percentages to the sides
              add_totals = F,
            ) +
-    scale_fill_brewer(palette = "RdYlGn") +
+    scale_fill_manual(
+      values = fixed_colours
+    ) +
     guides(fill = guide_legend(nrow = 3, byrow = T))+
     theme(axis.text.x = element_blank(),
           axis.text.y = element_text(color = "black", size = 13),
           legend.text = element_text(color = "black", size = 13)
             )
-  
+
   plot
 }
+```
 
+
+```{r, fig.height=10,fig.width=11}
 likert_component(df = marthas_data_to_aggregate, 
                  component = adults_patient_check_in, 
                  exclude = 'No adult patients'
@@ -517,74 +559,30 @@ below_stage_x(df = marthas_data_to_aggregate,
 
 **Figure :** Breakdown of adoption states for component 1 in adults, by PSC
 
-```{r}
-likert_component <- function(df, component, exclude, by_phase = NULL){
-  
-  component <- enquo(component)
-  
-  if (is.null(by_phase)) {
-    psc_all_phases <- df |>
-      select(PSC, name_site_code, !!component) |>
-      # exclude these from percentage calculation
-      filter(!!component != exclude) |>
-      # note change from quoted component to local component
-      mutate(component = factor(!!component))
-
-    psc_for_likert <- psc_all_phases
-    } else if (by_phase == 'Phase 1') {
-      psc_phase_1 <- df |>
-        # exclude these from percentage calculation
-        filter(!!component != exclude,
-               Phase == '1') |>
-        select(PSC, name_site_code, !!component) |>
-        # note change from quoted component to local component
-        mutate(component = factor(!!component))
-      
-      psc_for_likert <- psc_phase_1
-    } else if (by_phase == 'Phase 2') {
-      psc_phase_2 <- df |>
-        # exclude these from percentage calculation
-        filter(!!component != exclude,
-               Phase == '2') |>
-        select(PSC, name_site_code, !!component) |>
-        # note change from quoted component to local component
-        mutate(component = factor(!!component))
-      
-      psc_for_likert <- psc_phase_2
-      }
-  
-  psc_for_likert
-
-  psc_all_phases_likert <- psc_for_likert |>
-    select(-!!component) |>
-    pivot_wider(names_from = PSC,
-                values_from = component)
-
-  plot <- gglikert(psc_all_phases_likert |>
-             # drop so we can graph by PSC correctly
-             select(-name_site_code),
-             # exclude second set of percentages to the sides
-             add_totals = F,
-           ) +
-    # COLOURS NEED TO STAY CONSTANT FOR STAGES WHEN SPLIT BY PHASE
-    scale_fill_brewer(palette = "RdYlGn") +
-    guides(fill = guide_legend(nrow = 3, byrow = T))+
-    theme(axis.text.x = element_blank(),
-          axis.text.y = element_text(color = "black", size = 13),
-          legend.text = element_text(color = "black", size = 13)
-            )
-
-  plot
-}
-```
-
-
-
 ```{r, fig.height=10,fig.width=11}
 likert_component(df = marthas_data_to_aggregate, 
                  component = paediatric_patient_check_in, 
                  exclude = 'No paediatric patients'
                    )
+```
+
+
+```{r, fig.height=10,fig.width=11}
+likert_component(df = marthas_data_to_aggregate, 
+                 component = paediatric_patient_check_in, 
+                 exclude = 'No paediatric patients',
+                 by_phase = 'Phase 1'
+                   )
+```
+
+
+```{r, fig.height=10,fig.width=11}
+likert_component(df = marthas_data_to_aggregate, 
+                 component = paediatric_patient_check_in, 
+                 exclude = 'No paediatric patients',
+                 by_phase = 'Phase 2'
+                   )
+
 ```
 
 #### Table
