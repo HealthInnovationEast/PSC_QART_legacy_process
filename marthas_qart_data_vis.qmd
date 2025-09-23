@@ -96,7 +96,7 @@ marthas_data_postcode  <- marthas_data_raw |>
 
 ## Note
 
-The visualisations and breakdowns below are experimental and for internal use only. Data presented is for `r reporting_quarter`.
+The visualisations and breakdowns below are experimental and for internal use only. Data presented was reported in `r reporting_quarter`.
 
 ## Distribution of sites by phase 
 
@@ -382,10 +382,9 @@ below_stage_x(df = marthas_data_to_aggregate,
 
 ::: {.panel-tabset}
 
-#### Plot
+#### All sites
 
 **Figure :** Breakdown of adoption states for component 1 in adults, by PSC
-
 
 ```{r}
 # this will allow colours to remain fixed by stage, even when we split vis by phase
@@ -466,7 +465,7 @@ likert_component(df = marthas_data_to_aggregate,
                    )
 ```
 
-#### Table
+**Underlying data**
 
 ```{r}
 psc_all_phases_table <- function(df, component, exclude){
@@ -492,10 +491,298 @@ psc_all_phases_table(df = marthas_data_to_aggregate,
                      component = adults_patient_check_in,
                      exclude = 'No adult patients'
                      ) |>
+  rename('Component 1' = adults_patient_check_in) |>
   DT::datatable(options = list(pageLength = 10))
 ```
 
-:::  
+#### Phase 1
+
+```{r, fig.height=10,fig.width=11}
+likert_component(df = marthas_data_to_aggregate, 
+                 component = adults_patient_check_in, 
+                 exclude = 'No adult patients',
+                 by_phase = 'Phase 1'
+                   )
+```
+
+**Underlying data**
+
+```{r}
+psc_all_phases_table(df = marthas_data_to_aggregate |> filter(Phase == '1'),
+                     component = adults_patient_check_in,
+                     exclude = 'No adult patients'
+                     ) |>
+  rename('Component 1' = adults_patient_check_in) |>
+  DT::datatable(options = list(pageLength = 10))
+```
+
+
+#### Phase 2
+
+```{r, fig.height=10,fig.width=11}
+likert_component(df = marthas_data_to_aggregate, 
+                 component = adults_patient_check_in, 
+                 exclude = 'No adult patients',
+                 by_phase = 'Phase 2'
+                   )
+```
+
+**Underlying data**
+
+```{r}
+psc_all_phases_table(df = marthas_data_to_aggregate |> filter(Phase == '2'),
+                     component = adults_patient_check_in,
+                     exclude = 'No adult patients'
+                     ) |>
+  rename('Component 1' = adults_patient_check_in) |>
+  DT::datatable(options = list(pageLength = 10))
+```
+
+:::
+
+### Component 2
+
+All staff will be able, at any time, to ask for a review from a different team if they are concerned that a patient is deteriorating, and they are not being responded to.
+
+#### National overview
+
+TEXT
+
+::: {.panel-tabset}
+
+#### Plot
+
+**Figure :** Stages of adoption of component 2 across Martha's rule sites, by phase
+
+```{r, fig.height=8,fig.width=10}
+national_by_phase_table <- national_by_phase(df = marthas_data_to_aggregate,
+                                             component = adults_independent_clinical_review,
+                                             exclude = 'No adult patients'
+)
+
+plot_national_by_phase(df = national_by_phase_table, 
+                       component = adults_independent_clinical_review
+)
+```
+
+
+#### Table 
+
+```{r}
+national_all_phases(df = marthas_data_to_aggregate, 
+                    component = adults_independent_clinical_review,
+                    exclude = 'No adult patients'
+) |>
+  kable()
+```
+
+
+#### Reports at or below stage 2
+
+```{r}
+below_stage_x(df = marthas_data_to_aggregate, 
+              component = adults_independent_clinical_review,
+              exclude = 'No adult patients'
+              ) |>
+  rename('Component 2' = adults_independent_clinical_review) |>
+  kable()
+```
+
+:::
+
+#### PSC Overview
+
+::: {.panel-tabset}
+
+#### All sites
+
+**Figure :** Breakdown of adoption states for component 2 in adults, by PSC
+
+```{r, fig.height=10,fig.width=11}
+likert_component(df = marthas_data_to_aggregate, 
+                 component = adults_independent_clinical_review,
+                 exclude = 'No adult patients'
+                   )
+```
+
+**Underlying data**
+
+```{r}
+psc_all_phases_table(df = marthas_data_to_aggregate,
+                     component = adults_independent_clinical_review,
+                     exclude = 'No adult patients'
+                     ) |>
+  rename('Component 2' = adults_independent_clinical_review) |>
+  DT::datatable(options = list(pageLength = 10))
+```
+
+
+#### Phase 1
+
+```{r, fig.height=10,fig.width=11}
+likert_component(df = marthas_data_to_aggregate, 
+                 component = adults_independent_clinical_review, 
+                 exclude = 'No adult patients',
+                 by_phase = 'Phase 1'
+                   )
+```
+
+**Underlying data**
+
+```{r}
+psc_all_phases_table(df = marthas_data_to_aggregate |> filter(Phase == '1'),
+                     component = adults_independent_clinical_review,
+                     exclude = 'No adult patients'
+                     ) |>
+  rename('Component 2' = adults_independent_clinical_review) |>
+  DT::datatable(options = list(pageLength = 10))
+```
+
+
+#### Phase 2
+
+```{r, fig.height=10,fig.width=11}
+likert_component(df = marthas_data_to_aggregate, 
+                 component = adults_independent_clinical_review, 
+                 exclude = 'No adult patients',
+                 by_phase = 'Phase 2'
+                   )
+```
+
+**Underlying data**
+
+```{r}
+psc_all_phases_table(df = marthas_data_to_aggregate |> filter(Phase == '2'),
+                     component = adults_independent_clinical_review,
+                     exclude = 'No adult patients'
+                     ) |>
+  rename('Component 2' = adults_independent_clinical_review) |>
+  DT::datatable(options = list(pageLength = 10))
+```
+
+:::
+
+### Component 3
+
+This escalation route will also always be available to patients themselves, their families and carers and advertised across the hospital.
+
+#### National overview
+
+TEXT
+
+::: {.panel-tabset}
+
+#### Plot
+
+**Figure :** Stages of adoption of component 3 across Martha's rule sites, by phase
+
+```{r, fig.height=8,fig.width=10}
+national_by_phase_table <- national_by_phase(df = marthas_data_to_aggregate,
+                                             component = adults_escalation_available_to_patient_carers,
+                                             exclude = 'No adult patients'
+)
+
+plot_national_by_phase(df = national_by_phase_table, 
+                       component = adults_escalation_available_to_patient_carers
+)
+```
+
+
+#### Table 
+
+```{r}
+national_all_phases(df = marthas_data_to_aggregate, 
+                    component = adults_escalation_available_to_patient_carers,
+                    exclude = 'No adult patients'
+) |>
+  kable()
+```
+
+
+#### Reports at or below stage 2
+
+```{r}
+below_stage_x(df = marthas_data_to_aggregate, 
+              component = adults_escalation_available_to_patient_carers,
+              exclude = 'No adult patients'
+              ) |>
+  rename('Component 3' = adults_escalation_available_to_patient_carers) |>
+  kable()
+```
+
+:::
+
+#### PSC Overview
+
+::: {.panel-tabset}
+
+#### All Sites
+
+**Figure :** Breakdown of adoption states for component 3 in adults, by PSC
+
+```{r, fig.height=10,fig.width=11}
+likert_component(df = marthas_data_to_aggregate, 
+                 component = adults_escalation_available_to_patient_carers,
+                 exclude = 'No adult patients'
+                   )
+```
+
+**Underlying data**
+
+```{r}
+psc_all_phases_table(df = marthas_data_to_aggregate,
+                     component = adults_escalation_available_to_patient_carers,
+                     exclude = 'No adult patients'
+                     ) |>
+  rename('Component 3' = adults_escalation_available_to_patient_carers) |>
+  DT::datatable(options = list(pageLength = 10))
+```
+
+
+#### Phase 1
+
+```{r, fig.height=10,fig.width=11}
+likert_component(df = marthas_data_to_aggregate, 
+                 component = adults_escalation_available_to_patient_carers, 
+                 exclude = 'No adult patients',
+                 by_phase = 'Phase 1'
+                   )
+```
+
+**Underlying data**
+
+```{r}
+psc_all_phases_table(df = marthas_data_to_aggregate |> filter(Phase == '1'),
+                     component = adults_escalation_available_to_patient_carers,
+                     exclude = 'No adult patients'
+                     ) |>
+  rename('Component 3' = adults_escalation_available_to_patient_carers) |>
+  DT::datatable(options = list(pageLength = 10))
+```
+
+
+#### Phase 2
+
+```{r, fig.height=10,fig.width=11}
+likert_component(df = marthas_data_to_aggregate, 
+                 component = adults_escalation_available_to_patient_carers, 
+                 exclude = 'No adult patients',
+                 by_phase = 'Phase 2'
+                   )
+```
+
+**Underlying data**
+
+```{r}
+psc_all_phases_table(df = marthas_data_to_aggregate |> filter(Phase == '2'),
+                     component = adults_escalation_available_to_patient_carers,
+                     exclude = 'No adult patients'
+                     ) |>
+  rename('Component 3' = adults_escalation_available_to_patient_carers) |>
+  DT::datatable(options = list(pageLength = 10))
+```
+
+:::
 
 ## Stages of adoption across paediatric units 
 
@@ -555,9 +842,9 @@ below_stage_x(df = marthas_data_to_aggregate,
 
 ::: {.panel-tabset}
 
-#### Plot
+#### All sites
 
-**Figure :** Breakdown of adoption states for component 1 in adults, by PSC
+**Figure :** Breakdown of adoption states for component 1, by PSC
 
 ```{r, fig.height=10,fig.width=11}
 likert_component(df = marthas_data_to_aggregate, 
@@ -566,6 +853,18 @@ likert_component(df = marthas_data_to_aggregate,
                    )
 ```
 
+**Underlying data**
+
+```{r}
+psc_all_phases_table(df = marthas_data_to_aggregate,
+                     component = paediatric_patient_check_in,
+                     exclude = 'No paediatric patients'
+                     ) |>
+  rename('Component 1' = paediatric_patient_check_in) |>
+  DT::datatable(options = list(pageLength = 10))
+```
+
+#### Phase 1
 
 ```{r, fig.height=10,fig.width=11}
 likert_component(df = marthas_data_to_aggregate, 
@@ -575,7 +874,19 @@ likert_component(df = marthas_data_to_aggregate,
                    )
 ```
 
+**Underlying data**
 
+```{r}
+psc_all_phases_table(df = marthas_data_to_aggregate |> filter(Phase == '1'),
+                     component = paediatric_patient_check_in,
+                     exclude = 'No paediatric patients'
+                     ) |>
+  rename('Component 1' = paediatric_patient_check_in) |>
+  DT::datatable(options = list(pageLength = 10))
+```
+
+
+#### Phase 2
 ```{r, fig.height=10,fig.width=11}
 likert_component(df = marthas_data_to_aggregate, 
                  component = paediatric_patient_check_in, 
@@ -585,13 +896,260 @@ likert_component(df = marthas_data_to_aggregate,
 
 ```
 
-#### Table
+**Underlying data**
+
+```{r}
+psc_all_phases_table(df = marthas_data_to_aggregate |> filter(Phase == '2'),
+                     component = paediatric_patient_check_in,
+                     exclude = 'No paediatric patients'
+                     ) |>
+  rename('Component 1' = paediatric_patient_check_in) |>
+  DT::datatable(options = list(pageLength = 10))
+```
+
+:::
+
+### Component 2
+
+All staff will be able, at any time, to ask for a review from a different team if they are concerned that a patient is deteriorating, and they are not being responded to.
+
+#### National overview
+
+TEXT
+
+::: {.panel-tabset}
+
+#### Plot
+
+**Figure :** Stages of adoption of component 2 (in paediatric) across Martha's rule sites, by phase
+
+```{r, fig.height=8,fig.width=10}
+national_by_phase_table <- national_by_phase(df = marthas_data_to_aggregate,
+                                             component = paediatric_independent_clinical_review,
+                                              exclude = 'No paediatric patients'
+)
+
+plot_national_by_phase(df = national_by_phase_table, 
+                       component = paediatric_independent_clinical_review
+)
+```
+
+
+#### Table 
+
+Note: fewer sites here than overall, given there are sites with no paediatric units 
+
+```{r}
+national_all_phases(df = marthas_data_to_aggregate, 
+                    component = paediatric_independent_clinical_review,
+                    exclude = 'No paediatric patients'
+) |>
+  kable()
+```
+
+
+#### Reports at or below stage 2
+
+```{r}
+below_stage_x(df = marthas_data_to_aggregate, 
+              component = paediatric_independent_clinical_review,
+              exclude = 'No paediatric patients'
+              ) |>
+  rename('Component 2' = paediatric_independent_clinical_review) |>
+  kable()
+```
+
+:::
+
+#### PSC Overview
+
+::: {.panel-tabset}
+
+#### All sites
+
+**Figure :** Breakdown of adoption states for component 2, by PSC
+
+```{r, fig.height=10,fig.width=11}
+likert_component(df = marthas_data_to_aggregate, 
+                 component = paediatric_independent_clinical_review, 
+                 exclude = 'No paediatric patients'
+                   )
+```
+
+**Underlying data**
 
 ```{r}
 psc_all_phases_table(df = marthas_data_to_aggregate,
-                     component = adults_patient_check_in,
+                     component = paediatric_independent_clinical_review,
                      exclude = 'No paediatric patients'
                      ) |>
+  rename('Component 2' = paediatric_independent_clinical_review) |>
+  DT::datatable(options = list(pageLength = 10))
+```
+
+#### Phase 1
+
+```{r, fig.height=10,fig.width=11}
+likert_component(df = marthas_data_to_aggregate, 
+                 component = paediatric_independent_clinical_review, 
+                 exclude = 'No paediatric patients',
+                 by_phase = 'Phase 1'
+                   )
+```
+
+**Underlying data**
+
+```{r}
+psc_all_phases_table(df = marthas_data_to_aggregate |> filter(Phase == '1'),
+                     component = paediatric_independent_clinical_review,
+                     exclude = 'No paediatric patients'
+                     ) |>
+  rename('Component 2' = paediatric_independent_clinical_review) |>
+  DT::datatable(options = list(pageLength = 10))
+```
+
+
+#### Phase 2
+```{r, fig.height=10,fig.width=11}
+likert_component(df = marthas_data_to_aggregate, 
+                 component = paediatric_independent_clinical_review, 
+                 exclude = 'No paediatric patients',
+                 by_phase = 'Phase 2'
+                   )
+
+```
+
+**Underlying data**
+
+```{r}
+psc_all_phases_table(df = marthas_data_to_aggregate |> filter(Phase == '2'),
+                     component = paediatric_independent_clinical_review,
+                     exclude = 'No paediatric patients'
+                     ) |>
+  rename('Component 2' = paediatric_independent_clinical_review) |>
+  DT::datatable(options = list(pageLength = 10))
+```
+
+:::
+
+### Component 3
+
+This escalation route will also always be available to patients themselves, their families and carers and advertised across the hospital.
+
+#### National overview
+
+TEXT
+
+::: {.panel-tabset}
+
+#### Plot
+
+**Figure :** Stages of adoption of component 3 (in paediatric) across Martha's rule sites, by phase
+
+```{r, fig.height=8,fig.width=10}
+national_by_phase_table <- national_by_phase(df = marthas_data_to_aggregate,
+                                             component = paediatric_escalation_available_to_patient_carers,
+                                              exclude = 'No paediatric patients'
+)
+
+plot_national_by_phase(df = national_by_phase_table, 
+                       component = paediatric_escalation_available_to_patient_carers
+)
+```
+
+
+#### Table 
+
+Note: fewer sites here (180) than overall, given there are sites with no paediatric units 
+
+```{r}
+national_all_phases(df = marthas_data_to_aggregate, 
+                    component = paediatric_escalation_available_to_patient_carers,
+                    exclude = 'No paediatric patients'
+) |>
+  kable()
+```
+
+
+#### Reports at or below stage 2
+
+```{r}
+below_stage_x(df = marthas_data_to_aggregate, 
+              component = paediatric_escalation_available_to_patient_carers,
+              exclude = 'No paediatric patients'
+              ) |>
+  rename('Component 3' = paediatric_escalation_available_to_patient_carers) |>
+  kable()
+```
+
+:::
+
+#### PSC Overview
+
+::: {.panel-tabset}
+
+#### All sites
+
+**Figure :** Breakdown of adoption states for component 3, by PSC
+
+```{r, fig.height=10,fig.width=11}
+likert_component(df = marthas_data_to_aggregate, 
+                 component = paediatric_escalation_available_to_patient_carers, 
+                 exclude = 'No paediatric patients'
+                   )
+```
+
+**Underlying data**
+
+```{r}
+psc_all_phases_table(df = marthas_data_to_aggregate,
+                     component = paediatric_escalation_available_to_patient_carers,
+                     exclude = 'No paediatric patients'
+                     ) |>
+  rename('Component 3' = paediatric_escalation_available_to_patient_carers) |>
+  DT::datatable(options = list(pageLength = 10))
+```
+
+#### Phase 1
+
+```{r, fig.height=10,fig.width=11}
+likert_component(df = marthas_data_to_aggregate, 
+                 component = paediatric_escalation_available_to_patient_carers, 
+                 exclude = 'No paediatric patients',
+                 by_phase = 'Phase 1'
+                   )
+```
+
+**Underlying data**
+
+```{r}
+psc_all_phases_table(df = marthas_data_to_aggregate |> filter(Phase == '1'),
+                     component = paediatric_escalation_available_to_patient_carers,
+                     exclude = 'No paediatric patients'
+                     ) |>
+  rename('Component 3' = paediatric_escalation_available_to_patient_carers) |>
+  DT::datatable(options = list(pageLength = 10))
+```
+
+
+#### Phase 2
+```{r, fig.height=10,fig.width=11}
+likert_component(df = marthas_data_to_aggregate, 
+                 component = paediatric_escalation_available_to_patient_carers, 
+                 exclude = 'No paediatric patients',
+                 by_phase = 'Phase 2'
+                   )
+
+```
+
+**Underlying data**
+
+```{r}
+psc_all_phases_table(df = marthas_data_to_aggregate |> filter(Phase == '2'),
+                     component = paediatric_escalation_available_to_patient_carers,
+                     exclude = 'No paediatric patients'
+                     ) |>
+  rename('Component 3' = paediatric_escalation_available_to_patient_carers) |>
   DT::datatable(options = list(pageLength = 10))
 ```
 
