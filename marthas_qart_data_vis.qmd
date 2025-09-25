@@ -12,7 +12,7 @@ execute:
   echo: false
   warning: false
 params: 
-  reporting_quarter: '2024/25 Q6'
+  reporting_quarter: '2025/26 Q1'
   master_files_folder: '1. Master files'
   quarter_string: '25_26_Q1'
   marthas_data_file: 'marthas_psc_submissions_2025_26_Q1_processed_2025_09_08_184653.csv'
@@ -187,7 +187,7 @@ share_of_sites_table <- share_of_sites |>
 
 ### Plot
 
-**Figure :** Breakdown of Martha's rule sites by PSC and phase
+**Figure :** Breakdown of Martha's Rule sites by PSC and phase
 
 ```{r, fig.height=10,fig.width=10}
 share_of_sites_for_plot <- share_of_sites_long |>
@@ -243,13 +243,11 @@ Patients will be asked, at least daily, about how they are feeling, and if they 
 
 #### National overview
 
-Lot of the data in the middle stages for either phase, even though sites in phase 1 are assumed to have been in the programme longer (check this assumption)
-
 ::: {.panel-tabset}
 
 #### Plot
 
-**Figure :** Stages of adoption of component 1 (in adults) across Martha's rule sites, by phase
+**Figure :** Stages of adoption of component 1 across Martha's Rule sites with adult units, by phase
 
 ```{r}
 # function to aggregate by phase and component
@@ -325,7 +323,7 @@ plot_national_by_phase(df = national_by_phase_table,
 
 #### Table 
 
-Note: Fewer sites here (203) than overall, given sites with no adult units 
+*Note: Fewer sites here (203) than overall, given sites with no adult units* 
 
 ```{r}
 national_all_phases <- function(df, component, exclude){
@@ -384,7 +382,7 @@ below_stage_x(df = marthas_data_to_aggregate,
 
 #### All sites
 
-**Figure :** Breakdown of adoption states for component 1 in adults, by PSC
+**Figure :** Adoption stages for component 1 across all sites with adult units, by PSC
 
 ```{r}
 # this will allow colours to remain fixed by stage, even when we split vis by phase
@@ -497,6 +495,8 @@ psc_all_phases_table(df = marthas_data_to_aggregate,
 
 #### Phase 1
 
+**Figure :** Adoption stages for component 1 across phase 1 sites with adult units, by PSC
+
 ```{r, fig.height=10,fig.width=11}
 likert_component(df = marthas_data_to_aggregate, 
                  component = adults_patient_check_in, 
@@ -518,6 +518,8 @@ psc_all_phases_table(df = marthas_data_to_aggregate |> filter(Phase == '1'),
 
 
 #### Phase 2
+
+**Figure :** Adoption stages for component 1 across phase 2 sites with adult units, by PSC
 
 ```{r, fig.height=10,fig.width=11}
 likert_component(df = marthas_data_to_aggregate, 
@@ -546,13 +548,11 @@ All staff will be able, at any time, to ask for a review from a different team i
 
 #### National overview
 
-TEXT
-
 ::: {.panel-tabset}
 
 #### Plot
 
-**Figure :** Stages of adoption of component 2 across Martha's rule sites, by phase
+**Figure :** Stages of adoption of component 2 across Martha’s Rule sites with adult units, by phase
 
 ```{r, fig.height=8,fig.width=10}
 national_by_phase_table <- national_by_phase(df = marthas_data_to_aggregate,
@@ -596,7 +596,7 @@ below_stage_x(df = marthas_data_to_aggregate,
 
 #### All sites
 
-**Figure :** Breakdown of adoption states for component 2 in adults, by PSC
+**Figure :** Adoption stages for component 2 across all sites with adult units, by PSC
 
 ```{r, fig.height=10,fig.width=11}
 likert_component(df = marthas_data_to_aggregate, 
@@ -619,6 +619,8 @@ psc_all_phases_table(df = marthas_data_to_aggregate,
 
 #### Phase 1
 
+**Figure :** Adoption stages for component 2 across phase 1 sites with adult units, by PSC
+
 ```{r, fig.height=10,fig.width=11}
 likert_component(df = marthas_data_to_aggregate, 
                  component = adults_independent_clinical_review, 
@@ -640,6 +642,8 @@ psc_all_phases_table(df = marthas_data_to_aggregate |> filter(Phase == '1'),
 
 
 #### Phase 2
+
+**Figure :** Adoption stages for component 2 across phase 2 sites with adult units, by PSC
 
 ```{r, fig.height=10,fig.width=11}
 likert_component(df = marthas_data_to_aggregate, 
@@ -668,13 +672,11 @@ This escalation route will also always be available to patients themselves, thei
 
 #### National overview
 
-TEXT
-
 ::: {.panel-tabset}
 
 #### Plot
 
-**Figure :** Stages of adoption of component 3 across Martha's rule sites, by phase
+**Figure :** Stages of adoption of component 3 across Martha’s Rule sites with adult units, by phase
 
 ```{r, fig.height=8,fig.width=10}
 national_by_phase_table <- national_by_phase(df = marthas_data_to_aggregate,
@@ -718,7 +720,7 @@ below_stage_x(df = marthas_data_to_aggregate,
 
 #### All Sites
 
-**Figure :** Breakdown of adoption states for component 3 in adults, by PSC
+**Figure :** Adoption stages for component 3 across all sites with adult units, by PSC
 
 ```{r, fig.height=10,fig.width=11}
 likert_component(df = marthas_data_to_aggregate, 
@@ -741,6 +743,8 @@ psc_all_phases_table(df = marthas_data_to_aggregate,
 
 #### Phase 1
 
+**Figure :** Adoption stages for component 3 across phase 1 sites with adult units, by PSC
+
 ```{r, fig.height=10,fig.width=11}
 likert_component(df = marthas_data_to_aggregate, 
                  component = adults_escalation_available_to_patient_carers, 
@@ -762,6 +766,8 @@ psc_all_phases_table(df = marthas_data_to_aggregate |> filter(Phase == '1'),
 
 
 #### Phase 2
+
+**Figure :** Adoption stages for component 3 across phase 2 sites with adult units, by PSC
 
 ```{r, fig.height=10,fig.width=11}
 likert_component(df = marthas_data_to_aggregate, 
@@ -792,13 +798,11 @@ Patients will be asked, at least daily, about how they are feeling, and if they 
 
 #### National overview
 
-TEXT
-
 ::: {.panel-tabset}
 
 #### Plot
 
-**Figure :** Stages of adoption of component 1 (in paediatric) across Martha's rule sites, by phase
+**Figure :** Stages of adoption of component 1 across Martha’s Rule sites with paediatric units, by phase
 
 ```{r, fig.height=8,fig.width=10}
 national_by_phase_table <- national_by_phase(df = marthas_data_to_aggregate,
@@ -814,7 +818,7 @@ plot_national_by_phase(df = national_by_phase_table,
 
 #### Table 
 
-Note: fewer sites here (180) than overall, given there are sites with no paediatric units 
+*Note: fewer sites here (180) than overall, given sites with no paediatric units*
 
 ```{r}
 national_all_phases(df = marthas_data_to_aggregate, 
@@ -844,7 +848,7 @@ below_stage_x(df = marthas_data_to_aggregate,
 
 #### All sites
 
-**Figure :** Breakdown of adoption states for component 1, by PSC
+**Figure :** Adoption stages for component 1 across all sites with paediatric units, by PSC
 
 ```{r, fig.height=10,fig.width=11}
 likert_component(df = marthas_data_to_aggregate, 
@@ -865,6 +869,8 @@ psc_all_phases_table(df = marthas_data_to_aggregate,
 ```
 
 #### Phase 1
+
+**Figure :** Adoption stages for component 1 across phase 1 sites with paediatric units, by PSC
 
 ```{r, fig.height=10,fig.width=11}
 likert_component(df = marthas_data_to_aggregate, 
@@ -887,6 +893,9 @@ psc_all_phases_table(df = marthas_data_to_aggregate |> filter(Phase == '1'),
 
 
 #### Phase 2
+
+**Figure :** Adoption stages for component 1 across phase 2 sites with paediatric units, by PSC
+
 ```{r, fig.height=10,fig.width=11}
 likert_component(df = marthas_data_to_aggregate, 
                  component = paediatric_patient_check_in, 
@@ -915,13 +924,11 @@ All staff will be able, at any time, to ask for a review from a different team i
 
 #### National overview
 
-TEXT
-
 ::: {.panel-tabset}
 
 #### Plot
 
-**Figure :** Stages of adoption of component 2 (in paediatric) across Martha's rule sites, by phase
+**Figure :** Stages of adoption of component 2 across Martha’s Rule sites with paediatric units, by phase
 
 ```{r, fig.height=8,fig.width=10}
 national_by_phase_table <- national_by_phase(df = marthas_data_to_aggregate,
@@ -936,8 +943,6 @@ plot_national_by_phase(df = national_by_phase_table,
 
 
 #### Table 
-
-Note: fewer sites here than overall, given there are sites with no paediatric units 
 
 ```{r}
 national_all_phases(df = marthas_data_to_aggregate, 
@@ -967,7 +972,7 @@ below_stage_x(df = marthas_data_to_aggregate,
 
 #### All sites
 
-**Figure :** Breakdown of adoption states for component 2, by PSC
+**Figure :** Adoption stages for component 2 across all sites with paediatric units, by PSC
 
 ```{r, fig.height=10,fig.width=11}
 likert_component(df = marthas_data_to_aggregate, 
@@ -988,6 +993,8 @@ psc_all_phases_table(df = marthas_data_to_aggregate,
 ```
 
 #### Phase 1
+
+**Figure :** Adoption stages for component 2 across phase 1 sites with paediatric units, by PSC
 
 ```{r, fig.height=10,fig.width=11}
 likert_component(df = marthas_data_to_aggregate, 
@@ -1010,6 +1017,9 @@ psc_all_phases_table(df = marthas_data_to_aggregate |> filter(Phase == '1'),
 
 
 #### Phase 2
+
+**Figure :** Adoption stages for component 2 across phase 2 sites with paediatric units, by PSC
+
 ```{r, fig.height=10,fig.width=11}
 likert_component(df = marthas_data_to_aggregate, 
                  component = paediatric_independent_clinical_review, 
@@ -1038,13 +1048,11 @@ This escalation route will also always be available to patients themselves, thei
 
 #### National overview
 
-TEXT
-
 ::: {.panel-tabset}
 
 #### Plot
 
-**Figure :** Stages of adoption of component 3 (in paediatric) across Martha's rule sites, by phase
+**Figure :** Stages of adoption of component 3 across Martha’s Rule sites with paediatric units, by phase
 
 ```{r, fig.height=8,fig.width=10}
 national_by_phase_table <- national_by_phase(df = marthas_data_to_aggregate,
@@ -1059,8 +1067,6 @@ plot_national_by_phase(df = national_by_phase_table,
 
 
 #### Table 
-
-Note: fewer sites here (180) than overall, given there are sites with no paediatric units 
 
 ```{r}
 national_all_phases(df = marthas_data_to_aggregate, 
@@ -1090,7 +1096,7 @@ below_stage_x(df = marthas_data_to_aggregate,
 
 #### All sites
 
-**Figure :** Breakdown of adoption states for component 3, by PSC
+**Figure :** Adoption stages for component 3 across all sites with paediatric units, by PSC
 
 ```{r, fig.height=10,fig.width=11}
 likert_component(df = marthas_data_to_aggregate, 
@@ -1111,6 +1117,8 @@ psc_all_phases_table(df = marthas_data_to_aggregate,
 ```
 
 #### Phase 1
+
+**Figure :** Adoption stages for component 3 across phase 1 sites with paediatric units, by PSC
 
 ```{r, fig.height=10,fig.width=11}
 likert_component(df = marthas_data_to_aggregate, 
@@ -1133,6 +1141,8 @@ psc_all_phases_table(df = marthas_data_to_aggregate |> filter(Phase == '1'),
 
 
 #### Phase 2
+
+**Figure :** Adoption stages for component 3 across phase 2 sites with paediatric units, by PSC
 ```{r, fig.height=10,fig.width=11}
 likert_component(df = marthas_data_to_aggregate, 
                  component = paediatric_escalation_available_to_patient_carers, 
