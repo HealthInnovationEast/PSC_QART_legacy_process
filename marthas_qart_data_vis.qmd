@@ -134,7 +134,7 @@ uk <- ne_states(country = "United Kingdom", returnclass = "sf")
 # filter for England
 england <- uk %>% filter(geonunit == "England")
 
-# outiline of england
+# outline of england
 england_outline <- england %>%
   summarise(geometry = st_union(geometry))
 
