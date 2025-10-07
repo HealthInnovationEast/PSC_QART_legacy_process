@@ -64,7 +64,7 @@ postcodes_lookup_table <- lapply(unique(site_postcode_list$api_site_postcode),
 
 
 ```{r}
-# NOTE block below is a place holder that will coem in place in 2526 Q2
+# NOTE block below is a place holder that will come in place in 2526 Q2
 # go into share point and download latest data
 #master_files_dr <- chosenlib$get_item(glue::glue("{base_url}/{master_files_folder}"))
 
@@ -106,15 +106,25 @@ Missing data for two phase 2 sites here:
 - RAN01 - The Royal National Orthopaedic Hospital (Stanmore)
 
 ```{r}
-# free styling aggregations and visualisations
+# aggregations and visualisations
 marthas_data_to_aggregate <- marthas_data_raw |>
   rename('PSC' = updated_psc_name,
          'Phase' = phase) |>
-  # consolidate org code and names for table printing
-  mutate(name_trust_code = paste0(name_of_trust, ' (', trust_code, ')'),
-         name_site_code = paste0(name_of_site, ' (', site_code, ')'),
-         Phase = as.character(Phase),
-         .before = Phase) |>
+  mutate(
+    # fix trust names
+    name_of_trust = str_to_title(name_of_trust), # turn into title case
+    # then fix strings: Nhs, And, Of
+    name_of_trust = str_replace_all(name_of_trust, '\\bNhs\\b', str_to_upper),
+    name_of_trust = str_replace_all(name_of_trust, '\\bAnd\\b|\\bOf\\b', str_to_lower),
+    # repeat for site names
+    name_of_site = str_to_title(name_of_site),
+    name_of_site = str_replace_all(name_of_site, '\\bNhs|Hq\\b', str_to_upper),
+    name_of_site = str_replace_all(name_of_site, '\\bAnd\\b|\\bOf\\b', str_to_lower),
+    # consolidate org code and names for table printing
+    name_trust_code = paste0(name_of_trust, ' (', trust_code, ')'),
+    name_site_code = paste0(name_of_site, ' (', site_code, ')'),
+    Phase = as.character(Phase),
+    .before = Phase) |>
   select(-c(trust_code, name_of_trust, site_code, name_of_site))
 
 
@@ -145,13 +155,12 @@ trust_sites_sf <- sf::st_as_sf(marthas_data_postcode , coords = c('longitude', '
 
 **Figure :** Martha's Rule sites in England, by phase
 
-```{r, fig.height=8,fig.width=8}
+```{r, fig.height=8,fig.width=8.2}
 ggplot() +
   geom_sf(data = england_outline, fill = "white", color = "black") +
   geom_sf(data = trust_sites_sf, 
           aes(colour = factor(phase)),
-          size = 2,
-          alpha = 0.7
+          size = 2
           ) +
   scale_colour_manual(values = c('#801650', '#28A197'),
                       labels = c("Phase 1", "Phase 2")  # custom legend labels
@@ -159,7 +168,10 @@ ggplot() +
   theme_minimal()  +
   theme(axis.text = element_blank(),
         panel.grid = element_blank(),
-        legend.title = element_blank()
+        legend.title = element_blank(),
+        legend.position = 'top',
+        legend.justification = 'left',
+        legend.text = element_text(size = 14)
         )
 ```
 
@@ -180,9 +192,11 @@ share_of_sites_long <- share_of_sites |>
                values_to = 'Number of sites')
 
 #share of site table 
+total_sites <- sum(share_of_sites_long$`Number of sites`)
+
 share_of_sites_table <- share_of_sites |>
   adorn_totals('both') |>
-  mutate(Percent = label_percent(accuracy = 0.1)(Total/210))
+  mutate(Percent = label_percent(accuracy = 0.1)(Total/total_sites))
 ```
 
 ### Plot
@@ -193,37 +207,38 @@ share_of_sites_table <- share_of_sites |>
 share_of_sites_for_plot <- share_of_sites_long |>
   left_join(share_of_sites_table |> select(PSC, Percent), by = 'PSC')
 
-share_of_sites_perc_labels <- share_of_sites_for_plot |>
-  group_by(PSC) |> 
-  summarise('Number of sites' = sum(`Number of sites`), Percent = first(Percent)) |>
-  ungroup()
-
 ggplot(data = share_of_sites_for_plot,
        aes(x = `Number of sites`, y = forcats::fct_rev(PSC)
            )
        ) +
-  geom_bar(aes( fill = forcats::fct_rev(Phase)),stat = 'identity', alpha = 0.7) +
-  geom_text(data = share_of_sites_perc_labels,
-            aes(x = `Number of sites`, 
-                y = forcats::fct_rev(PSC), 
+  geom_bar(aes( fill = forcats::fct_rev(Phase)),stat = 'identity') +
+  # label 
+  geom_text(data = share_of_sites_table |> filter(PSC != 'Total'),
+            aes(x = Total,
+                y = forcats::fct_rev(PSC),
                 label = Percent
-                ),
+            ),
             hjust = -0.1,
             position=position_dodge2(width=0.9),
             size = 4.5
             ) +
   scale_x_continuous(expand = expansion(mult = c(0.02,0.11))) +
-  scale_fill_manual(values = c('#28A197', '#801650')
+  scale_fill_manual(values = c('#801650', '#28A197'),
+                    breaks = c('Phase 1', 'Phase 2')
                     ) +
   theme_minimal() +
-  theme(axis.title.y = element_blank(),
-        axis.title.x = element_text(color = "black", size = 13),
-        axis.text.x = element_text(color = "black", size = 13),
-        axis.text.y = element_text(color = "black", size = 13),
-        legend.text = element_text(color = "black", size = 13),
+  theme(axis.title = element_blank(),
+        axis.text.x = element_text(color = "black", size = 14),
+        axis.text.y = element_text(color = "black", size = 14),
+        legend.text = element_text(color = "black", size = 14),
         panel.grid.minor.x = element_blank(),
+        panel.grid.major.y = element_blank(),
         axis.ticks = element_line(color = "grey"),
-        legend.title = element_blank())
+        legend.title = element_blank(),
+        legend.position = 'top',
+        legend.justification = 'left',
+        legend.location = 'plot'
+        )
 ```
 
 ### Table
@@ -236,6 +251,36 @@ share_of_sites_table |>
 :::
 
 ## Stages of adoption across adult units 
+```{r}
+# function to aggregate spefic component by stage
+national_all_phases <- function(df, component, exclude){
+  # quote
+  component <- enquo(component)
+  
+  national_all_phases <- df |>
+    # exclude these from percentage calculation
+    filter(!!component != exclude) |>
+    tabyl(!!component) |>
+    rename('Number of sites' = n, 'Percent' = percent, 'Stage' = !!component) |> 
+    adorn_totals('row') |>
+    mutate(Percent = label_percent(accuracy = 0.1)(Percent)) 
+  
+  national_all_phases
+}
+
+adults_comp_1 <- national_all_phases(df = marthas_data_to_aggregate, 
+                    component = adults_patient_check_in,
+                    exclude = 'No adult patients'
+                    ) 
+
+total_sites_adult_units <- adults_comp_1 |> 
+  filter(Stage == 'Total') |> 
+  pull(`Number of sites`)
+```
+
+
+**Note:** The graphs and tables presented below include only sites that have adult units. Therefore, the total presented for this section (n = `r total_sites_adult_units`) is smaller than the total number of all Martha's Rule sites (n = `r total_sites`)
+
 
 ### Component 1
 
@@ -261,8 +306,10 @@ national_by_phase <- function(df, component, exclude){
            ) |>
     group_by(Phase, !!component) |>
     summarise(number_of_sites = n()) |>
+    ungroup() |>
     group_by(Phase) |>
     mutate(group_size_by_phase = sum(number_of_sites)) |>
+    ungroup() |>
     arrange(!!component )
   
   national_by_phase
@@ -277,32 +324,30 @@ plot_national_by_phase <- function(df, component){
   plot_national_by_phase <- ggplot(
     data = df,
     aes(
-      y = number_of_sites,
-      x = factor(!!component)
+      x = number_of_sites,
+      y = factor(!!component)
       )
     ) +
-  geom_bar(aes(fill = fct_rev(factor(Phase))),
+  geom_bar(aes(fill = #fct_rev(factor(Phase))),
+                 factor(Phase)),
            stat = 'identity',
-           alpha = 0.7,
-           position = position_dodge()) +
-  labs(x = "Stage",
-       y = "Number of sites"
-       )+
-  scale_fill_manual(values = c('#28A197', '#801650'),
-                    name = "Phase",  # custom legend title
-                    labels = c("Phase 2", "Phase 1")  # custom legend labels
+           # preserve width of bars, even when there's no data for one group
+           position = position_dodge(preserve = 'single')) +
+  scale_fill_manual(values = c('#801650', '#28A197'),
+                    labels = c('Phase 1', 'Phase 2')  # custom legend labels
                     )+
-  scale_x_discrete(labels = label_wrap(25)) +
+  scale_y_discrete(labels = label_wrap(25)) +
   theme_minimal() +
-  theme(axis.title.x = element_blank(),
-        axis.title.y = element_text(color = "black", size = 13),
-        axis.text.x = element_text(color = "black", size = 13,
-                                   angle = 90),
-        axis.text.y = element_text(color = "black", size = 13),
+  theme(axis.title = element_blank(),
+        axis.text = element_text(color = "black", size = 14),
         panel.grid.minor.x = element_blank(),
+        panel.grid.major.y = element_blank(),
         axis.ticks = element_line(color = "grey"),
         legend.title = element_blank(),
-        legend.text = element_text(color = "black", size = 13)
+        legend.text = element_text(color = "black", size = 14),
+        legend.position = 'top',
+        legend.justification = 'left',
+        legend.location = 'plot'
         )
   
   plot_national_by_phase
@@ -323,29 +368,9 @@ plot_national_by_phase(df = national_by_phase_table,
 
 #### Table 
 
-*Note: Fewer sites here (203) than overall, given sites with no adult units* 
-
 ```{r}
-national_all_phases <- function(df, component, exclude){
-  # quote
-  component <- enquo(component)
-  
-  national_all_phases <- df |>
-    # exclude these from percentage calculation
-    filter(!!component != exclude) |>
-    tabyl(!!component) |>
-    rename('Number of sites' = n, 'Percent' = percent, 'Stage' = !!component) |> 
-    adorn_totals('row') |>
-    mutate(Percent = label_percent(accuracy = 0.1)(Percent)) 
-  
-  national_all_phases
-}
-
-national_all_phases(df = marthas_data_to_aggregate, 
-                    component = adults_patient_check_in,
-                    exclude = 'No adult patients'
-                    ) |>
-  kable()
+adults_comp_1 |>
+  kable() 
 ```
 
 #### Reports at or below stage 2
@@ -441,26 +466,30 @@ likert_component <- function(df, component, exclude, by_phase = NULL){
              select(-name_site_code),
              # exclude second set of percentages to the sides
              add_totals = F,
+             labels_size = 4.5
            ) +
     scale_fill_manual(
       values = fixed_colours
     ) +
-    guides(fill = guide_legend(nrow = 3, byrow = T))+
+    guides(fill = guide_legend(nrow = 2, byrow = T))+
     theme(axis.text.x = element_blank(),
-          axis.text.y = element_text(color = "black", size = 13),
-          legend.text = element_text(color = "black", size = 13)
-            )
+          axis.text.y = element_text(color = "black", size = 14),
+          legend.text = element_text(color = "black", size = 14),
+          legend.position = 'top',
+          legend.justification = 'left',
+          legend.location = 'plot'
+          )
 
   plot
 }
 ```
 
 
-```{r, fig.height=10,fig.width=11}
+```{r, fig.height=10,fig.width=12}
 likert_component(df = marthas_data_to_aggregate, 
                  component = adults_patient_check_in, 
                  exclude = 'No adult patients'
-                   )
+                   ) 
 ```
 
 **Underlying data**
@@ -497,7 +526,7 @@ psc_all_phases_table(df = marthas_data_to_aggregate,
 
 **Figure :** Adoption stages for component 1 across phase 1 sites with adult units, by PSC
 
-```{r, fig.height=10,fig.width=11}
+```{r, fig.height=10,fig.width=12}
 likert_component(df = marthas_data_to_aggregate, 
                  component = adults_patient_check_in, 
                  exclude = 'No adult patients',
@@ -521,7 +550,7 @@ psc_all_phases_table(df = marthas_data_to_aggregate |> filter(Phase == '1'),
 
 **Figure :** Adoption stages for component 1 across phase 2 sites with adult units, by PSC
 
-```{r, fig.height=10,fig.width=11}
+```{r, fig.height=10,fig.width=12}
 likert_component(df = marthas_data_to_aggregate, 
                  component = adults_patient_check_in, 
                  exclude = 'No adult patients',
@@ -598,7 +627,7 @@ below_stage_x(df = marthas_data_to_aggregate,
 
 **Figure :** Adoption stages for component 2 across all sites with adult units, by PSC
 
-```{r, fig.height=10,fig.width=11}
+```{r, fig.height=10,fig.width=12}
 likert_component(df = marthas_data_to_aggregate, 
                  component = adults_independent_clinical_review,
                  exclude = 'No adult patients'
@@ -621,7 +650,7 @@ psc_all_phases_table(df = marthas_data_to_aggregate,
 
 **Figure :** Adoption stages for component 2 across phase 1 sites with adult units, by PSC
 
-```{r, fig.height=10,fig.width=11}
+```{r, fig.height=10,fig.width=12}
 likert_component(df = marthas_data_to_aggregate, 
                  component = adults_independent_clinical_review, 
                  exclude = 'No adult patients',
@@ -645,7 +674,7 @@ psc_all_phases_table(df = marthas_data_to_aggregate |> filter(Phase == '1'),
 
 **Figure :** Adoption stages for component 2 across phase 2 sites with adult units, by PSC
 
-```{r, fig.height=10,fig.width=11}
+```{r, fig.height=10,fig.width=12}
 likert_component(df = marthas_data_to_aggregate, 
                  component = adults_independent_clinical_review, 
                  exclude = 'No adult patients',
@@ -722,7 +751,7 @@ below_stage_x(df = marthas_data_to_aggregate,
 
 **Figure :** Adoption stages for component 3 across all sites with adult units, by PSC
 
-```{r, fig.height=10,fig.width=11}
+```{r, fig.height=10,fig.width=12}
 likert_component(df = marthas_data_to_aggregate, 
                  component = adults_escalation_available_to_patient_carers,
                  exclude = 'No adult patients'
@@ -745,7 +774,7 @@ psc_all_phases_table(df = marthas_data_to_aggregate,
 
 **Figure :** Adoption stages for component 3 across phase 1 sites with adult units, by PSC
 
-```{r, fig.height=10,fig.width=11}
+```{r, fig.height=10,fig.width=12}
 likert_component(df = marthas_data_to_aggregate, 
                  component = adults_escalation_available_to_patient_carers, 
                  exclude = 'No adult patients',
@@ -769,7 +798,7 @@ psc_all_phases_table(df = marthas_data_to_aggregate |> filter(Phase == '1'),
 
 **Figure :** Adoption stages for component 3 across phase 2 sites with adult units, by PSC
 
-```{r, fig.height=10,fig.width=11}
+```{r, fig.height=10,fig.width=12}
 likert_component(df = marthas_data_to_aggregate, 
                  component = adults_escalation_available_to_patient_carers, 
                  exclude = 'No adult patients',
@@ -791,6 +820,21 @@ psc_all_phases_table(df = marthas_data_to_aggregate |> filter(Phase == '2'),
 :::
 
 ## Stages of adoption across paediatric units 
+
+```{r}
+paediatric_comp_1 <- national_all_phases(df = marthas_data_to_aggregate, 
+                    component = paediatric_patient_check_in,
+                    exclude = 'No paediatric patients'
+)
+
+total_sites_paed_units <- paediatric_comp_1 |>
+  filter(Stage == 'Total') |>
+  pull(`Number of sites`)
+```
+
+
+**Note:** The graphs and tables presented below include only sites that have paediatric units. Therefore, the total presented for this section (n = `r total_sites_paed_units`) is smaller than the total number of all Martha's Rule sites (n = `r total_sites`)
+
 
 ### Component 1
 
@@ -818,13 +862,8 @@ plot_national_by_phase(df = national_by_phase_table,
 
 #### Table 
 
-*Note: fewer sites here (180) than overall, given sites with no paediatric units*
-
 ```{r}
-national_all_phases(df = marthas_data_to_aggregate, 
-                    component = paediatric_patient_check_in,
-                    exclude = 'No paediatric patients'
-) |>
+paediatric_comp_1 |>
   kable()
 ```
 
@@ -850,7 +889,7 @@ below_stage_x(df = marthas_data_to_aggregate,
 
 **Figure :** Adoption stages for component 1 across all sites with paediatric units, by PSC
 
-```{r, fig.height=10,fig.width=11}
+```{r, fig.height=10,fig.width=12}
 likert_component(df = marthas_data_to_aggregate, 
                  component = paediatric_patient_check_in, 
                  exclude = 'No paediatric patients'
@@ -872,7 +911,7 @@ psc_all_phases_table(df = marthas_data_to_aggregate,
 
 **Figure :** Adoption stages for component 1 across phase 1 sites with paediatric units, by PSC
 
-```{r, fig.height=10,fig.width=11}
+```{r, fig.height=10,fig.width=12}
 likert_component(df = marthas_data_to_aggregate, 
                  component = paediatric_patient_check_in, 
                  exclude = 'No paediatric patients',
@@ -896,7 +935,7 @@ psc_all_phases_table(df = marthas_data_to_aggregate |> filter(Phase == '1'),
 
 **Figure :** Adoption stages for component 1 across phase 2 sites with paediatric units, by PSC
 
-```{r, fig.height=10,fig.width=11}
+```{r, fig.height=10,fig.width=12}
 likert_component(df = marthas_data_to_aggregate, 
                  component = paediatric_patient_check_in, 
                  exclude = 'No paediatric patients',
@@ -974,7 +1013,7 @@ below_stage_x(df = marthas_data_to_aggregate,
 
 **Figure :** Adoption stages for component 2 across all sites with paediatric units, by PSC
 
-```{r, fig.height=10,fig.width=11}
+```{r, fig.height=10,fig.width=12}
 likert_component(df = marthas_data_to_aggregate, 
                  component = paediatric_independent_clinical_review, 
                  exclude = 'No paediatric patients'
@@ -996,7 +1035,7 @@ psc_all_phases_table(df = marthas_data_to_aggregate,
 
 **Figure :** Adoption stages for component 2 across phase 1 sites with paediatric units, by PSC
 
-```{r, fig.height=10,fig.width=11}
+```{r, fig.height=10,fig.width=12}
 likert_component(df = marthas_data_to_aggregate, 
                  component = paediatric_independent_clinical_review, 
                  exclude = 'No paediatric patients',
@@ -1020,7 +1059,7 @@ psc_all_phases_table(df = marthas_data_to_aggregate |> filter(Phase == '1'),
 
 **Figure :** Adoption stages for component 2 across phase 2 sites with paediatric units, by PSC
 
-```{r, fig.height=10,fig.width=11}
+```{r, fig.height=10,fig.width=12}
 likert_component(df = marthas_data_to_aggregate, 
                  component = paediatric_independent_clinical_review, 
                  exclude = 'No paediatric patients',
@@ -1098,7 +1137,7 @@ below_stage_x(df = marthas_data_to_aggregate,
 
 **Figure :** Adoption stages for component 3 across all sites with paediatric units, by PSC
 
-```{r, fig.height=10,fig.width=11}
+```{r, fig.height=10,fig.width=12}
 likert_component(df = marthas_data_to_aggregate, 
                  component = paediatric_escalation_available_to_patient_carers, 
                  exclude = 'No paediatric patients'
@@ -1120,7 +1159,7 @@ psc_all_phases_table(df = marthas_data_to_aggregate,
 
 **Figure :** Adoption stages for component 3 across phase 1 sites with paediatric units, by PSC
 
-```{r, fig.height=10,fig.width=11}
+```{r, fig.height=10,fig.width=12}
 likert_component(df = marthas_data_to_aggregate, 
                  component = paediatric_escalation_available_to_patient_carers, 
                  exclude = 'No paediatric patients',
@@ -1143,7 +1182,7 @@ psc_all_phases_table(df = marthas_data_to_aggregate |> filter(Phase == '1'),
 #### Phase 2
 
 **Figure :** Adoption stages for component 3 across phase 2 sites with paediatric units, by PSC
-```{r, fig.height=10,fig.width=11}
+```{r, fig.height=10,fig.width=12}
 likert_component(df = marthas_data_to_aggregate, 
                  component = paediatric_escalation_available_to_patient_carers, 
                  exclude = 'No paediatric patients',
@@ -1167,7 +1206,7 @@ psc_all_phases_table(df = marthas_data_to_aggregate |> filter(Phase == '2'),
 
 ## All adult data 
 
-<div style="width: 75vw;">
+<div style="width: 55vw;">
 
 ```{r}
 # stages to colour
@@ -1182,19 +1221,27 @@ marthas_data_to_aggregate |>
          'Component 2' = adults_independent_clinical_review,
          'Component 3' = adults_escalation_available_to_patient_carers
          ) |>
-    DT::datatable(options = list(pageLength = 21)) |>
+    DT::datatable(options = 
+                    list(pageLength = 10,
+                         columnDefs = list(
+                           list(width = '110px', targets = c(2, 3)),
+                           list(width = '50px', targets = c(4)),
+                           list(width = '80px', targets = c(5, 6, 7))
+                           )
+                         )
+                  ) |>
     DT::formatStyle(
       columns = c('Component 1', 'Component 2','Component 3'),
       backgroundColor = styleEqual(
         levels = stages,
-        c('red', 'tomato', 'orange')
+        c('#D73027', '#F46D43', '#FDAE61')
       )
     ) 
 ```
 
 </div>
 
-<div style="width: 75vw;">
+<div style="width: 55vw;">
 
 ## All paediatric data 
 ```{r}
@@ -1206,12 +1253,20 @@ marthas_data_to_aggregate |>
          'Component 2' = paediatric_independent_clinical_review,
          'Component 3' = paediatric_escalation_available_to_patient_carers
          ) |>
-  DT::datatable(options = list(pageLength = 21)) |>
+    DT::datatable(options = 
+                    list(pageLength = 10,
+                         columnDefs = list(
+                           list(width = '110px', targets = c(2, 3)),
+                           list(width = '50px', targets = c(4)),
+                           list(width = '80px', targets = c(5, 6, 7))
+                           )
+                         )
+                  ) |>
   DT::formatStyle(
     columns = c('Component 1', 'Component 2','Component 3'),
     backgroundColor = styleEqual(
       levels = stages,
-      c('red', 'tomato', 'orange')
+      c('#D73027', '#F46D43', '#FDAE61')
     )
   )
 ```
