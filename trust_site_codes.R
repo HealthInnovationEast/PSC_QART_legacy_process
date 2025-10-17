@@ -5,7 +5,7 @@ psc_icb_trust_lookup <- read.csv(here("lookups", "psc_icb_trust_lookup.csv"))
 pscs <- unique(psc_icb_trust_lookup$updated_psc_name)
 
 # download look up provided by improvement team
-site_lookup_file_name <- '20250710 Site list for QART template.xlsx'
+message(str_glue('Site look up list provided: {site_lookup_file_name}'))
 site_lookup_file <- master_files_dr$get_item(str_glue({site_lookup_file_name}))
 site_lookup_file$download(dest = here("lookups", str_glue({site_lookup_file_name})), 
                             overwrite = T)
@@ -95,7 +95,7 @@ new_trusts_succession_history <- call_org_names_and_dates |>
   # put trust names back
   left_join(no_psc_returns, by = c('api_org_code' = 'api_parent_code')) |>
   # remove unnecessary vars
-  select(-c(updated_psc_name, api_icb_code, api_icb_name, api_current_org_name))|>
+  select(-c(updated_psc_name, api_current_icb_code, api_current_icb_name, api_current_org_name))|>
   # work out trust code and name after org changes
   mutate(api_org_current_code = if_else(!is.na(api_succ_code), api_succ_code, api_org_code),
          api_org_current_name = if_else(is.na(api_succ_code), api_org_name, NA)) |>

@@ -34,15 +34,15 @@ for (psc in pscs) {
   # grid with icb codes and names
   location_icb <- psc_icb_trust_lookup |>
     filter(updated_psc_name == psc) |>
-    distinct(api_icb_code, api_icb_name)
+    distinct(api_current_icb_code, api_current_icb_name)
 
   # grid with icb code, trust code, icb name, and trust name
   location_icb_trust <- psc_icb_trust_lookup |>
     filter(updated_psc_name == psc) |>
     # choosing this order to accommodate most aesthetic width of cells in template
     distinct(
-      api_icb_code, api_current_code,
-      api_icb_name, api_current_org_name
+      api_current_icb_code, api_current_code,
+      api_current_icb_name, api_current_org_name
     )
 
   # grid with trust code and trust name

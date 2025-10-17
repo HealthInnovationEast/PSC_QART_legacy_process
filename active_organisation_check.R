@@ -4,15 +4,15 @@
 # i.e., to account for changes in orgs applicable from 2024/25 Q4 and after
 
 
-# download previously submitted data from SharePoint
+# download previously submitted matneo data from SharePoint
 master_files_dr <- chosenlib$get_item(glue::glue("{base_url}/{master_files_folder}"))
-previous_data_file <- master_files_dr$get_item(str_glue({previous_submissions_file_name}))
-previous_data_file$download(dest = here("output", str_glue({previous_submissions_file_name})), 
+previous_data_file <- master_files_dr$get_item(str_glue({previous_mat_neo_submissions_file_name}))
+previous_data_file$download(dest = here("output", str_glue({previous_mat_neo_submissions_file_name})), 
                        overwrite = T)
 
 # upload data 
 org_names_previous_submissions <- read.csv(
-  here(str_glue('output/{previous_submissions_file_name}'))
+  here(str_glue('output/{previous_mat_neo_submissions_file_name}'))
   ) |>
   # some of the encoding went off so we fix here 
   mutate_if(
@@ -23,8 +23,11 @@ org_names_previous_submissions <- read.csv(
   # we know of submissions under trust sites instead of trusts names
   filter(quarter == previous_quarter_string) |>
   distinct(updated_psc_name, api_icb_code, api_icb_name, api_org_code, organisation_name_verified) |>
-  rename(previous_quarter_icb_name = api_icb_name,
-         previous_quarter_org_name = organisation_name_verified)
+  rename('previous_quarter_icb_name' = api_icb_name,
+         'previous_quarter_org_name' = organisation_name_verified,
+         'previous_quarter_org_code' = api_org_code,
+         'previous_quarter_icb_code' = api_icb_code
+          )
 
 # API call flow:
 # 1. use trust codes to determine legacy status and extract succession history
@@ -139,7 +142,7 @@ call_by_org_code <- function(api_org_code) {
   )
 }
 
-call_org_end_dates <- apply(org_names_previous_submissions |> select(api_org_code), 1, call_by_org_code) |>
+call_org_end_dates <- apply(org_names_previous_submissions |> select(previous_quarter_org_code), 1, call_by_org_code) |>
   bind_rows() |>
   relocate(api_date_end, .after = api_date_start) |>
   mutate(api_date_start = ymd(api_date_start),
@@ -277,32 +280,32 @@ all_icbs <- content(GET(link))
 call_icb_names <- data.frame()
 
 for (icb in 1:length(all_icbs$Organisations)) {
-  api_icb_code <- all_icbs$Organisations[[icb]]$OrgId
-  api_icb_name <- all_icbs$Organisations[[icb]]$Name
+  api_current_icb_code <- all_icbs$Organisations[[icb]]$OrgId
+  api_current_icb_name <- all_icbs$Organisations[[icb]]$Name
   
-  call_icb_names[icb, "api_icb_code"] <- api_icb_code
-  call_icb_names[icb, "api_icb_name"] <- api_icb_name
+  call_icb_names[icb, "api_current_icb_code"] <- api_current_icb_code
+  call_icb_names[icb, "api_current_icb_name"] <- api_current_icb_name
 }
 
 # add ICB codes to get ICB names form previous call so trusts have all ICB details needed
 map_active_trusts_icb_details <- call_icb_names |>
-  left_join(call_icb_org_codes, by ="api_icb_code")
+  left_join(call_icb_org_codes, by = c("api_current_icb_code" = "api_icb_code"))
 
 # output 1: how organisations names will appear in templates
 # this is a map of active orgs for value stored in reporting_quarter_string 
 map_psc_trust_icb_active_orgs <- map_active_trusts_icb_details |>
   left_join(org_names_previous_submissions,
-            by = c('api_current_code' = 'api_org_code',
-                   'api_icb_code')) |>
+            by = c('api_current_code' = 'previous_quarter_org_code')
+            ) |>
   select(updated_psc_name, 
-         api_icb_code, previous_quarter_icb_name, api_icb_name,
+         api_current_icb_code, previous_quarter_icb_name, api_current_icb_name,
          api_current_code, previous_quarter_org_name, api_current_org_name
   ) |> 
   # check for name changes 
-  mutate(icb_name_change = previous_quarter_icb_name != api_icb_name,
+  mutate(icb_name_change = previous_quarter_icb_name != api_current_icb_name,
          trust_name_change = previous_quarter_org_name != api_current_org_name,
          ) |>
-  relocate(icb_name_change, .after = api_icb_name)
+  relocate(icb_name_change, .after = api_current_icb_name)
 
 # QA 
 qa_name_changes <- map_psc_trust_icb_active_orgs |>
@@ -310,10 +313,10 @@ qa_name_changes <- map_psc_trust_icb_active_orgs |>
 
 empty_qa_name_changes <- nrow(qa_name_changes) == 0
 
-if (empty_qa_multiple_succ == F) {
+if (empty_qa_name_changes == F) {
   warning("There have been either ICB or Trust name changes")
   t(qa_name_changes |> 
-      select(previous_quarter_icb_name, api_icb_name,
+      select(previous_quarter_icb_name, api_current_icb_name,
              previous_quarter_org_name , api_current_org_name)
     )
 } else {
@@ -323,7 +326,7 @@ if (empty_qa_multiple_succ == F) {
 # final output
 map_psc_trust_icb_active_orgs_final <- map_psc_trust_icb_active_orgs |>
   select(updated_psc_name, 
-         api_icb_code, api_icb_name,
+         api_current_icb_code, api_current_icb_name,
          api_current_code, api_current_org_name) 
 
 write.csv(map_psc_trust_icb_active_orgs_final, here("lookups", "psc_icb_trust_lookup.csv"), row.names = F)
@@ -337,9 +340,12 @@ chosenlib$upload_file(
 # print a message of where organisation changes have occurred 
 map_legacy <- call_orgs_legacy_status_quarter |> 
   filter(!is.na(nhs_inactive_from_quarter)) |>
-  left_join(org_names_previous_submissions |> select(updated_psc_name, api_org_code, previous_quarter_org_name),
-            by = 'api_org_code') |>
-  select(updated_psc_name, api_org_code, api_org_name, api_date_end, api_succ_code, api_succ_name) 
+  left_join(org_names_previous_submissions |> 
+              select(updated_psc_name, previous_quarter_org_code,
+                     previous_quarter_org_name), 
+            by = c('api_org_code' = 'previous_quarter_org_code')) |>
+  select(updated_psc_name, api_org_code, api_org_name, 
+         api_date_end, api_succ_code, api_succ_name) 
 
 if (nrow(map_legacy) > 0){
   message(str_glue('The following organisation changes are applicable up to {reporting_quarter_string}'))
