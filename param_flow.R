@@ -36,7 +36,7 @@ previous_mat_neo_submissions_file_name <- 'mat_neo_qart_all_data_upto_2024_25_Q4
 marthas_phase_2_nhse_submission <- 'Marthas Rule phase 2 sites supported by natps team 2526 Q1_Returned'
 
 # NOTE this object will need changing in 2526 Q2 to reflect appendign data to previous submissions
-marthas_data_file <- 'marthas_psc_submissions_2025_26_Q1_processed_2025_09_08_184653.csv'
+#marthas_data_file <- 'marthas_psc_submissions_2025_26_Q1_processed_2025_09_08_184653.csv'
 
 # ----------------- code below stays **fixed** 
 
@@ -52,6 +52,7 @@ if (str_detect(previous_mat_neo_submissions_file_name, quarter_check) == FALSE) 
 master_files_folder <- "1. Master files" # where data files are in SharePoint
 slides_folder <- "2. Slides" # where presentation will be saved in SharePoint
 template_file_name <- "preferred_template_2526_changes.xlsx"
+site_lookup_file_name <- '20250710 Site list for QART template.xlsx'
 
 if (stage_of_process == "prepare_templates") {
   # will produce a new version of psc_icb_trust_lookup.csv to account for org changes (if there have been any)

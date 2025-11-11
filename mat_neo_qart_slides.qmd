@@ -42,8 +42,9 @@ master_files_dr <- chosenlib$get_item(glue::glue("{base_url}/{master_files_folde
 mat_neo_data_file <- master_files_dr$list_files() |> 
   select(name) |> 
   filter(str_detect(name, 
-                    # below parameter is generated in read_qart_submissions.R
-                    quarter_string)
+                    # quarter_string parameter is generated in read_qart_submissions.R
+                    paste0('mat_neo_qart_all_data_upto_', quarter_string)
+                    )
          ) |>
   as.vector() |>
   unlist() |> 
@@ -163,15 +164,15 @@ visualise_line(
 
 ```{r}
 spaghetti_data <- bind_rows(
-  aggregate_stage(mat_neo_data, newtt2, stage = "Stage 3"),
-  aggregate_stage(mat_neo_data, mews, stage = "Stage 3")
+  aggregate_stage(mat_neo_data, newtt2, stage = "Stage 4"),
+  aggregate_stage(mat_neo_data, mews, stage = "Stage 4")
 )
 
 visualise_line(
   df = spaghetti_data,
   aes_group = expr(intervention),
   aes_colour = expr(intervention),
-  subtitle_string = "Percentage of organisations reporting deterioration tool use at stage 3"
+  subtitle_string = "Percentage of organisations reporting deterioration tool use at stage 4"
 ) +
   geom_line() +
   geom_point(size = 2) +
