@@ -7,29 +7,29 @@ master_files_location <- chosenlib$get_item(glue::glue("{base_url}/{master_files
 
 master_files <- master_files_location$list_files()
 
-marthas_nhse_submission_file <- master_files |>
+marthas_nhse_quarterly_submission_file <- master_files |>
   select(name) |>
   # submissions must be saved with returned ending on file name
   filter(str_detect(name, marthas_phase_2_nhse_submission))
 
-if (nrow(marthas_nhse_submission_file) == 0) {
-  stop(glue::glue("file not found in location '{master_files_location}':\n file name provided: '{marthas_nhse_submission_file}'"))
+if (nrow(marthas_nhse_quarterly_submission_file) == 0) {
+  stop(glue::glue("file not found in location '{master_files_folder}':\n file name provided: '{marthas_phase_2_nhse_submission}'"))
 }
 
-marthas_nhse_submission <- master_files_location$get_item(marthas_nhse_submission_file)
+marthas_nhse_quarterly_submission <- master_files_location$get_item(marthas_nhse_quarterly_submission_file)
 
 # download file 
-path <- here('data', str_glue('{marthas_nhse_submission_file}'))
+marthas_nhse_quarterly_submission_path <- here('data', str_glue('{marthas_nhse_quarterly_submission_file}'))
 
-marthas_nhse_submission$download(
-  dest = path,
+marthas_nhse_quarterly_submission$download(
+  dest = marthas_nhse_quarterly_submission_path,
   overwrite = T
 )
 
 # read martha's data submitted by nhse 
-# note that we will to append addtional data from PSC's in loops
+# note that we will to append additional data from PSC's in loops
 data_marthas_nhse <- read_excel(
-  path = path, 
+  path = marthas_nhse_quarterly_submission_path, 
   sheet = 1,
   range = "A7:M42"
 ) |> clean_names() |>
@@ -136,20 +136,41 @@ for (hin in hin_folders) {
     #filter(!is.na(adults_patient_check_in) & !is.na(paediatric_patient_check_in)) |>
     filter(if_any(matches('adults|paediatric'), ~!is.na(.))) |>
     mutate(updated_psc_name = hin, .before = trust_code) |>
-    bind_rows(data_marthas_nhse |> filter(updated_psc_name == hin))
+    bind_rows(data_marthas_nhse |> filter(updated_psc_name == hin)) |>
+    mutate(
+      quarter = reporting_quarter_string,
+      .after = name_of_site
+    )
   
   # check there's info for all codes
-  site_code_check <- data_marthas |> 
+  missing_code_check <- data_marthas |> 
     filter(!site_code %in% data_marthas_tidy$site_code) 
   
-  incomplete_sites <- site_code_check |> 
+  incomplete_sites <- missing_code_check |> 
     select(site_code, name_of_site) |> 
     as.character() |>
     paste(collapse = '-')
   
-  if (nrow(site_code_check) > 0) {
+  if (nrow(missing_code_check) > 0) {
     warning(str_glue('{hin}: MR data missing for {incomplete_sites}'))
-    #stop('Data still not provided for sites above')
+  }
+  
+  # check psc's are not submitting info expected from nhse and viceversa
+  duplicate_code_check <- data_marthas_tidy |>
+    group_by(site_code, name_of_site) |>
+    summarise(site_occurrence = n()) |>
+    ungroup() |>
+    filter(site_occurrence > 1)
+  
+  duplicated_sites <- duplicate_code_check |> 
+    select(site_code, name_of_site) |> 
+    as.character() |>
+    paste(collapse = '-')
+  
+  if (nrow(duplicate_code_check) > 0) {
+    warning(str_glue("Skipping {hin}"))
+    warning(str_glue('{hin}: duplicated MR data for {duplicated_sites}'))
+    next
   }
   
   # append extracted data to list
@@ -250,7 +271,7 @@ for (hin in hin_folders) {
       quarter = reporting_quarter_string,
       .after = organisation_name_verified
     ) |>
-    # order columns to emulate structure in previous usbmisisosn data file
+    # order columns to emulate structure in previous submissions data file
     select(updated_psc_name, api_icb_code, api_icb_name,
            api_org_code, organisation_name_verified, quarter:Mews)
 
@@ -287,7 +308,7 @@ quarter_string <- reporting_quarter_string |>
   str_replace_all("/| ", "_")
 
 time_stamp_ext <- format(Sys.time(), "%Y_%m_%d_%H%M%S.csv")
-marthas_submissions_path <- glue::glue("output/marthas_psc_submissions_{quarter_string}_processed_{time_stamp_ext}")
+marthas_submissions_path <- glue::glue("output/marthas_psc_nhse_submissions_{quarter_string}_processed_{time_stamp_ext}")
 mat_neo_opt_submissions_path <- glue::glue("output/mat_neo_optimisation_psc_submissions_{quarter_string}_processed_{time_stamp_ext}")
 
 write.csv(results_marthas,
@@ -300,4 +321,4 @@ write.csv(results_mat_neo,
           row.names = F
 )
 
-message(glue::glue('Data files with data for {reporting_quarter_string} have been produced'))
+message(glue::glue('{reporting_quarter_string} data files have been produced'))
