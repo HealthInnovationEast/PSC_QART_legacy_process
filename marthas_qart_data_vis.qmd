@@ -12,12 +12,10 @@ execute:
   echo: false
   warning: false
 params: 
-  reporting_quarter: '2025/26 Q1'
+  reporting_quarter: '2025/26 Q2'
   master_files_folder: '1. Master files'
-  quarter_string: '25_26_Q1'
-  marthas_data_file: 'marthas_psc_submissions_2025_26_Q1_processed_2025_11_10_212149.csv'
+  quarter_string: '25_26_Q2'
 ---
-
 
 ```{r}
 library(here)
@@ -50,9 +48,8 @@ source('config_sharepoint_location.R')
 reporting_quarter <- params$reporting_quarter
 master_files_folder <- params$master_files_folder
 quarter_string <- params$quarter_string
-marthas_data_file <- params$marthas_data_file
 
-# bring site look up with postcode info and get geo inpho
+# bring site look up with postcode info and get geo info
 site_postcode_list <- read.csv(here('lookups', 'psc_trust_site_lookup.csv')) |>
   select(trust_site_code, api_site_postcode) 
 
@@ -60,34 +57,34 @@ postcodes_lookup_table <- lapply(unique(site_postcode_list$api_site_postcode),
                                  PostcodesioR::postcode_lookup) |>
   bind_rows() |>
   right_join(site_postcode_list, by = c('postcode' = 'api_site_postcode'))
-```
 
-
-```{r}
-# NOTE block below is a place holder that will come in place in 2526 Q2
 # go into share point and download latest data
-#master_files_dr <- chosenlib$get_item(glue::glue("{base_url}/{master_files_folder}"))
+master_files_dr <- chosenlib$get_item(glue::glue("{base_url}/{master_files_folder}"))
 
-# marthas_data_file <- master_files_dr$list_files() |> 
-#   select(name) |> 
-#   filter(str_detect(name, 
-#                     # below parameter is generated in read_qart_submissions.R
-#                     quarter_string)
-#          ) |>
-#   as.vector() |>
-#   unlist() |> 
-#   unname()
-# 
-# marthas_identified_data <- master_files_dr$get_item(str_glue({marthas_data_file}))
-# 
-# marthas_identified_data$download(dest = here("data", str_glue({marthas_data_file})), 
-#                        overwrite = T)
+marthas_data_file <- master_files_dr$list_files() |>
+  select(name) |>
+  filter(str_detect(name,
+                    # below parameter is generated in read_qart_submissions.R
+                    paste0('marthas_qart_all_data_upto_20', quarter_string)
+                    )
+         ) |>
+  as.vector() |>
+  unlist() |>
+  unname()
 
-# marthas_data <- read.csv(here(str_glue('data/{marthas_data_file}'))) |>
-#   mutate(updated_psc_name = str_remove_all(updated_psc_name, 'HIN'))
+marthas_identified_data <- master_files_dr$get_item(str_glue({marthas_data_file}))
+
+marthas_identified_data$download(dest = here("data", str_glue({marthas_data_file})),
+                       overwrite = T)
+
+marthas_data <- read.csv(here(str_glue('data/{marthas_data_file}'))) |>
+  mutate(updated_psc_name = str_remove_all(updated_psc_name, 'HIN'))
+
+latest_quarter <- max(marthas_data$quarter)
 
 marthas_data_raw <- read.csv(here(str_glue('output/{marthas_data_file}'))) |>
-  mutate(updated_psc_name = str_remove_all(updated_psc_name, ' HIN')) 
+  mutate(updated_psc_name = str_remove_all(updated_psc_name, ' HIN')) |>
+  filter(quarter == latest_quarter)
 
 marthas_data_postcode  <- marthas_data_raw |>
   left_join(postcodes_lookup_table, by = c('site_code' = 'trust_site_code')) |>
