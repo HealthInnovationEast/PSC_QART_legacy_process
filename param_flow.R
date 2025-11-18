@@ -20,7 +20,7 @@ source('config_sharepoint_location.R')
 stage_of_process <- "process_submissions" 
 
 # set dates by setting end of reporting quarter (mind that latest data will be lagged by 1 quarter)
-reporting_quarter_end_date <- ymd('2025-06-30') 
+reporting_quarter_end_date <- ymd('2025-09-30') 
 reporting_quarter_string <- quarter(reporting_quarter_end_date, 
                                     fiscal_start = 4,
                                     type = 'year_start/end')
@@ -30,13 +30,15 @@ previous_quarter_string <- quarter(previous_quarter_end_date,
                                    type = 'year_start/end')
 
 # file below will be used to append new submissions data from PSC
-previous_mat_neo_submissions_file_name <- 'mat_neo_qart_all_data_upto_2024_25_Q4.csv' 
+previous_mat_neo_submissions_file_name <- 'mat_neo_qart_all_data_upto_2025_26_Q1.csv' 
 
-# file with list of Martha's rule phase 2 sites supported by nshe
-marthas_phase_2_nhse_submission <- 'Marthas Rule phase 2 sites supported by natps team 2526 Q1_Returned'
+# this one is to append new martha's rule submissions (from PSC's and improv team)
+previous_marthas_submissions_file_name <- 
+  'marthas_psc_nhse_submissions_2025_26_Q1_processed_2025_11_16_173503.csv'
 
-# NOTE this object will need changing in 2526 Q2 to reflect appendign data to previous submissions
-#marthas_data_file <- 'marthas_psc_submissions_2025_26_Q1_processed_2025_09_08_184653.csv'
+# file with Martha's rule phase 2 sites supported by improv team
+marthas_phase_2_nhse_submission <- 
+  'Marthas Rule phase 2 sites supported by natps team 2526 Q2_Returned'
 
 # ----------------- code below stays **fixed** 
 
