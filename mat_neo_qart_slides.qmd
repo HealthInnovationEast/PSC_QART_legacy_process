@@ -7,9 +7,9 @@ format:
     fig-dpi: 800
 editor: visual
 params: 
-  reporting_quarter: '2024/25 Q3'
+  reporting_quarter: '2025/26 Q2'
   master_files_folder: '1. Master files'
-  quarter_string: '24_25_Q3'
+  quarter_string: '25_26_Q2'
 ---
 
 ```{r}
@@ -43,7 +43,7 @@ mat_neo_data_file <- master_files_dr$list_files() |>
   select(name) |> 
   filter(str_detect(name, 
                     # quarter_string parameter is generated in read_qart_submissions.R
-                    paste0('mat_neo_qart_all_data_upto_', quarter_string)
+                    paste0('mat_neo_qart_all_data_upto_20', quarter_string)
                     )
          ) |>
   as.vector() |>
