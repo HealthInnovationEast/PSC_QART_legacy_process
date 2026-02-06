@@ -31,10 +31,13 @@ marthas_nhse_quarterly_submission$download(
 data_marthas_nhse <- read_excel(
   path = marthas_nhse_quarterly_submission_path, 
   sheet = 1,
-  range = "A7:M42"
+  # select frist 100 rows (in case list of sites increases)
+  range = "A7:M100"
 ) |> clean_names() |>
   # removing decorative column
   select(-'x10') |>
+  # remove any empty rows 
+  remove_empty("rows") |>
   # flag 
   mutate(nhse_natps_submisison = TRUE)
 
@@ -287,21 +290,6 @@ if (length(unique(results_marthas$updated_psc_name)) != 15 &
     ){
   stop('Data not appended correctly')
 }
-
-# number of organisations using the deterioration tools
-# these numbers are used for an impact slide produced by improvement team
-# our role is to provide an udpate on these figures
-orgs_newtt2 <- results_mat_neo |>
-  filter(str_detect(Newtt2, '(?i)stage (4|5|6|7)')) 
-
-print(str_glue("Number of organisations using NEWTT2:
-               {length(unique(orgs_newtt2$organisation_name_verified))}"))
-
-orgs_mews <- results_mat_neo |>
-  filter(str_detect(Mews, '(?i)stage (4|5|6|7)')) 
-
-print(str_glue("Number of organisations using MEWS:
-               {length(unique(orgs_mews$organisation_name_verified))}"))
 
 # write quarterly data files
 quarter_string <- reporting_quarter_string |>
