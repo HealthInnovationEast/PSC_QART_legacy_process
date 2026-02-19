@@ -30,7 +30,7 @@ for (psc in pscs) {
   rows_to_grey_out <- which(str_detect(sites_to_grey,"Yes"))
   
   
-  # all other grids geenrated 
+  # all other grids generated 
   # grid with icb codes and names
   location_icb <- psc_icb_trust_lookup |>
     filter(updated_psc_name == psc) |>
@@ -123,16 +123,7 @@ for (psc in pscs) {
   
   ## CULTURE PROGRAMME
   
-  # moments numbers
-  wb <- wb_add_data(wb,
-    sheet = "MOMENTS Numbers",
-    x = location_trusts,
-    start_col = 2,
-    start_row = 6,
-    col_names = FALSE
-  )
-  
-  # plt eng't with psc
+  # plt engagement with psc
   wb <- wb_add_data(wb,
     sheet = "PLT Engagement with PSC",
     x = location_trusts,
@@ -141,25 +132,7 @@ for (psc in pscs) {
     col_names = FALSE
   )
   
-  # plt eng't with cc
-  wb <- wb_add_data(wb,
-    sheet = "PLT Engagement with CCs",
-    x = location_trusts,
-    start_col = 5,
-    start_row = 5,
-    col_names = FALSE
-  )
-  
-  # cc eng't with PSC
-  wb <- wb_add_data(wb,
-                    sheet = "CC Engagement with PSC",
-                    x = location_trusts,
-                    start_col = 5,
-                    start_row = 5,
-                    col_names = FALSE
-  )
-  
-  # cc numbers
+  # culture coach numbers
   wb <- wb_add_data(wb,
                     sheet = "Culture Coach Numbers",
                     x = location_trusts,

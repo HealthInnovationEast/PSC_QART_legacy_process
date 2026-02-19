@@ -12,9 +12,9 @@ execute:
   echo: false
   warning: false
 params: 
-  reporting_quarter: '2025/26 Q2'
+  reporting_quarter: '2025/26 Q3'
   master_files_folder: '1. Master files'
-  quarter_string: '25_26_Q2'
+  quarter_string: '2025_26_Q3'
 ---
 
 ```{r}
@@ -51,7 +51,7 @@ quarter_string <- params$quarter_string
 
 # bring site look up with postcode info and get geo info
 site_postcode_list <- read.csv(here('lookups', 'psc_trust_site_lookup.csv')) |>
-  select(trust_site_code, api_site_postcode) 
+  select(trust_site_code, api_site_postcode)
 
 postcodes_lookup_table <- lapply(unique(site_postcode_list$api_site_postcode),
                                  PostcodesioR::postcode_lookup) |>
@@ -59,13 +59,14 @@ postcodes_lookup_table <- lapply(unique(site_postcode_list$api_site_postcode),
   right_join(site_postcode_list, by = c('postcode' = 'api_site_postcode'))
 
 # go into share point and download latest data
-master_files_dr <- chosenlib$get_item(glue::glue("{base_url}/{master_files_folder}"))
+master_files_dr <- chosenlib$get_item(glue::glue(
+  "{base_url}/{master_files_folder}"))
 
 marthas_data_file <- master_files_dr$list_files() |>
   select(name) |>
   filter(str_detect(name,
                     # below parameter is generated in read_qart_submissions.R
-                    paste0('marthas_qart_all_data_upto_20', quarter_string)
+                    paste0('marthas_qart_all_data_upto_', quarter_string)
                     )
          ) |>
   as.vector() |>
@@ -76,6 +77,7 @@ marthas_identified_data <- master_files_dr$get_item(str_glue({marthas_data_file}
 
 marthas_identified_data$download(dest = here("data", str_glue({marthas_data_file})),
                        overwrite = T)
+
 
 marthas_data <- read.csv(here(str_glue('data/{marthas_data_file}'))) |>
   mutate(updated_psc_name = str_remove_all(updated_psc_name, 'HIN'))
@@ -94,14 +96,10 @@ marthas_data_postcode  <- marthas_data_raw |>
 ## User guidance notes
 
 - The visualisations and breakdowns below are experimental and for NHS England's internal use only. Data presented was reported in `r reporting_quarter`.
-- Several breakdowns of the data are presented throughout the report. Always check the size of numerators and denominators underlying a percentage. The more granular a breakdown, the higher the chances of obtaining 0% and 100% values due to small group sizes. 
+- Several breakdowns of the data are presented throughout the report. Always check the size of numerators and denominators behind a percentage. The more granular a breakdown, the higher the chances of obtaining 0% and 100% values due to small group sizes. 
 - PSC overview charts for every component have been "centred" to allow comparisons of adoption maturity between PSC's. This means the middle of the chart is a focal point that represents the most common stage reported and bars will sway to the right or left of that central point to reflect adoption progress. Bars leaning towards the right-hand side of the chart represent more mature adoption, whilst bars leaning to the left are equivalent to less mature adoption.
 
 ## Distribution of sites by phase 
-
-Missing data for two phase 1 site this quarter: 
-
-- RAN01 - The Royal National Orthopaedic Hospital (Stanmore) - UCLPartners
 
 ```{r}
 # aggregations and visualisations
@@ -147,8 +145,9 @@ england_outline <- england %>%
   summarise(geometry = st_union(geometry))
 
 # make data sf
-trust_sites_sf <- sf::st_as_sf(marthas_data_postcode , coords = c('longitude', 'latitude'),
-                      crs = 4326)
+trust_sites_sf <- sf::st_as_sf(marthas_data_postcode , 
+                               coords = c('longitude','latitude'),
+                               crs = 4326)
 ```
 
 **Figure 1:** Martha's Rule sites in England, by phase
@@ -259,17 +258,41 @@ national_all_phases <- function(df, component, exclude){
     # exclude these from percentage calculation
     filter(!!component != exclude) |>
     tabyl(!!component) |>
-    rename('Number of sites' = n, 'Percent' = percent, 'Stage' = !!component) |> 
-    adorn_totals('row') |>
-    mutate(Percent = label_percent(accuracy = 0.1)(Percent)) 
+    rename('Number of sites' = n, 'Percent' = percent, 'Stage' = !!component) 
+
+  # stage check to show all stages in  tables
+  all_possible_stages <- c('Stage 0 - No contact',
+                           'Stage 1 - Knowledge',
+                           'Stage 2 - Interest',
+                           'Stage 3 - Decision',
+                           'Stage 4 - Testing or Implementation',
+                           'Stage 5 - Adoption',
+                           'Stage 6 - Spread',
+                           'Stage 7 - Sustained')
   
-  national_all_phases
+  # this is a tibble that has the stages not shown in aggregation by tabyl
+  stages_zero_values <- tibble(Stage = all_possible_stages,
+                              `Number of sites` = 0, 
+                               Percent = 0) |>
+    # we only keep what's not shown by tabyl
+    filter(!Stage %in% national_all_phases$Stage)
+
+  national_all_phases_tidy <- national_all_phases |>
+    # add rows with zero values
+    bind_rows(stages_zero_values)|>
+    arrange(Stage) |>
+    # add totals and format percentages
+    adorn_totals('row') |>
+    mutate(Percent = label_percent(accuracy = 0.1)(Percent))
+    
+  
+  national_all_phases_tidy
 }
 
 adults_comp_1 <- national_all_phases(df = marthas_data_to_aggregate, 
                     component = adults_patient_check_in,
                     exclude = 'No adult patients'
-                    ) 
+                    )
 
 total_sites_adult_units <- adults_comp_1 |> 
   filter(Stage == 'Total') |> 
@@ -366,10 +389,35 @@ plot_national_by_phase(df = national_by_phase_table,
 
 #### Table 
 
+**All sites**
+
 ```{r}
 adults_comp_1 |>
   kable() 
 ```
+
+**Phase 1 sites**
+
+```{r}
+national_all_phases(df = marthas_data_to_aggregate |> 
+                      filter(Phase == 1), 
+                    component = adults_patient_check_in,
+                    exclude = 'No adult patients'
+                    ) |>
+  kable()
+```
+
+**Phase 2 sites**
+
+```{r}
+national_all_phases(df = marthas_data_to_aggregate |> 
+                      filter(Phase == 2), 
+                    component = adults_patient_check_in,
+                    exclude = 'No adult patients'
+                    ) |>
+  kable()
+```
+
 
 #### Reports at or below stage 2
 ```{r}
@@ -593,13 +641,38 @@ plot_national_by_phase(df = national_by_phase_table,
 ```
 
 
-#### Table 
+#### Table
+
+**All sites**
 
 ```{r}
 national_all_phases(df = marthas_data_to_aggregate, 
                     component = adults_independent_clinical_review,
                     exclude = 'No adult patients'
 ) |>
+  kable()
+```
+
+
+**Phase 1 sites**
+
+```{r}
+national_all_phases(df = marthas_data_to_aggregate |> 
+                      filter(Phase == 1), 
+                    component = adults_independent_clinical_review,
+                    exclude = 'No adult patients'
+                    ) |>
+  kable()
+```
+
+**Phase 2 sites**
+
+```{r}
+national_all_phases(df = marthas_data_to_aggregate |> 
+                      filter(Phase == 2), 
+                    component = adults_independent_clinical_review,
+                    exclude = 'No adult patients'
+                    ) |>
   kable()
 ```
 
@@ -719,6 +792,8 @@ plot_national_by_phase(df = national_by_phase_table,
 
 #### Table 
 
+**All sites**
+
 ```{r}
 national_all_phases(df = marthas_data_to_aggregate, 
                     component = adults_escalation_available_to_patient_carers,
@@ -727,6 +802,28 @@ national_all_phases(df = marthas_data_to_aggregate,
   kable()
 ```
 
+
+**Phase 1 sites**
+
+```{r}
+national_all_phases(df = marthas_data_to_aggregate |> 
+                      filter(Phase == 1), 
+                    component = adults_escalation_available_to_patient_carers,
+                    exclude = 'No adult patients'
+                    ) |>
+  kable()
+```
+
+**Phase 2 sites**
+
+```{r}
+national_all_phases(df = marthas_data_to_aggregate |> 
+                      filter(Phase == 2), 
+                    component = adults_escalation_available_to_patient_carers,
+                    exclude = 'No adult patients'
+                    ) |>
+  kable()
+```
 
 #### Reports at or below stage 2
 
@@ -847,9 +944,10 @@ Patients will be asked, at least daily, about how they are feeling, and if they 
 **Figure 15:** Stages of adoption of component 1 across Martha’s Rule sites with paediatric units, by phase
 
 ```{r, fig.height=8,fig.width=10}
-national_by_phase_table <- national_by_phase(df = marthas_data_to_aggregate,
-                                             component = paediatric_patient_check_in,
-                                              exclude = 'No paediatric patients'
+national_by_phase_table <- national_by_phase(
+  df = marthas_data_to_aggregate,
+  component = paediatric_patient_check_in,
+  exclude = 'No paediatric patients'
 )
 
 plot_national_by_phase(df = national_by_phase_table, 
@@ -860,11 +958,34 @@ plot_national_by_phase(df = national_by_phase_table,
 
 #### Table 
 
+**All sites**
+
 ```{r}
 paediatric_comp_1 |>
   kable()
 ```
 
+**Phase 1 sites**
+
+```{r}
+national_all_phases(df = marthas_data_to_aggregate |> 
+                      filter(Phase == 1), 
+                    component = paediatric_patient_check_in,
+                    exclude = 'No paediatric patients'
+                    ) |>
+  kable()
+```
+
+**Phase 2 sites**
+
+```{r}
+national_all_phases(df = marthas_data_to_aggregate |> 
+                      filter(Phase == 2), 
+                    component = paediatric_patient_check_in,
+                    exclude = 'No paediatric patients'
+                    ) |>
+  kable()
+```
 
 #### Reports at or below stage 2
 
@@ -981,11 +1102,35 @@ plot_national_by_phase(df = national_by_phase_table,
 
 #### Table 
 
+**All sites**
+
 ```{r}
 national_all_phases(df = marthas_data_to_aggregate, 
                     component = paediatric_independent_clinical_review,
                     exclude = 'No paediatric patients'
 ) |>
+  kable()
+```
+
+**Phase 1 sites**
+
+```{r}
+national_all_phases(df = marthas_data_to_aggregate |> 
+                      filter(Phase == 1), 
+                    component = paediatric_independent_clinical_review,
+                    exclude = 'No paediatric patients'
+                    ) |>
+  kable()
+```
+
+**Phase 2 sites**
+
+```{r}
+national_all_phases(df = marthas_data_to_aggregate |> 
+                      filter(Phase == 2), 
+                    component = paediatric_independent_clinical_review,
+                    exclude = 'No paediatric patients'
+                    ) |>
   kable()
 ```
 
@@ -1105,6 +1250,8 @@ plot_national_by_phase(df = national_by_phase_table,
 
 #### Table 
 
+**All sites**
+
 ```{r}
 national_all_phases(df = marthas_data_to_aggregate, 
                     component = paediatric_escalation_available_to_patient_carers,
@@ -1113,6 +1260,27 @@ national_all_phases(df = marthas_data_to_aggregate,
   kable()
 ```
 
+**Phase 1 sites**
+
+```{r}
+national_all_phases(df = marthas_data_to_aggregate |> 
+                      filter(Phase == 1), 
+                    component = paediatric_escalation_available_to_patient_carers,
+                    exclude = 'No paediatric patients'
+                    ) |>
+  kable()
+```
+
+**Phase 2 sites**
+
+```{r}
+national_all_phases(df = marthas_data_to_aggregate |> 
+                      filter(Phase == 2), 
+                    component = paediatric_escalation_available_to_patient_carers,
+                    exclude = 'No paediatric patients'
+                    ) |>
+  kable()
+```
 
 #### Reports at or below stage 2
 
