@@ -21,7 +21,7 @@ stage_of_process <- "process_submissions"
 
 # set dates by setting end of reporting quarter 
 # (mind that latest data will be lagged by 1 quarter)
-reporting_quarter_end_date <- ymd('2025-12-31') 
+reporting_quarter_end_date <- ymd('2026-03-31') 
 reporting_quarter_string <- quarter(reporting_quarter_end_date, 
                                     fiscal_start = 4,
                                     type = 'year_start/end')
@@ -31,15 +31,15 @@ previous_quarter_string <- quarter(previous_quarter_end_date,
                                    type = 'year_start/end')
 
 # file below will be used to append new submissions data from PSCs
-previous_mat_neo_submissions_file_name <- 'mat_neo_qart_all_data_upto_2025_26_Q2.csv' 
+previous_mat_neo_submissions_file_name <- 'mat_neo_qart_all_data_upto_2025_26_Q3.csv' 
 
 # this one is to append new martha's rule submissions (from PSC's and improv team)
 previous_marthas_submissions_file_name <- 
-  'marthas_qart_all_data_upto_2025_26_Q2.csv'
+  'marthas_qart_all_data_upto_2025_26_Q3.csv'
 
 # file with Martha's rule phase 2 sites supported by improv team
 marthas_phase_2_nhse_submission <- 
-  'Marthas Rule phase 2 sites supported by natps team 2526 Q3_Returned'
+  'Marthas Rule phase 2 sites supported by natps team 2526 Q4_Returned'
 
 # ----------------- code below stays **fixed** 
 

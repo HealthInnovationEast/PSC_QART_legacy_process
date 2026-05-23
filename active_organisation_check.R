@@ -318,7 +318,7 @@ if (empty_qa_name_changes == F) {
   t(qa_name_changes |> 
       select(previous_quarter_icb_name, api_current_icb_name,
              previous_quarter_org_name , api_current_org_name)
-    )
+    ) 
 } else {
   message("There have been no organisation changes between now an the previous quarter")
 }
