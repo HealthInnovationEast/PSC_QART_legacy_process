@@ -39,8 +39,6 @@ library(DT)
 # post code and mapping libraries
 library(PostcodesioR)
 library(sf)
-#library(rnaturalearth)
-library(rnaturalearthdata)
 
 source('config_sharepoint_location.R')
 
@@ -132,42 +130,46 @@ marthas_data_to_aggregate |>
 ```
 
 ```{r}
-# # get UK boundaries 
-# uk <- ne_states(country = "United Kingdom", returnclass = "sf")
-# 
-# # filter for England
-# england <- uk %>% filter(geonunit == "England")
-# 
-# # outline of england
-# england_outline <- england %>%
-#   summarise(geometry = st_union(geometry))
-# 
-# # make data sf
-# trust_sites_sf <- sf::st_as_sf(marthas_data_postcode , 
-#                                coords = c('longitude','latitude'),
-#                                crs = 4326)
+# get UK boundaries
+uk <- st_read(
+  "https://open-geography-portalx-ons.hub.arcgis.com/datasets/ons::countries-december-2025-boundaries-uk-buc.geojson",
+  #suppress output message
+  quiet = T
+)
+
+# filter for England
+england <- uk[uk$CTRY25NM == "England", ]
+
+# outline of england
+england_outline <- england |>
+  summarise(geometry = st_union(geometry))
+
+# make data sf
+trust_sites_sf <- sf::st_as_sf(marthas_data_postcode ,
+                               coords = c('longitude','latitude'),
+                               crs = 4326)
 ```
 
 **Figure 1:** Martha's Rule sites in England, by phase
 
 ```{r, fig.height=8,fig.width=8.2}
-# ggplot() +
-#   geom_sf(data = england_outline, fill = "white", color = "black") +
-#   geom_sf(data = trust_sites_sf, 
-#           aes(colour = factor(phase)),
-#           size = 2
-#           ) +
-#   scale_colour_manual(values = c('#801650', '#28A197'),
-#                       labels = c("Phase 1", "Phase 2")  # custom legend labels
-#                     ) +
-#   theme_minimal()  +
-#   theme(axis.text = element_blank(),
-#         panel.grid = element_blank(),
-#         legend.title = element_blank(),
-#         legend.position = 'top',
-#         legend.justification = 'left',
-#         legend.text = element_text(size = 14)
-#         )
+ggplot() +
+  geom_sf(data = england_outline, fill = "white", color = "black") +
+  geom_sf(data = trust_sites_sf,
+          aes(colour = factor(phase)),
+          size = 2
+          ) +
+  scale_colour_manual(values = c('#801650', '#28A197'),
+                      labels = c("Phase 1", "Phase 2")  # custom legend labels
+                    ) +
+  theme_minimal()  +
+  theme(axis.text = element_blank(),
+        panel.grid = element_blank(),
+        legend.title = element_blank(),
+        legend.position = 'top',
+        legend.justification = 'left',
+        legend.text = element_text(size = 14)
+        )
 ```
 
 ## Share of sites by PSC
