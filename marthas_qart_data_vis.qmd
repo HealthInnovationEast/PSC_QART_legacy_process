@@ -39,7 +39,7 @@ library(DT)
 # post code and mapping libraries
 library(PostcodesioR)
 library(sf)
-library(rnaturalearth)
+#library(rnaturalearth)
 library(rnaturalearthdata)
 
 source('config_sharepoint_location.R')
@@ -131,45 +131,43 @@ marthas_data_to_aggregate |>
   kable(align = 'lll')
 ```
 
-
-
 ```{r}
-# get UK boundaries 
-uk <- ne_states(country = "United Kingdom", returnclass = "sf")
-
-# filter for England
-england <- uk %>% filter(geonunit == "England")
-
-# outline of england
-england_outline <- england %>%
-  summarise(geometry = st_union(geometry))
-
-# make data sf
-trust_sites_sf <- sf::st_as_sf(marthas_data_postcode , 
-                               coords = c('longitude','latitude'),
-                               crs = 4326)
+# # get UK boundaries 
+# uk <- ne_states(country = "United Kingdom", returnclass = "sf")
+# 
+# # filter for England
+# england <- uk %>% filter(geonunit == "England")
+# 
+# # outline of england
+# england_outline <- england %>%
+#   summarise(geometry = st_union(geometry))
+# 
+# # make data sf
+# trust_sites_sf <- sf::st_as_sf(marthas_data_postcode , 
+#                                coords = c('longitude','latitude'),
+#                                crs = 4326)
 ```
 
 **Figure 1:** Martha's Rule sites in England, by phase
 
 ```{r, fig.height=8,fig.width=8.2}
-ggplot() +
-  geom_sf(data = england_outline, fill = "white", color = "black") +
-  geom_sf(data = trust_sites_sf, 
-          aes(colour = factor(phase)),
-          size = 2
-          ) +
-  scale_colour_manual(values = c('#801650', '#28A197'),
-                      labels = c("Phase 1", "Phase 2")  # custom legend labels
-                    ) +
-  theme_minimal()  +
-  theme(axis.text = element_blank(),
-        panel.grid = element_blank(),
-        legend.title = element_blank(),
-        legend.position = 'top',
-        legend.justification = 'left',
-        legend.text = element_text(size = 14)
-        )
+# ggplot() +
+#   geom_sf(data = england_outline, fill = "white", color = "black") +
+#   geom_sf(data = trust_sites_sf, 
+#           aes(colour = factor(phase)),
+#           size = 2
+#           ) +
+#   scale_colour_manual(values = c('#801650', '#28A197'),
+#                       labels = c("Phase 1", "Phase 2")  # custom legend labels
+#                     ) +
+#   theme_minimal()  +
+#   theme(axis.text = element_blank(),
+#         panel.grid = element_blank(),
+#         legend.title = element_blank(),
+#         legend.position = 'top',
+#         legend.justification = 'left',
+#         legend.text = element_text(size = 14)
+#         )
 ```
 
 ## Share of sites by PSC
@@ -740,7 +738,6 @@ psc_all_phases_table(df = marthas_data_to_aggregate |> filter(Phase == '1'),
   DT::datatable(options = list(pageLength = 10))
 ```
 
-
 #### Phase 2
 
 **Figure 10:** Adoption stages for component 2 across phase 2 sites with adult units, by PSC
@@ -913,6 +910,77 @@ psc_all_phases_table(df = marthas_data_to_aggregate |> filter(Phase == '2'),
 ```
 
 :::
+
+### All adult sites at stage 6 or above
+```{r}
+adults_stage6_plus <- marthas_data_to_aggregate |>
+  select(PSC, name_trust_code, 
+         name_site_code, Phase,
+         starts_with('adults')
+         ) |>
+  filter(
+    if_all(starts_with('adults'), 
+           ~ str_detect(., '(?i)stage (6|7)'))
+    ) 
+
+#counts
+adult_sites_at6_plus <- nrow(adults_stage6_plus)
+
+adults_stage6_plus_table <- adults_stage6_plus |> 
+  tabyl(Phase)
+
+adults_stage6_plus_phase1 <- adults_stage6_plus_table |> 
+  filter(Phase == '1') |> 
+  pull(n)
+
+adults_stage6_plus_phase2 <- adults_stage6_plus_table |> 
+  filter(Phase == '2') |> 
+  pull(n) 
+```
+
+This sections shows all adult sites (n = `r adult_sites_at6_plus`) reporting adoption at stage 6 or above as at `r latest_quarter`.
+
+<div style="width: 45vw;">
+
+::: {.panel-tabset}
+
+#### Phase 1
+
+There are `r adults_stage6_plus_phase1` adult sites reporting adoption at stage 6 or above.
+
+```{r}
+adults_stage6_plus |>
+  filter(Phase == '1') |>
+  select(PSC,
+         'Trust' = name_trust_code, 
+         'Site' = name_site_code,
+         Phase,
+         'Component 1' = adults_patient_check_in,
+         'Component 2' = adults_independent_clinical_review,
+         'Component 3' = adults_escalation_available_to_patient_carers) |>
+  DT::datatable(options = list(pageLength = 10))
+```
+
+#### Phase 2
+
+There are `r adults_stage6_plus_phase2` adult sites reporting adoption at stage 6 or above.
+
+```{r}
+adults_stage6_plus |>
+  filter(Phase == '2') |>
+  select(PSC,
+         'Trust' = name_trust_code, 
+         'Site' = name_site_code,
+         Phase,
+         'Component 1' = adults_patient_check_in,
+         'Component 2' = adults_independent_clinical_review,
+         'Component 3' = adults_escalation_available_to_patient_carers) |>
+  DT::datatable(options = list(pageLength = 10))
+```
+
+:::
+
+</div>
 
 ## Stages of adoption across paediatric units 
 
@@ -1369,6 +1437,77 @@ psc_all_phases_table(df = marthas_data_to_aggregate |> filter(Phase == '2'),
 ```
 
 :::
+
+### All paediatric sites at stage 6 or above
+```{r}
+paeds_stage6_plus <- marthas_data_to_aggregate |>
+  select(PSC, name_trust_code, 
+         name_site_code, Phase,
+         starts_with('paed')
+         ) |>
+  filter(
+    if_all(starts_with('paed'), 
+           ~ str_detect(., '(?i)stage (6|7)'))
+    ) 
+
+#counts
+paeds_sites_at6_plus <- nrow(paeds_stage6_plus)
+
+paeds_stage6_plus_table <- paeds_stage6_plus |> 
+  tabyl(Phase)
+
+paeds_stage6_plus_phase1 <- paeds_stage6_plus_table |> 
+  filter(Phase == '1') |> 
+  pull(n)
+
+paeds_stage6_plus_phase2 <- paeds_stage6_plus_table |> 
+  filter(Phase == '2') |> 
+  pull(n) 
+```
+
+This sections shows all paediatric sites (n = `r paeds_sites_at6_plus`) reporting adoption at stage 6 or above as at `r latest_quarter`.
+
+<div style="width: 45vw;">
+
+::: {.panel-tabset}
+
+#### Phase 1
+
+There are `r paeds_stage6_plus_phase1` paediatric sites reporting adoption at stage 6 or above.
+
+```{r}
+paeds_stage6_plus |>
+  filter(Phase == '1') |>
+  select(PSC,
+         'Trust' = name_trust_code, 
+         'Site' = name_site_code,
+         Phase,
+         'Component 1' = paediatric_patient_check_in,
+         'Component 2' = paediatric_independent_clinical_review,
+         'Component 3' = paediatric_escalation_available_to_patient_carers) |>
+  DT::datatable(options = list(pageLength = 10))
+```
+
+#### Phase 2
+
+There are `r paeds_stage6_plus_phase2` paediatric sites reporting adoption at stage 6 or above.
+
+```{r}
+paeds_stage6_plus |>
+  filter(Phase == '2') |>
+  select(PSC,
+         'Trust' = name_trust_code, 
+         'Site' = name_site_code,
+         Phase,
+         'Component 1' = paediatric_patient_check_in,
+         'Component 2' = paediatric_independent_clinical_review,
+         'Component 3' = paediatric_escalation_available_to_patient_carers) |>
+  DT::datatable(options = list(pageLength = 10))
+```
+
+:::
+
+</div>
 
 ## All adult data 
 
