@@ -11,7 +11,7 @@ template_file$download(dest = here("lookups", str_glue({template_file_name})),
 current_quarter_year <- str_remove_all(reporting_quarter_string, '20|/')
 
 # for testing one template
-#pscs = pscs[pscs %in% c('North West Coast HIN')]
+pscs = pscs[pscs %in% c('North West Coast HIN')]
 
 # loop through locations provided in psc_lookup.csv
 for (psc in pscs) {
@@ -24,17 +24,16 @@ for (psc in pscs) {
     # this is to avoid printing string '#N/A' for empty cells
     mutate(across(where(is.character), ~replace_na(., ' ')))
   
-  sites_to_grey <- psc_trust_site_lookup |>
-    filter(updated_psc_name == psc) %>% select(to_grey_out) %>% 
-    pull(to_grey_out)
-  rows_to_grey_out <- which(str_detect(sites_to_grey,"Yes"))
-  
-  
   # all other grids generated 
   # grid with icb codes and names
   location_icb <- psc_icb_trust_lookup |>
     filter(updated_psc_name == psc) |>
     distinct(api_current_icb_code, api_current_icb_name)
+  
+  # wider form of location_icb_trust for medsip
+  location_icb_wide <- location_icb |> 
+    pivot_wider(names_from = api_current_icb_code, 
+                values_from = api_current_icb_name)
 
   # grid with icb code, trust code, icb name, and trust name
   location_icb_trust <- psc_icb_trust_lookup |>
@@ -56,25 +55,15 @@ for (psc in pscs) {
   
   # add trust and sites to Martha's Rule tab
   wb <- wb_add_data(wb,
-    sheet = "Martha's Rule",
+    sheet = "MR - Adult & Paeds",
     x = location_trust_sites,
     start_col = 2,
-    start_row = 8,
+    start_row = 7,
     col_names = FALSE
   )
   
-  
-  #greying out step
-  for (x in rows_to_grey_out ){
-  wb <- wb_add_fill(wb,
-              sheet = "Martha's Rule",
-               dims =  wb_dims(rows= 8 + x - 1,
-                               cols= 2:6),
-               color = wb_color("grey")
-                )
-  }
-  
   # add ICB names to Medicines tab
+  # long form
   wb <- wb_add_data(wb,
     sheet = "Medicines",
     x = location_icb,
@@ -82,63 +71,43 @@ for (psc in pscs) {
     start_row = 6,
     col_names = FALSE
   )
+  
+  # wide form
+  wb <- wb_add_data(wb,
+    sheet = "Medicines",
+    x = location_icb_wide,
+    start_col = 4,
+    start_row = 15,
+    col_names = TRUE
+  )
 
   # add ICB and Trust names to MatNeo tab
-
-  # optimisation grid
-  wb <- wb_add_data(wb,
-    sheet = "MatNeo",
-    x = location_icb_trust,
-    start_col = 2,
-    start_row = 9,
-    col_names = FALSE
-  )
 
   # deterioration tools grid
   wb <- wb_add_data(wb,
     sheet = "MatNeo",
     x = location_icb_trust,
     start_col = 2,
-    start_row = 30,
+    start_row = 8,
     col_names = FALSE
   )
 
-  # preterm birth lead engagement
+  # abc grid
   wb <- wb_add_data(wb,
     sheet = "MatNeo",
-    x = location_trusts,
-    start_col = 3,
-    start_row = 62,
+    x = location_icb_trust,
+    start_col = 2,
+    start_row = 42,
     col_names = FALSE
   )
-
+  
   # PAS score
   wb <- wb_add_data(wb,
     sheet = "MatNeo",
     x = location_icb,
     start_col = 3,
-    start_row = 82,
+    start_row = 63,
     col_names = FALSE
-  )
-  
-  ## CULTURE PROGRAMME
-  
-  # plt engagement with psc
-  wb <- wb_add_data(wb,
-    sheet = "PLT Engagement with PSC",
-    x = location_trusts,
-    start_col = 5,
-    start_row = 5,
-    col_names = FALSE
-  )
-  
-  # culture coach numbers
-  wb <- wb_add_data(wb,
-                    sheet = "Culture Coach Numbers",
-                    x = location_trusts,
-                    start_col = 2,
-                    start_row = 6,
-                    col_names = FALSE
   )
 
   wb_save(wb,

@@ -25,6 +25,7 @@ sites_phase_2 <- read_excel(here("lookups", str_glue({site_lookup_file_name})),
 site_lookup <- bind_rows(sites_phase_1, sites_phase_2)
 
 # wrangle to allow left join to psc_icb_trust_lookup
+# TODO : REMOVE greying out
 site_lookup_parsed <- site_lookup |>
   select(-c(psc), # not useful as using abbreviated names
          name_of_trust,
@@ -141,7 +142,7 @@ psc_trust_site_lookup <- call_site_postcode_and_parent_codes  |>
   # row order
   arrange(updated_psc_name, api_current_org_name, api_site_name)
 
-# NOTE this line should be removed from 2526 Q2
+# TODO: fix this bug by separating matneo and MR site lists
 psc_trust_site_lookup <- psc_trust_site_lookup %>%
   mutate(updated_psc_name = if_else(trust_site_code == "RD816", "Eastern HIN", updated_psc_name))
 
