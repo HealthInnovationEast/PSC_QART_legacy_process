@@ -56,7 +56,7 @@ if (str_detect(previous_mat_neo_submissions_file_name, quarter_check) == FALSE) 
 master_files_folder <- "1. Master files" # where data files are in SharePoint
 slides_folder <- "2. Slides" # where presentation will be saved in SharePoint
 template_file_name <- "qart_template_2627.xlsx"
-site_lookup_file_name <- '20260607 Site list for QART template.xlsx'
+site_lookup_file_name <- 'MR_Phase1_2_&_3_Master.xlsx'
 
 if (stage_of_process == "prepare_templates") {
   # will produce a new version of psc_icb_trust_lookup.csv to account for org changes (if there have been any)

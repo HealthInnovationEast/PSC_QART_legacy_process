@@ -10,8 +10,8 @@ template_file$download(dest = here("lookups", str_glue({template_file_name})),
 # file friendly naming string for saving results
 current_quarter_year <- str_remove_all(reporting_quarter_string, '20|/')
 
-# for testing one template
-pscs = pscs[pscs %in% c('North West Coast HIN')]
+# if testing one template
+# pscs = pscs[pscs %in% c('North West Coast HIN')]
 
 # loop through locations provided in psc_lookup.csv
 for (psc in pscs) {
@@ -19,8 +19,8 @@ for (psc in pscs) {
   # generated in trust_site_codes.R
   location_trust_sites <- psc_trust_site_lookup |>
     filter(updated_psc_name == psc) |>
-    select(api_parent_code, api_current_org_name,
-           trust_site_code, api_site_name, phase) |>
+    select(api_org_code, api_org_name,
+           site_sdcs_code, api_site_name, phase) |>
     # this is to avoid printing string '#N/A' for empty cells
     mutate(across(where(is.character), ~replace_na(., ' ')))
   
@@ -53,13 +53,37 @@ for (psc in pscs) {
   # load template excel file
   wb <- openxlsx2::wb_load(here("lookups", str_glue({template_file_name})))
   
-  # add trust and sites to Martha's Rule tab
+  # add trust and sites to Martha's Rule tabs
+  # MR adult and paeds
   wb <- wb_add_data(wb,
-    sheet = "MR - Adult & Paeds",
-    x = location_trust_sites,
-    start_col = 2,
-    start_row = 7,
-    col_names = FALSE
+                    sheet = "MR - Adult & Paeds",
+                    x = location_trust_sites |> 
+                      filter(phase %in% c('1', '2')),
+                    start_col = 2,
+                    start_row = 7,
+                    col_names = FALSE
+  )
+  
+  # MR matneo
+  wb <- wb_add_data(wb,
+                    sheet = "MR - Maternity & Neonatal",
+                    x = location_trust_sites |>
+                      filter(phase == 'matneo') |> 
+                      select(-phase),
+                    start_col = 2,
+                    start_row = 7,
+                    col_names = FALSE
+  )
+  
+  # MR ED
+  wb <- wb_add_data(wb,
+                    sheet = "MR - Emergency Departments",
+                    x = location_trust_sites |>
+                      filter(phase == 'ed') |> 
+                      select(-phase),
+                    start_col = 2,
+                    start_row = 7,
+                    col_names = FALSE
   )
   
   # add ICB names to Medicines tab
