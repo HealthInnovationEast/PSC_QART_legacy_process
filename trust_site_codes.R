@@ -169,7 +169,7 @@ psc_trust_site_lookup <- site_lookup |>
              hin_psc == 'East Midlands' ~ 'East Midlands HIN',
              hin_psc == 'East' ~ 'Eastern HIN',
              hin_psc == 'Eastern' ~ 'Eastern HIN',
-             hin_psc == 'ICHP' ~ 'Imperial College Helath Partners HIN',
+             hin_psc == 'ICHP' ~ 'Imperial College Health Partners HIN',
              hin_psc == 'KSS' ~ 'Kent Surrey Sussex HIN',
              hin_psc == 'Manchester' ~ 'Manchester HIN',
              hin_psc == 'NENC' ~ 'North East and North Cumbria (NENC) HIN',
