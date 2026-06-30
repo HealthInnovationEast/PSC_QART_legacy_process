@@ -287,9 +287,19 @@ for (icb in 1:length(all_icbs$Organisations)) {
   call_icb_names[icb, "api_current_icb_name"] <- api_current_icb_name
 }
 
+# check for ICB changes
+icb_codes_status_check <- apply(
+  call_icb_names |> distinct(api_current_icb_code), 
+  1, call_by_org_code) |>
+  bind_rows() 
+
+# this gives us the 36 active icbs from 2026/27 q1
+active_icb_codes <- icb_codes_status_check |>
+  filter(is.na(api_date_end))
+  
 # add ICB codes to get ICB names form previous call so trusts have all ICB details needed
-map_active_trusts_icb_details <- call_icb_names |>
-  left_join(call_icb_org_codes, by = c("api_current_icb_code" = "api_icb_code"))
+map_active_trusts_icb_details <- active_icb_codes |>
+  left_join(call_icb_org_codes, by = c("api_org_code" = "api_icb_code"))
 
 # output 1: how organisations names will appear in templates
 # this is a map of active orgs for value stored in reporting_quarter_string 
@@ -298,7 +308,10 @@ map_psc_trust_icb_active_orgs <- map_active_trusts_icb_details |>
             by = c('api_current_code' = 'previous_quarter_org_code')
             ) |>
   select(updated_psc_name, 
-         api_current_icb_code, previous_quarter_icb_name, api_current_icb_name,
+         api_current_icb_code = api_org_code, 
+         previous_quarter_icb_name, 
+         api_current_icb_name = api_org_name,
+         # trust info
          api_current_code, previous_quarter_org_name, api_current_org_name
   ) |> 
   # check for name changes 
@@ -324,12 +337,14 @@ if (empty_qa_name_changes == F) {
 }
 
 # final output
-map_psc_trust_icb_active_orgs_final <- map_psc_trust_icb_active_orgs |>
-  select(updated_psc_name, 
-         api_current_icb_code, api_current_icb_name,
-         api_current_code, api_current_org_name) 
 
-write.csv(map_psc_trust_icb_active_orgs_final, here("lookups", "psc_icb_trust_lookup.csv"), row.names = F)
+map_psc_trust_icb_active_orgs_final <- map_psc_trust_icb_active_orgs |>
+select(updated_psc_name, 
+       api_current_icb_code, api_current_icb_name,
+       api_current_code, api_current_org_name) 
+
+write.csv(map_psc_trust_icb_active_orgs_final, 
+          here("lookups", "psc_icb_trust_lookup.csv"), row.names = F)
 
 # save file on SharePoint 
 chosenlib$upload_file(
