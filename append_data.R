@@ -1,5 +1,5 @@
-previous_submissions <- c(previous_marthas_submissions_file_name,
-                          previous_mat_neo_submissions_file_name
+previous_submissions <- c(previous_marthas_submissions_file_name#,
+                          #previous_mat_neo_submissions_file_name
                           )
 
 for (previous_submission in previous_submissions){

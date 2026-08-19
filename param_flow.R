@@ -17,7 +17,7 @@ source('config_sharepoint_location.R')
 
 # this is the stage of the task we want execute
 # either "prepare_templates" or "process_submissions"
-stage_of_process <- "prepare_templates" 
+stage_of_process <- "process_submissions" 
 
 # set dates by setting end of reporting quarter 
 # (mind that latest data will be lagged by 1 quarter)
@@ -39,8 +39,8 @@ previous_marthas_submissions_file_name <-
 
 # file with Martha's rule phase 2 sites supported by improv team
 # TO DO: decide if removing is necessary from 26/27 Q1
-marthas_phase_2_nhse_submission <- 
-  'Marthas Rule phase 2 sites supported by natps team 2526 Q4_Returned'
+# marthas_phase_2_nhse_submission <- 
+#   'Marthas Rule phase 2 sites supported by natps team 2526 Q4_Returned'
 
 # ----------------- code below stays **fixed** 
 
