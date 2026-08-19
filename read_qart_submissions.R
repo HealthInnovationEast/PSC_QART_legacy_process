@@ -1,57 +1,5 @@
 # script to find submissions from PSC on sharepoint and collate data for data processing outputs 
 
-# first go to master files folder and download martha's rule data submitted by nhse improvement team
-message('Fetching phase 2 site submissions by NHSE improvement team')
-
-master_files_location <- chosenlib$get_item(glue::glue("{base_url}/{master_files_folder}"))
-
-master_files <- master_files_location$list_files()
-
-# marthas_nhse_quarterly_submission_file <- master_files |>
-#   select(name) |>
-#   # submissions must be saved with returned ending on file name
-#   filter(str_detect(name, marthas_phase_2_nhse_submission))
-# 
-# if (nrow(marthas_nhse_quarterly_submission_file) == 0) {
-#   stop(glue::glue("file not found in location '{master_files_folder}':\n file name provided: '{marthas_phase_2_nhse_submission}'"))
-# }
-
-#marthas_nhse_quarterly_submission <- master_files_location$get_item(marthas_nhse_quarterly_submission_file)
-
-# download file 
-#marthas_nhse_quarterly_submission_path <- here('data', str_glue('{marthas_nhse_quarterly_submission_file}'))
-
-# marthas_nhse_quarterly_submission$download(
-#   dest = marthas_nhse_quarterly_submission_path,
-#   overwrite = T
-# )
-
-# read martha's data submitted by nhse 
-# note that we will to append additional data from PSC's in loops
-# data_marthas_nhse <- read_excel(
-#   path = marthas_nhse_quarterly_submission_path, 
-#   sheet = 1,
-#   # select frist 100 rows (in case list of sites increases)
-#   range = "A7:M100"
-# ) |> clean_names() |>
-#   # removing decorative column
-#   select(-'x10') |>
-#   # remove any empty rows 
-#   remove_empty("rows") |>
-#   # flag 
-#   mutate(nhse_natps_submisison = TRUE)
-
-# name reparation 
-# names(data_marthas_nhse) <- c('updated_psc_name', 'trust_code', 'name_of_trust', 
-#                          'site_code', 'name_of_site', 'phase',
-#                          'adults_patient_check_in', 
-#                          'adults_independent_clinical_review', 
-#                          'adults_escalation_available_to_patient_carers',
-#                          'paediatric_patient_check_in', 
-#                          'paediatric_independent_clinical_review', 
-#                          'paediatric_escalation_available_to_patient_carers',
-#                          'nhse_natps_submisison')
-
 # navigate sharepoint to hin locations
 hin_folders <- dr$list_files() |>
   select(name) |>
@@ -69,10 +17,75 @@ write.csv(hin_names,
           row.names = F
 )
 
-# empty data frames to save submissions
-results_marthas <- tibble()
-results_mat_neo <- tibble()
+# ==============================================================================
+# function to process data from excel sheets
+# ==============================================================================
+ 
+#' This function goes into a the completed excel worksheet sent by a HIN
+#' It extracts data from the different Martha's rule tabs and organises it in a tidy format.
 
+#' @param tf String. Temporary file path used to save worksheet locally. 
+#            Worksheet is downloaded from sharepoint site
+#' @param sheet_name String. Name of a tab in the worksheet to extract data from
+#' @param sheet_range String. Valid excel sheet range where data is recorded (e.g., "B6:M30")
+#' @param del_cols Vector. Column names to be deleted. These columns do not contain data. 
+#'                 They serve layout purposes in excel sheet 
+#' @param col_names Vector. Tidy names to be used to rename columns 
+#' @param hin_name String. Name of a health innovation network that submitted data
+
+#' @return Tidy table containing adoption data
+
+collect_sheet_data <- function(
+    tf, 
+    sheet_name, 
+    sheet_range, 
+    del_cols, 
+    col_names,
+    hin_name){
+  
+  # locate raw data submiited by HIN
+  data_marthas <- read_excel(
+    path = tf, 
+    sheet = sheet_name,
+    range = sheet_range 
+  ) |> 
+    clean_names() |>
+    # no data in this column, used for better print out in excel doc
+    select(-all_of(del_cols)) |>
+    remove_empty("rows")
+  
+  # assign tidy names
+  names(data_marthas) <- col_names
+  
+  data_marthas_tidy <- data_marthas |>
+    filter(if_any(matches('adults|paediatric'), ~!is.na(.))) |>
+    mutate(updated_psc_name = hin, .before = trust_code) |>
+    mutate(
+      quarter = reporting_quarter_string,
+      .after = name_of_site
+    )
+  
+  # check there's info for all codes
+  missing_code_check <- data_marthas |> 
+    filter(!site_code %in% data_marthas_tidy$site_code) 
+  
+  incomplete_sites <- missing_code_check |> 
+    select(site_code, name_of_site) |> 
+    as.character() |>
+    paste(collapse = '-')
+  
+  if (nrow(missing_code_check) > 0) {
+    warning(str_glue('{hin}: MR data missing for {incomplete_sites}'))
+  }
+  
+  return(data_marthas_tidy)
+}
+
+# empty data frames to save submissions
+results_marthas_adult_paeds <- tibble()
+#results_mat_neo <- tibble()
+
+# for testing 
 #hin_folders = 'Manchester HIN'
 
 for (hin in hin_folders) {
@@ -115,70 +128,29 @@ for (hin in hin_folders) {
   )
   
   # read martha's rule data
-  message("Reading Martha's Rule submissions")
+  message("Reading Martha's Rule submissions: adult and paeds")
   
-  data_marthas <- read_excel(
-    path = tf, sheet = "MR - Adult & Paeds",
-    range = "B6:M30" 
-  ) |> 
-    clean_names() |>
-    # no data in this column, used for better print out in excel doc
-    select(-'x9') |>
-    remove_empty("rows")
+  col_names <- c('trust_code', 'name_of_trust', 
+                 'site_code', 'name_of_site', 'phase',
+                 'adults_patient_check_in', 
+                 'adults_independent_clinical_review', 
+                 'adults_escalation_available_to_patient_carers',
+                 'paediatric_patient_check_in', 
+                 'paediatric_independent_clinical_review', 
+                 'paediatric_escalation_available_to_patient_carers')
   
-  names(data_marthas) <- c('trust_code', 'name_of_trust', 
-                           'site_code', 'name_of_site', 'phase',
-                           'adults_patient_check_in', 
-                           'adults_independent_clinical_review', 
-                           'adults_escalation_available_to_patient_carers',
-                           'paediatric_patient_check_in', 
-                           'paediatric_independent_clinical_review', 
-                           'paediatric_escalation_available_to_patient_carers')
-  
-  data_marthas_tidy <- data_marthas |>
-    #filter(!is.na(adults_patient_check_in) & !is.na(paediatric_patient_check_in)) |>
-    filter(if_any(matches('adults|paediatric'), ~!is.na(.))) |>
-    mutate(updated_psc_name = hin, .before = trust_code) |>
-    #bind_rows(data_marthas_nhse |> filter(updated_psc_name == hin)) |>
-    mutate(
-      quarter = reporting_quarter_string,
-      .after = name_of_site
-    )
-  
-  # check there's info for all codes
-  missing_code_check <- data_marthas |> 
-    filter(!site_code %in% data_marthas_tidy$site_code) 
-  
-  incomplete_sites <- missing_code_check |> 
-    select(site_code, name_of_site) |> 
-    as.character() |>
-    paste(collapse = '-')
-  
-  if (nrow(missing_code_check) > 0) {
-    warning(str_glue('{hin}: MR data missing for {incomplete_sites}'))
-  }
-  
-  # check psc's are not submitting info expected from nhse and viceversa
-  # duplicate_code_check <- data_marthas_tidy |>
-  #   group_by(site_code, name_of_site) |>
-  #   summarise(site_occurrence = n()) |>
-  #   ungroup() |>
-  #   filter(site_occurrence > 1)
-  # 
-  # duplicated_sites <- duplicate_code_check |> 
-  #   select(site_code, name_of_site) |> 
-  #   as.character() |>
-  #   paste(collapse = '-')
-  # 
-  # if (nrow(duplicate_code_check) > 0) {
-  #   warning(str_glue("Skipping {hin}"))
-  #   warning(str_glue('{hin}: duplicated MR data for {duplicated_sites}'))
-  #   next
-  # }
+  # deploy function
+  data_marthas_tidy <- collect_sheet_data(
+    tf = tf, 
+    sheet_name = "MR - Adult & Paeds", 
+    sheet_range = "B6:M30", 
+    del_cols = c('x9'), 
+    col_names = col_names,
+    hin_name = hin)
   
   # append extracted data to list
-  results_marthas <- bind_rows(results_marthas, data_marthas_tidy)
-
+  results_marthas_adult_paeds <- bind_rows(results_marthas_adult_paeds, data_marthas_tidy)
+  
   # # read matneo data
   # message("Reading MatNeo submissions")
   # 
@@ -285,7 +257,7 @@ for (hin in hin_folders) {
   
 }
 
-if (length(unique(results_marthas$updated_psc_name)) != 15 #& 
+if (length(unique(results_marthas_adult_paeds$updated_psc_name)) != 15 #& 
     #length(unique(results_mat_neo$updated_psc_name)) != 15
     ){
   stop('Data not appended correctly')
@@ -299,7 +271,7 @@ time_stamp_ext <- format(Sys.time(), "%Y_%m_%d_%H%M%S.csv")
 marthas_submissions_path <- glue::glue("output/marthas_psc_submissions_{quarter_string}_processed_{time_stamp_ext}")
 #mat_neo_opt_submissions_path <- glue::glue("output/mat_neo_optimisation_psc_submissions_{quarter_string}_processed_{time_stamp_ext}")
 
-write.csv(results_marthas,
+write.csv(results_marthas_adult_paeds,
   file = here(marthas_submissions_path),
   row.names = F
 )
