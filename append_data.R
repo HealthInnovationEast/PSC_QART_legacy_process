@@ -9,13 +9,13 @@
 #'                            Needs to include .csv extension
 #' @param file_path String. Local file path with current submissions from all 15 HINs
 #'                  paths are produced in read_qart_submissions.R
-#' @param updated_file_name String. Valid excel sheet range where data is recorded (e.g., "B6:M30")
-
-#' @output updated csv file with current and sumulative data. File is saved on sharepoint
+#' @param updated_file_name_start String. Reflects the beginning of the
+#'              entire file name to be used to save file with current and cumulative data
+#' @output updated csv file with current and cumulative data. File is saved on sharepoint
 
 append_data <- function(previous_submission,
                         file_path,
-                        updated_file_name
+                        updated_file_name_start
                         ){
   # identify file with data from previous submissions on sharepoint
   master_files_location <- chosenlib$get_item(
@@ -54,15 +54,17 @@ append_data <- function(previous_submission,
   # collated data produced in read_quart_submissions.R
   reporting_quarter_submissions <- read.csv(
     here(file_path)) |>
-    clean_names() 
+    clean_names() |>
+    mutate_all(as.character)
   
   # bind rows
   all_submissions <- previous_submission_data |>
+    mutate_all(as.character) |>
     bind_rows(reporting_quarter_submissions) 
   
   message("Saving updated Martha's data to SharePoint")
   
-  file_name <- glue('{updated_file_name}_data_upto_{quarter_string}.csv')
+  file_name <- glue('{updated_file_name_start}_data_upto_{quarter_string}.csv')
   
   write.csv(all_submissions, 
             str_glue("output/{file_name}"),
@@ -77,11 +79,21 @@ append_data <- function(previous_submission,
           ' have been appended')
 }
 
-# TODO: add function calls to append data for martha's ed and matneo
-# might be better to do once 2627 Q2 data is received 
+# deploy function, maybe loop
 append_data(
   previous_submission = previous_marthas_submissions_adults_paeds,
   file_path = marthas_adults_paeds_submissions_path,
-  updated_file_name = 'marthas_qart_adults_paeds'
+  updated_file_name_start = 'marthas_qart_adults_paeds'
   )
 
+append_data(
+  previous_submission = previous_marthas_submissions_matneo,
+  file_path = marthas_mat_neo_submissions_path,
+  updated_file_name_start = 'marthas_qart_matneo'
+)
+
+append_data(
+  previous_submission = previous_marthas_submissions_ed,
+  file_path = marthas_ed_submissions_path,
+  updated_file_name_start = 'marthas_qart_ed'
+)
