@@ -21,7 +21,7 @@ append_data <- function(previous_submission,
   master_files_location <- chosenlib$get_item(
     glue::glue("{base_url}/{master_files_folder}"))
   
-  master_files <- master_files_dir$list_files()
+  master_files <- master_files_location$list_files()
   
   previous_submission_file <- master_files |>
     select(name) |>

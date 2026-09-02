@@ -12,9 +12,9 @@ execute:
   echo: false
   warning: false
 params: 
-  reporting_quarter: '2025/26 Q3'
+  reporting_quarter: '2026/27 Q1'
   master_files_folder: '1. Master files'
-  quarter_string: '2025_26_Q3'
+  quarter_string: '2026_27_Q1'
 ---
 
 ```{r}
@@ -46,9 +46,29 @@ source('config_sharepoint_location.R')
 reporting_quarter <- params$reporting_quarter
 master_files_folder <- params$master_files_folder
 quarter_string <- params$quarter_string
+```
+
+```{r}
+# go into share point and download lookup with postcode info for map
+master_files_dr <- chosenlib$get_item(glue::glue(
+  "{base_url}/{master_files_folder}"))
+
+lookup_data_file <- master_files_dr$list_files() |>
+  select(name) |>
+  filter(str_detect(name,'psc_trust_site_lookup.csv'
+                    )
+         ) |>
+  as.vector() |>
+  unlist() |>
+  unname()
+
+lookup_file_identified <- master_files_dr$get_item(str_glue({lookup_data_file}))
+
+lookup_file_identified$download(dest = here("data", str_glue({lookup_data_file})),
+                       overwrite = T)
 
 # bring site look up with postcode info and get geo info
-site_postcode_list <- read.csv(here('lookups', 'psc_trust_site_lookup.csv')) |>
+site_postcode_list <- read.csv(here('data', 'psc_trust_site_lookup.csv')) |>
   select(site_sdcs_code, api_site_postcode)
 
 postcodes_lookup_table <- lapply(unique(site_postcode_list$api_site_postcode),
@@ -57,14 +77,11 @@ postcodes_lookup_table <- lapply(unique(site_postcode_list$api_site_postcode),
   right_join(site_postcode_list, by = c('postcode' = 'api_site_postcode'))
 
 # go into share point and download latest data
-master_files_dr <- chosenlib$get_item(glue::glue(
-  "{base_url}/{master_files_folder}"))
-
 marthas_data_file <- master_files_dr$list_files() |>
   select(name) |>
   filter(str_detect(name,
                     # below parameter is generated in read_qart_submissions.R
-                    paste0('marthas_qart_all_data_upto_', quarter_string)
+                    paste0('marthas_qart_adults_paeds_data_upto_', quarter_string)
                     )
          ) |>
   as.vector() |>
@@ -82,8 +99,7 @@ marthas_data <- read.csv(here(str_glue('data/{marthas_data_file}'))) |>
 
 latest_quarter <- max(marthas_data$quarter)
 
-marthas_data_raw <- read.csv(here(str_glue('output/{marthas_data_file}'))) |>
-  mutate(updated_psc_name = str_remove_all(updated_psc_name, ' HIN')) |>
+marthas_data_raw <- marthas_data |>
   filter(quarter == latest_quarter)
 
 marthas_data_postcode  <- marthas_data_raw |>
@@ -146,7 +162,7 @@ england_outline <- england |>
   summarise(geometry = st_union(geometry))
 
 # make data sf
-trust_sites_sf <- sf::st_as_sf(marthas_data_postcode ,
+trust_sites_sf <- sf::st_as_sf(marthas_data_postcode,
                                coords = c('longitude','latitude'),
                                crs = 4326)
 ```
@@ -415,10 +431,10 @@ national_all_phases(df = marthas_data_to_aggregate |>
   kable()
 ```
 
-#### Reports at or below stage 2
+#### Reports at or below stage 3
 
 ```{r}
-below_stage_x <- function(df, component, exclude, stage_filter = '(?i)stage (0|1|2)'){
+below_stage_x <- function(df, component, exclude, stage_filter = '(?i)stage (0|1|2|3)'){
   
   component <- enquo(component)
 
@@ -665,7 +681,7 @@ national_all_phases(df = marthas_data_to_aggregate |>
   kable()
 ```
 
-#### Reports at or below stage 2
+#### Reports at or below stage 3
 
 ```{r}
 below_stage_x(df = marthas_data_to_aggregate, 
@@ -805,7 +821,7 @@ national_all_phases(df = marthas_data_to_aggregate |>
   kable()
 ```
 
-#### Reports at or below stage 2
+#### Reports at or below stage 3
 
 ```{r}
 below_stage_x(df = marthas_data_to_aggregate, 
@@ -1026,7 +1042,7 @@ national_all_phases(df = marthas_data_to_aggregate |>
   kable()
 ```
 
-#### Reports at or below stage 2
+#### Reports at or below stage 3
 
 ```{r}
 below_stage_x(df = marthas_data_to_aggregate, 
@@ -1167,7 +1183,7 @@ national_all_phases(df = marthas_data_to_aggregate |>
   kable()
 ```
 
-#### Reports at or below stage 2
+#### Reports at or below stage 3
 
 ```{r}
 below_stage_x(df = marthas_data_to_aggregate, 
@@ -1308,7 +1324,7 @@ national_all_phases(df = marthas_data_to_aggregate |>
   kable()
 ```
 
-#### Reports at or below stage 2
+#### Reports at or below stage 3
 
 ```{r}
 below_stage_x(df = marthas_data_to_aggregate, 
