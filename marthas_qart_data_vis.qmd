@@ -77,7 +77,7 @@ postcodes_lookup_table <- lapply(unique(site_postcode_list$api_site_postcode),
   right_join(site_postcode_list, by = c('postcode' = 'api_site_postcode'))
 
 # go into share point and download latest data
-marthas_data_file <- master_files_dr$list_files() |>
+adults_paeds_data_file <- master_files_dr$list_files() |>
   select(name) |>
   filter(str_detect(name,
                     # below parameter is generated in read_qart_submissions.R
@@ -88,21 +88,23 @@ marthas_data_file <- master_files_dr$list_files() |>
   unlist() |>
   unname()
 
-marthas_identified_data <- master_files_dr$get_item(str_glue({marthas_data_file}))
+adults_paeds_identified_data <-master_files_dr$get_item(
+  str_glue({adults_paeds_data_file}))
 
-marthas_identified_data$download(dest = here("data", str_glue({marthas_data_file})),
-                       overwrite = T)
+adults_paeds_identified_data$download(
+  dest = here("data", str_glue({adults_paeds_data_file})),
+  overwrite = T
+  )
 
-
-marthas_data <- read.csv(here(str_glue('data/{marthas_data_file}'))) |>
+adults_paeds_data <- read.csv(here(str_glue('data/{adults_paeds_data_file}'))) |>
   mutate(updated_psc_name = str_remove_all(updated_psc_name, 'HIN'))
 
-latest_quarter <- max(marthas_data$quarter)
+latest_quarter <- max(adults_paeds_data$quarter)
 
-marthas_data_raw <- marthas_data |>
+adults_paeds_data_raw <- adults_paeds_data |>
   filter(quarter == latest_quarter)
 
-marthas_data_postcode  <- marthas_data_raw |>
+adults_paeds_data_postcode  <- adults_paeds_data_raw |>
   left_join(postcodes_lookup_table, by = c('site_code' = 'site_sdcs_code')) |>
   relocate(postcode, .after = name_of_site)
 ```
@@ -118,7 +120,7 @@ marthas_data_postcode  <- marthas_data_raw |>
 
 ```{r}
 # aggregations and visualisations
-marthas_data_to_aggregate <- marthas_data_raw |>
+adults_paeds_to_aggregate <- adults_paeds_data_raw |>
   rename('PSC' = updated_psc_name,
          'Phase' = phase) |>
   mutate(
@@ -139,7 +141,7 @@ marthas_data_to_aggregate <- marthas_data_raw |>
   select(-c(trust_code, name_of_trust, site_code, name_of_site))
 
 
-marthas_data_to_aggregate |>
+adults_paeds_to_aggregate |>
   tabyl(Phase, sort = T) |> 
   rename('Number of sites' = n, 'Percent' = percent) |> 
   mutate(Percent = label_percent(accuracy = 0.1)(Percent)) |>
@@ -162,7 +164,7 @@ england_outline <- england |>
   summarise(geometry = st_union(geometry))
 
 # make data sf
-trust_sites_sf <- sf::st_as_sf(marthas_data_postcode,
+trust_sites_sf <- sf::st_as_sf(adults_paeds_data_postcode,
                                coords = c('longitude','latitude'),
                                crs = 4326)
 ```
@@ -193,7 +195,7 @@ ggplot() +
 
 ::: panel-tabset
 ```{r}
-share_of_sites <- marthas_data_to_aggregate |>
+share_of_sites <- adults_paeds_to_aggregate |>
   tabyl(PSC, Phase) |>
   rename('Phase 1' = `1`,
          'Phase 2' = `2`
@@ -305,7 +307,7 @@ national_all_phases <- function(df, component, exclude){
   national_all_phases_tidy
 }
 
-adults_comp_1 <- national_all_phases(df = marthas_data_to_aggregate, 
+adults_comp_1 <- national_all_phases(df = adults_paeds_to_aggregate, 
                     component = adults_patient_check_in,
                     exclude = 'No adult patients'
                     )
@@ -390,7 +392,7 @@ plot_national_by_phase <- function(df, component){
 
 ```{r, fig.height=8,fig.width=10}
 # deploy functions
-national_by_phase_table <- national_by_phase(df = marthas_data_to_aggregate,
+national_by_phase_table <- national_by_phase(df = adults_paeds_to_aggregate,
                                              component = adults_patient_check_in,
                                               exclude = 'No adult patients'
                                              )
@@ -412,7 +414,7 @@ adults_comp_1 |>
 **Phase 1 sites**
 
 ```{r}
-national_all_phases(df = marthas_data_to_aggregate |> 
+national_all_phases(df = adults_paeds_to_aggregate |> 
                       filter(Phase == 1), 
                     component = adults_patient_check_in,
                     exclude = 'No adult patients'
@@ -423,7 +425,7 @@ national_all_phases(df = marthas_data_to_aggregate |>
 **Phase 2 sites**
 
 ```{r}
-national_all_phases(df = marthas_data_to_aggregate |> 
+national_all_phases(df = adults_paeds_to_aggregate |> 
                       filter(Phase == 2), 
                     component = adults_patient_check_in,
                     exclude = 'No adult patients'
@@ -450,7 +452,7 @@ below_stage_x <- function(df, component, exclude, stage_filter = '(?i)stage (0|1
     
 }
 
-below_stage_x(df = marthas_data_to_aggregate, 
+below_stage_x(df = adults_paeds_to_aggregate, 
               component = adults_patient_check_in,
               exclude = 'No adult patients'
               ) |>
@@ -542,7 +544,7 @@ likert_component <- function(df, component, exclude, by_phase = NULL){
 ```
 
 ```{r, fig.height=10,fig.width=12}
-likert_component(df = marthas_data_to_aggregate, 
+likert_component(df = adults_paeds_to_aggregate, 
                  component = adults_patient_check_in, 
                  exclude = 'No adult patients'
                    ) 
@@ -570,7 +572,7 @@ psc_all_phases_table <- function(df, component, exclude){
   psc_all_phases_table
 }
 
-psc_all_phases_table(df = marthas_data_to_aggregate,
+psc_all_phases_table(df = adults_paeds_to_aggregate,
                      component = adults_patient_check_in,
                      exclude = 'No adult patients'
                      ) |>
@@ -583,7 +585,7 @@ psc_all_phases_table(df = marthas_data_to_aggregate,
 **Figure 5:** Adoption stages for component 1 across phase 1 sites with adult units, by PSC
 
 ```{r, fig.height=10,fig.width=12}
-likert_component(df = marthas_data_to_aggregate, 
+likert_component(df = adults_paeds_to_aggregate, 
                  component = adults_patient_check_in, 
                  exclude = 'No adult patients',
                  by_phase = 'Phase 1'
@@ -593,7 +595,7 @@ likert_component(df = marthas_data_to_aggregate,
 **Underlying data**
 
 ```{r}
-psc_all_phases_table(df = marthas_data_to_aggregate |> filter(Phase == '1'),
+psc_all_phases_table(df = adults_paeds_to_aggregate |> filter(Phase == '1'),
                      component = adults_patient_check_in,
                      exclude = 'No adult patients'
                      ) |>
@@ -606,7 +608,7 @@ psc_all_phases_table(df = marthas_data_to_aggregate |> filter(Phase == '1'),
 **Figure 6:** Adoption stages for component 1 across phase 2 sites with adult units, by PSC
 
 ```{r, fig.height=10,fig.width=12}
-likert_component(df = marthas_data_to_aggregate, 
+likert_component(df = adults_paeds_to_aggregate, 
                  component = adults_patient_check_in, 
                  exclude = 'No adult patients',
                  by_phase = 'Phase 2'
@@ -616,7 +618,7 @@ likert_component(df = marthas_data_to_aggregate,
 **Underlying data**
 
 ```{r}
-psc_all_phases_table(df = marthas_data_to_aggregate |> filter(Phase == '2'),
+psc_all_phases_table(df = adults_paeds_to_aggregate |> filter(Phase == '2'),
                      component = adults_patient_check_in,
                      exclude = 'No adult patients'
                      ) |>
@@ -637,7 +639,7 @@ All staff will be able, at any time, to ask for a review from a different team i
 **Figure 7:** Stages of adoption of component 2 across Martha’s Rule sites with adult units, by phase
 
 ```{r, fig.height=8,fig.width=10}
-national_by_phase_table <- national_by_phase(df = marthas_data_to_aggregate,
+national_by_phase_table <- national_by_phase(df = adults_paeds_to_aggregate,
                                              component = adults_independent_clinical_review,
                                              exclude = 'No adult patients'
 )
@@ -652,7 +654,7 @@ plot_national_by_phase(df = national_by_phase_table,
 **All sites**
 
 ```{r}
-national_all_phases(df = marthas_data_to_aggregate, 
+national_all_phases(df = adults_paeds_to_aggregate, 
                     component = adults_independent_clinical_review,
                     exclude = 'No adult patients'
 ) |>
@@ -662,7 +664,7 @@ national_all_phases(df = marthas_data_to_aggregate,
 **Phase 1 sites**
 
 ```{r}
-national_all_phases(df = marthas_data_to_aggregate |> 
+national_all_phases(df = adults_paeds_to_aggregate |> 
                       filter(Phase == 1), 
                     component = adults_independent_clinical_review,
                     exclude = 'No adult patients'
@@ -673,7 +675,7 @@ national_all_phases(df = marthas_data_to_aggregate |>
 **Phase 2 sites**
 
 ```{r}
-national_all_phases(df = marthas_data_to_aggregate |> 
+national_all_phases(df = adults_paeds_to_aggregate |> 
                       filter(Phase == 2), 
                     component = adults_independent_clinical_review,
                     exclude = 'No adult patients'
@@ -684,7 +686,7 @@ national_all_phases(df = marthas_data_to_aggregate |>
 #### Reports at or below stage 3
 
 ```{r}
-below_stage_x(df = marthas_data_to_aggregate, 
+below_stage_x(df = adults_paeds_to_aggregate, 
               component = adults_independent_clinical_review,
               exclude = 'No adult patients'
               ) |>
@@ -701,7 +703,7 @@ below_stage_x(df = marthas_data_to_aggregate,
 **Figure 8:** Adoption stages for component 2 across all sites with adult units, by PSC
 
 ```{r, fig.height=10,fig.width=12}
-likert_component(df = marthas_data_to_aggregate, 
+likert_component(df = adults_paeds_to_aggregate, 
                  component = adults_independent_clinical_review,
                  exclude = 'No adult patients'
                    )
@@ -710,7 +712,7 @@ likert_component(df = marthas_data_to_aggregate,
 **Underlying data**
 
 ```{r}
-psc_all_phases_table(df = marthas_data_to_aggregate,
+psc_all_phases_table(df = adults_paeds_to_aggregate,
                      component = adults_independent_clinical_review,
                      exclude = 'No adult patients'
                      ) |>
@@ -723,7 +725,7 @@ psc_all_phases_table(df = marthas_data_to_aggregate,
 **Figure 9:** Adoption stages for component 2 across phase 1 sites with adult units, by PSC
 
 ```{r, fig.height=10,fig.width=12}
-likert_component(df = marthas_data_to_aggregate, 
+likert_component(df = adults_paeds_to_aggregate, 
                  component = adults_independent_clinical_review, 
                  exclude = 'No adult patients',
                  by_phase = 'Phase 1'
@@ -733,7 +735,7 @@ likert_component(df = marthas_data_to_aggregate,
 **Underlying data**
 
 ```{r}
-psc_all_phases_table(df = marthas_data_to_aggregate |> filter(Phase == '1'),
+psc_all_phases_table(df = adults_paeds_to_aggregate |> filter(Phase == '1'),
                      component = adults_independent_clinical_review,
                      exclude = 'No adult patients'
                      ) |>
@@ -746,7 +748,7 @@ psc_all_phases_table(df = marthas_data_to_aggregate |> filter(Phase == '1'),
 **Figure 10:** Adoption stages for component 2 across phase 2 sites with adult units, by PSC
 
 ```{r, fig.height=10,fig.width=12}
-likert_component(df = marthas_data_to_aggregate, 
+likert_component(df = adults_paeds_to_aggregate, 
                  component = adults_independent_clinical_review, 
                  exclude = 'No adult patients',
                  by_phase = 'Phase 2'
@@ -756,7 +758,7 @@ likert_component(df = marthas_data_to_aggregate,
 **Underlying data**
 
 ```{r}
-psc_all_phases_table(df = marthas_data_to_aggregate |> filter(Phase == '2'),
+psc_all_phases_table(df = adults_paeds_to_aggregate |> filter(Phase == '2'),
                      component = adults_independent_clinical_review,
                      exclude = 'No adult patients'
                      ) |>
@@ -777,7 +779,7 @@ This escalation route will also always be available to patients themselves, thei
 **Figure 11:** Stages of adoption of component 3 across Martha’s Rule sites with adult units, by phase
 
 ```{r, fig.height=8,fig.width=10}
-national_by_phase_table <- national_by_phase(df = marthas_data_to_aggregate,
+national_by_phase_table <- national_by_phase(df = adults_paeds_to_aggregate,
                                              component = adults_escalation_available_to_patient_carers,
                                              exclude = 'No adult patients'
 )
@@ -792,7 +794,7 @@ plot_national_by_phase(df = national_by_phase_table,
 **All sites**
 
 ```{r}
-national_all_phases(df = marthas_data_to_aggregate, 
+national_all_phases(df = adults_paeds_to_aggregate, 
                     component = adults_escalation_available_to_patient_carers,
                     exclude = 'No adult patients'
 ) |>
@@ -802,7 +804,7 @@ national_all_phases(df = marthas_data_to_aggregate,
 **Phase 1 sites**
 
 ```{r}
-national_all_phases(df = marthas_data_to_aggregate |> 
+national_all_phases(df = adults_paeds_to_aggregate |> 
                       filter(Phase == 1), 
                     component = adults_escalation_available_to_patient_carers,
                     exclude = 'No adult patients'
@@ -813,7 +815,7 @@ national_all_phases(df = marthas_data_to_aggregate |>
 **Phase 2 sites**
 
 ```{r}
-national_all_phases(df = marthas_data_to_aggregate |> 
+national_all_phases(df = adults_paeds_to_aggregate |> 
                       filter(Phase == 2), 
                     component = adults_escalation_available_to_patient_carers,
                     exclude = 'No adult patients'
@@ -824,7 +826,7 @@ national_all_phases(df = marthas_data_to_aggregate |>
 #### Reports at or below stage 3
 
 ```{r}
-below_stage_x(df = marthas_data_to_aggregate, 
+below_stage_x(df = adults_paeds_to_aggregate, 
               component = adults_escalation_available_to_patient_carers,
               exclude = 'No adult patients'
               ) |>
@@ -841,7 +843,7 @@ below_stage_x(df = marthas_data_to_aggregate,
 **Figure 12:** Adoption stages for component 3 across all sites with adult units, by PSC
 
 ```{r, fig.height=10,fig.width=12}
-likert_component(df = marthas_data_to_aggregate, 
+likert_component(df = adults_paeds_to_aggregate, 
                  component = adults_escalation_available_to_patient_carers,
                  exclude = 'No adult patients'
                    )
@@ -850,7 +852,7 @@ likert_component(df = marthas_data_to_aggregate,
 **Underlying data**
 
 ```{r}
-psc_all_phases_table(df = marthas_data_to_aggregate,
+psc_all_phases_table(df = adults_paeds_to_aggregate,
                      component = adults_escalation_available_to_patient_carers,
                      exclude = 'No adult patients'
                      ) |>
@@ -863,7 +865,7 @@ psc_all_phases_table(df = marthas_data_to_aggregate,
 **Figure 13:** Adoption stages for component 3 across phase 1 sites with adult units, by PSC
 
 ```{r, fig.height=10,fig.width=12}
-likert_component(df = marthas_data_to_aggregate, 
+likert_component(df = adults_paeds_to_aggregate, 
                  component = adults_escalation_available_to_patient_carers, 
                  exclude = 'No adult patients',
                  by_phase = 'Phase 1'
@@ -873,7 +875,7 @@ likert_component(df = marthas_data_to_aggregate,
 **Underlying data**
 
 ```{r}
-psc_all_phases_table(df = marthas_data_to_aggregate |> filter(Phase == '1'),
+psc_all_phases_table(df = adults_paeds_to_aggregate |> filter(Phase == '1'),
                      component = adults_escalation_available_to_patient_carers,
                      exclude = 'No adult patients'
                      ) |>
@@ -886,7 +888,7 @@ psc_all_phases_table(df = marthas_data_to_aggregate |> filter(Phase == '1'),
 **Figure 14:** Adoption stages for component 3 across phase 2 sites with adult units, by PSC
 
 ```{r, fig.height=10,fig.width=12}
-likert_component(df = marthas_data_to_aggregate, 
+likert_component(df = adults_paeds_to_aggregate, 
                  component = adults_escalation_available_to_patient_carers, 
                  exclude = 'No adult patients',
                  by_phase = 'Phase 2'
@@ -896,7 +898,7 @@ likert_component(df = marthas_data_to_aggregate,
 **Underlying data**
 
 ```{r}
-psc_all_phases_table(df = marthas_data_to_aggregate |> filter(Phase == '2'),
+psc_all_phases_table(df = adults_paeds_to_aggregate |> filter(Phase == '2'),
                      component = adults_escalation_available_to_patient_carers,
                      exclude = 'No adult patients'
                      ) |>
@@ -908,7 +910,7 @@ psc_all_phases_table(df = marthas_data_to_aggregate |> filter(Phase == '2'),
 ### All adult sites at stage 6 or above
 
 ```{r}
-adults_stage6_plus <- marthas_data_to_aggregate |>
+adults_stage6_plus <- adults_paeds_to_aggregate |>
   select(PSC, name_trust_code, 
          name_site_code, Phase,
          starts_with('adults')
@@ -976,7 +978,7 @@ adults_stage6_plus |>
 ## Stages of adoption across paediatric units
 
 ```{r}
-paediatric_comp_1 <- national_all_phases(df = marthas_data_to_aggregate, 
+paediatric_comp_1 <- national_all_phases(df = adults_paeds_to_aggregate, 
                     component = paediatric_patient_check_in,
                     exclude = 'No paediatric patients'
 )
@@ -1001,7 +1003,7 @@ Patients will be asked, at least daily, about how they are feeling, and if they 
 
 ```{r, fig.height=8,fig.width=10}
 national_by_phase_table <- national_by_phase(
-  df = marthas_data_to_aggregate,
+  df = adults_paeds_to_aggregate,
   component = paediatric_patient_check_in,
   exclude = 'No paediatric patients'
 )
@@ -1023,7 +1025,7 @@ paediatric_comp_1 |>
 **Phase 1 sites**
 
 ```{r}
-national_all_phases(df = marthas_data_to_aggregate |> 
+national_all_phases(df = adults_paeds_to_aggregate |> 
                       filter(Phase == 1), 
                     component = paediatric_patient_check_in,
                     exclude = 'No paediatric patients'
@@ -1034,7 +1036,7 @@ national_all_phases(df = marthas_data_to_aggregate |>
 **Phase 2 sites**
 
 ```{r}
-national_all_phases(df = marthas_data_to_aggregate |> 
+national_all_phases(df = adults_paeds_to_aggregate |> 
                       filter(Phase == 2), 
                     component = paediatric_patient_check_in,
                     exclude = 'No paediatric patients'
@@ -1045,7 +1047,7 @@ national_all_phases(df = marthas_data_to_aggregate |>
 #### Reports at or below stage 3
 
 ```{r}
-below_stage_x(df = marthas_data_to_aggregate, 
+below_stage_x(df = adults_paeds_to_aggregate, 
               component = paediatric_patient_check_in,
               exclude = 'No paediatric patients'
               ) |>
@@ -1062,7 +1064,7 @@ below_stage_x(df = marthas_data_to_aggregate,
 **Figure 16:** Adoption stages for component 1 across all sites with paediatric units, by PSC
 
 ```{r, fig.height=10,fig.width=12}
-likert_component(df = marthas_data_to_aggregate, 
+likert_component(df = adults_paeds_to_aggregate, 
                  component = paediatric_patient_check_in, 
                  exclude = 'No paediatric patients'
                    )
@@ -1071,7 +1073,7 @@ likert_component(df = marthas_data_to_aggregate,
 **Underlying data**
 
 ```{r}
-psc_all_phases_table(df = marthas_data_to_aggregate,
+psc_all_phases_table(df = adults_paeds_to_aggregate,
                      component = paediatric_patient_check_in,
                      exclude = 'No paediatric patients'
                      ) |>
@@ -1084,7 +1086,7 @@ psc_all_phases_table(df = marthas_data_to_aggregate,
 **Figure 17:** Adoption stages for component 1 across phase 1 sites with paediatric units, by PSC
 
 ```{r, fig.height=10,fig.width=12}
-likert_component(df = marthas_data_to_aggregate, 
+likert_component(df = adults_paeds_to_aggregate, 
                  component = paediatric_patient_check_in, 
                  exclude = 'No paediatric patients',
                  by_phase = 'Phase 1'
@@ -1094,7 +1096,7 @@ likert_component(df = marthas_data_to_aggregate,
 **Underlying data**
 
 ```{r}
-psc_all_phases_table(df = marthas_data_to_aggregate |> filter(Phase == '1'),
+psc_all_phases_table(df = adults_paeds_to_aggregate |> filter(Phase == '1'),
                      component = paediatric_patient_check_in,
                      exclude = 'No paediatric patients'
                      ) |>
@@ -1107,7 +1109,7 @@ psc_all_phases_table(df = marthas_data_to_aggregate |> filter(Phase == '1'),
 **Figure 18:** Adoption stages for component 1 across phase 2 sites with paediatric units, by PSC
 
 ```{r, fig.height=10,fig.width=12}
-likert_component(df = marthas_data_to_aggregate, 
+likert_component(df = adults_paeds_to_aggregate, 
                  component = paediatric_patient_check_in, 
                  exclude = 'No paediatric patients',
                  by_phase = 'Phase 2'
@@ -1118,7 +1120,7 @@ likert_component(df = marthas_data_to_aggregate,
 **Underlying data**
 
 ```{r}
-psc_all_phases_table(df = marthas_data_to_aggregate |> filter(Phase == '2'),
+psc_all_phases_table(df = adults_paeds_to_aggregate |> filter(Phase == '2'),
                      component = paediatric_patient_check_in,
                      exclude = 'No paediatric patients'
                      ) |>
@@ -1139,7 +1141,7 @@ All staff will be able, at any time, to ask for a review from a different team i
 **Figure 19:** Stages of adoption of component 2 across Martha’s Rule sites with paediatric units, by phase
 
 ```{r, fig.height=8,fig.width=10}
-national_by_phase_table <- national_by_phase(df = marthas_data_to_aggregate,
+national_by_phase_table <- national_by_phase(df = adults_paeds_to_aggregate,
                                              component = paediatric_independent_clinical_review,
                                               exclude = 'No paediatric patients'
 )
@@ -1154,7 +1156,7 @@ plot_national_by_phase(df = national_by_phase_table,
 **All sites**
 
 ```{r}
-national_all_phases(df = marthas_data_to_aggregate, 
+national_all_phases(df = adults_paeds_to_aggregate, 
                     component = paediatric_independent_clinical_review,
                     exclude = 'No paediatric patients'
 ) |>
@@ -1164,7 +1166,7 @@ national_all_phases(df = marthas_data_to_aggregate,
 **Phase 1 sites**
 
 ```{r}
-national_all_phases(df = marthas_data_to_aggregate |> 
+national_all_phases(df = adults_paeds_to_aggregate |> 
                       filter(Phase == 1), 
                     component = paediatric_independent_clinical_review,
                     exclude = 'No paediatric patients'
@@ -1175,7 +1177,7 @@ national_all_phases(df = marthas_data_to_aggregate |>
 **Phase 2 sites**
 
 ```{r}
-national_all_phases(df = marthas_data_to_aggregate |> 
+national_all_phases(df = adults_paeds_to_aggregate |> 
                       filter(Phase == 2), 
                     component = paediatric_independent_clinical_review,
                     exclude = 'No paediatric patients'
@@ -1186,7 +1188,7 @@ national_all_phases(df = marthas_data_to_aggregate |>
 #### Reports at or below stage 3
 
 ```{r}
-below_stage_x(df = marthas_data_to_aggregate, 
+below_stage_x(df = adults_paeds_to_aggregate, 
               component = paediatric_independent_clinical_review,
               exclude = 'No paediatric patients'
               ) |>
@@ -1203,7 +1205,7 @@ below_stage_x(df = marthas_data_to_aggregate,
 **Figure 20:** Adoption stages for component 2 across all sites with paediatric units, by PSC
 
 ```{r, fig.height=10,fig.width=12}
-likert_component(df = marthas_data_to_aggregate, 
+likert_component(df = adults_paeds_to_aggregate, 
                  component = paediatric_independent_clinical_review, 
                  exclude = 'No paediatric patients'
                    )
@@ -1212,7 +1214,7 @@ likert_component(df = marthas_data_to_aggregate,
 **Underlying data**
 
 ```{r}
-psc_all_phases_table(df = marthas_data_to_aggregate,
+psc_all_phases_table(df = adults_paeds_to_aggregate,
                      component = paediatric_independent_clinical_review,
                      exclude = 'No paediatric patients'
                      ) |>
@@ -1225,7 +1227,7 @@ psc_all_phases_table(df = marthas_data_to_aggregate,
 **Figure 21:** Adoption stages for component 2 across phase 1 sites with paediatric units, by PSC
 
 ```{r, fig.height=10,fig.width=12}
-likert_component(df = marthas_data_to_aggregate, 
+likert_component(df = adults_paeds_to_aggregate, 
                  component = paediatric_independent_clinical_review, 
                  exclude = 'No paediatric patients',
                  by_phase = 'Phase 1'
@@ -1235,7 +1237,7 @@ likert_component(df = marthas_data_to_aggregate,
 **Underlying data**
 
 ```{r}
-psc_all_phases_table(df = marthas_data_to_aggregate |> filter(Phase == '1'),
+psc_all_phases_table(df = adults_paeds_to_aggregate |> filter(Phase == '1'),
                      component = paediatric_independent_clinical_review,
                      exclude = 'No paediatric patients'
                      ) |>
@@ -1248,7 +1250,7 @@ psc_all_phases_table(df = marthas_data_to_aggregate |> filter(Phase == '1'),
 **Figure 22:** Adoption stages for component 2 across phase 2 sites with paediatric units, by PSC
 
 ```{r, fig.height=10,fig.width=12}
-likert_component(df = marthas_data_to_aggregate, 
+likert_component(df = adults_paeds_to_aggregate, 
                  component = paediatric_independent_clinical_review, 
                  exclude = 'No paediatric patients',
                  by_phase = 'Phase 2'
@@ -1259,7 +1261,7 @@ likert_component(df = marthas_data_to_aggregate,
 **Underlying data**
 
 ```{r}
-psc_all_phases_table(df = marthas_data_to_aggregate |> filter(Phase == '2'),
+psc_all_phases_table(df = adults_paeds_to_aggregate |> filter(Phase == '2'),
                      component = paediatric_independent_clinical_review,
                      exclude = 'No paediatric patients'
                      ) |>
@@ -1280,7 +1282,7 @@ This escalation route will also always be available to patients themselves, thei
 **Figure 23:** Stages of adoption of component 3 across Martha’s Rule sites with paediatric units, by phase
 
 ```{r, fig.height=8,fig.width=10}
-national_by_phase_table <- national_by_phase(df = marthas_data_to_aggregate,
+national_by_phase_table <- national_by_phase(df = adults_paeds_to_aggregate,
                                              component = paediatric_escalation_available_to_patient_carers,
                                               exclude = 'No paediatric patients'
 )
@@ -1295,7 +1297,7 @@ plot_national_by_phase(df = national_by_phase_table,
 **All sites**
 
 ```{r}
-national_all_phases(df = marthas_data_to_aggregate, 
+national_all_phases(df = adults_paeds_to_aggregate, 
                     component = paediatric_escalation_available_to_patient_carers,
                     exclude = 'No paediatric patients'
 ) |>
@@ -1305,7 +1307,7 @@ national_all_phases(df = marthas_data_to_aggregate,
 **Phase 1 sites**
 
 ```{r}
-national_all_phases(df = marthas_data_to_aggregate |> 
+national_all_phases(df = adults_paeds_to_aggregate |> 
                       filter(Phase == 1), 
                     component = paediatric_escalation_available_to_patient_carers,
                     exclude = 'No paediatric patients'
@@ -1316,7 +1318,7 @@ national_all_phases(df = marthas_data_to_aggregate |>
 **Phase 2 sites**
 
 ```{r}
-national_all_phases(df = marthas_data_to_aggregate |> 
+national_all_phases(df = adults_paeds_to_aggregate |> 
                       filter(Phase == 2), 
                     component = paediatric_escalation_available_to_patient_carers,
                     exclude = 'No paediatric patients'
@@ -1327,7 +1329,7 @@ national_all_phases(df = marthas_data_to_aggregate |>
 #### Reports at or below stage 3
 
 ```{r}
-below_stage_x(df = marthas_data_to_aggregate, 
+below_stage_x(df = adults_paeds_to_aggregate, 
               component = paediatric_escalation_available_to_patient_carers,
               exclude = 'No paediatric patients'
               ) |>
@@ -1344,7 +1346,7 @@ below_stage_x(df = marthas_data_to_aggregate,
 **Figure 24:** Adoption stages for component 3 across all sites with paediatric units, by PSC
 
 ```{r, fig.height=10,fig.width=12}
-likert_component(df = marthas_data_to_aggregate, 
+likert_component(df = adults_paeds_to_aggregate, 
                  component = paediatric_escalation_available_to_patient_carers, 
                  exclude = 'No paediatric patients'
                    )
@@ -1353,7 +1355,7 @@ likert_component(df = marthas_data_to_aggregate,
 **Underlying data**
 
 ```{r}
-psc_all_phases_table(df = marthas_data_to_aggregate,
+psc_all_phases_table(df = adults_paeds_to_aggregate,
                      component = paediatric_escalation_available_to_patient_carers,
                      exclude = 'No paediatric patients'
                      ) |>
@@ -1366,7 +1368,7 @@ psc_all_phases_table(df = marthas_data_to_aggregate,
 **Figure 25:** Adoption stages for component 3 across phase 1 sites with paediatric units, by PSC
 
 ```{r, fig.height=10,fig.width=12}
-likert_component(df = marthas_data_to_aggregate, 
+likert_component(df = adults_paeds_to_aggregate, 
                  component = paediatric_escalation_available_to_patient_carers, 
                  exclude = 'No paediatric patients',
                  by_phase = 'Phase 1'
@@ -1376,7 +1378,7 @@ likert_component(df = marthas_data_to_aggregate,
 **Underlying data**
 
 ```{r}
-psc_all_phases_table(df = marthas_data_to_aggregate |> filter(Phase == '1'),
+psc_all_phases_table(df = adults_paeds_to_aggregate |> filter(Phase == '1'),
                      component = paediatric_escalation_available_to_patient_carers,
                      exclude = 'No paediatric patients'
                      ) |>
@@ -1389,7 +1391,7 @@ psc_all_phases_table(df = marthas_data_to_aggregate |> filter(Phase == '1'),
 **Figure 26:** Adoption stages for component 3 across phase 2 sites with paediatric units, by PSC
 
 ```{r, fig.height=10,fig.width=12}
-likert_component(df = marthas_data_to_aggregate, 
+likert_component(df = adults_paeds_to_aggregate, 
                  component = paediatric_escalation_available_to_patient_carers, 
                  exclude = 'No paediatric patients',
                  by_phase = 'Phase 2'
@@ -1400,7 +1402,7 @@ likert_component(df = marthas_data_to_aggregate,
 **Underlying data**
 
 ```{r}
-psc_all_phases_table(df = marthas_data_to_aggregate |> filter(Phase == '2'),
+psc_all_phases_table(df = adults_paeds_to_aggregate |> filter(Phase == '2'),
                      component = paediatric_escalation_available_to_patient_carers,
                      exclude = 'No paediatric patients'
                      ) |>
@@ -1412,7 +1414,7 @@ psc_all_phases_table(df = marthas_data_to_aggregate |> filter(Phase == '2'),
 ### All paediatric sites at stage 6 or above
 
 ```{r}
-paeds_stage6_plus <- marthas_data_to_aggregate |>
+paeds_stage6_plus <- adults_paeds_to_aggregate |>
   select(PSC, name_trust_code, 
          name_site_code, Phase,
          starts_with('paed')
@@ -1484,7 +1486,7 @@ paeds_stage6_plus |>
 # stages to colour
 stages <- c('Stage 0 - No contact', 'Stage 1 - Knowledge', 'Stage 2 - Interest')
 
-marthas_data_to_aggregate |>
+adults_paeds_to_aggregate |>
   select(PSC, name_trust_code, name_site_code, 
          Phase, matches('adults')) |>
   rename('Trust' = name_trust_code, 
@@ -1516,7 +1518,7 @@ marthas_data_to_aggregate |>
 ## All paediatric data
 
 ```{r}
-marthas_data_to_aggregate |>
+adults_paeds_to_aggregate |>
   select(PSC, name_trust_code, name_site_code, Phase, matches('paediatric')) |> 
   rename('Trust' = name_trust_code, 
          'Site' = name_site_code,
