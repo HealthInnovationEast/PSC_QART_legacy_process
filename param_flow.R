@@ -34,7 +34,7 @@ previous_quarter_string <- quarter(previous_quarter_end_date,
 previous_mat_neo_submissions_file_name <- 'mat_neo_qart_all_data_upto_2025_26_Q4.csv' 
 
 # this one is to append new martha's rule submissions (from PSC's and improv team)
-previous_marthas_submissions_file_name <- 
+previous_marthas_submissions_adults_paeds <- 
   'marthas_qart_all_data_upto_2025_26_Q4.csv'
 
 # file with Martha's rule phase 2 sites supported by improv team

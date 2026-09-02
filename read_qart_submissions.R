@@ -181,7 +181,8 @@ for (hin in hin_folders) {
   data_marthas_tidy_mat_neo <- collect_sheet_data(
     tf = tf, 
     sheet_name = "MR - Maternity & Neonatal", 
-    sheet_range = "B6:X30", 
+    sheet_range = "B7:X30",
+    col_names = F,
     del_cols = c('x8', 'x12', 'x16', 'x20'), 
     tidy_col_names = col_names_adult_paeds,
     hin_name = hin)
