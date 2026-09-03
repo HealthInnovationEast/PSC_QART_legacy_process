@@ -49,6 +49,7 @@ quarter_string <- params$quarter_string
 ```
 
 ```{r}
+# TODO: create function
 # go into share point and download lookup with postcode info for map
 master_files_dr <- chosenlib$get_item(glue::glue(
   "{base_url}/{master_files_folder}"))
@@ -140,6 +141,37 @@ latest_quarter <- max(matneo_data$quarter)
 
 matneo_data_raw <- matneo_data |>
   filter(quarter == latest_quarter)
+
+# download ED data 
+
+ed_data_file <- master_files_dr$list_files() |>
+  select(name) |>
+  filter(str_detect(name,
+                    # below parameter is generated in read_qart_submissions.R
+                    paste0('marthas_qart_ed_data_upto_', quarter_string)
+                    )
+         ) |>
+  as.vector() |>
+  unlist() |>
+  unname()
+
+ed_data_file_identified_data <- master_files_dr$get_item(
+  str_glue({ed_data_file}))
+
+ed_data_file_identified_data$download(
+  dest = here("data", str_glue({ed_data_file})),
+  overwrite = T
+  )
+
+ed_data <- read.csv(
+  here(str_glue('data/{ed_data_file}'))
+  ) |>
+  mutate(updated_psc_name = str_remove_all(updated_psc_name, 'HIN'))
+
+latest_quarter <- max(ed_data$quarter)
+
+ed_data_raw <- ed_data |>
+  filter(quarter == latest_quarter)
 ```
 
 ## User guidance notes
@@ -152,6 +184,7 @@ matneo_data_raw <- matneo_data |>
 ## Distribution of sites by phase
 
 ```{r}
+# TODO: create function
 # create tidy adults and peads data frame for aggregation
 adults_paeds_to_aggregate <- adults_paeds_data_raw |>
   rename('PSC' = updated_psc_name,
@@ -175,6 +208,25 @@ adults_paeds_to_aggregate <- adults_paeds_data_raw |>
 
 # repeat for matneo
 matneo_to_aggregate <- matneo_data_raw |>
+  rename('PSC' = updated_psc_name) |>
+  mutate(
+    # fix trust names
+    name_of_trust = str_to_title(name_of_trust), # turn into title case
+    # then fix strings: Nhs, And, Of
+    name_of_trust = str_replace_all(name_of_trust, '\\bNhs\\b', str_to_upper),
+    name_of_trust = str_replace_all(name_of_trust, '\\bAnd\\b|\\bOf\\b', str_to_lower),
+    # repeat for site names
+    name_of_site = str_to_title(name_of_site),
+    name_of_site = str_replace_all(name_of_site, '\\bNhs|Hq\\b', str_to_upper),
+    name_of_site = str_replace_all(name_of_site, '\\bAnd\\b|\\bOf\\b', str_to_lower),
+    # consolidate org code and names for table printing
+    name_trust_code = paste0(name_of_trust, ' (', trust_code, ')'),
+    name_site_code = paste0(name_of_site, ' (', site_code, ')'),
+    .before = quarter) |>
+  select(-c(trust_code, name_of_trust, site_code, name_of_site))
+
+# repeat for ed
+ed_to_aggregate <- ed_data_raw |>
   rename('PSC' = updated_psc_name) |>
   mutate(
     # fix trust names
@@ -2233,6 +2285,926 @@ psc_all_phases_table(df = matneo_to_aggregate,
   DT::datatable(options = list(pageLength = 10))
 ```
 :::
+
+## TESTING Stages of adoption across emergency department settings
+
+```{r}
+adults_waiting_room_comp_1 <- national_all_phases(
+  df = ed_to_aggregate, 
+  component = adults_waiting_room_patient_check_in,
+  exclude = 'Not applicable'
+  )
+
+total_sites_ed <- adults_waiting_room_comp_1 |>
+  filter(Stage == 'Total') |>
+  pull(`Number of sites`)
+
+adults_majors_comp_1 <- national_all_phases(
+  df = ed_to_aggregate, 
+  component = adults_majors_patient_check_in,
+  exclude = 'Not applicable'
+  )
+
+adults_tes_comp_1 <- national_all_phases(
+  df = ed_to_aggregate, 
+  component = adults_tes_patient_check_in,
+  exclude = 'Not applicable'
+  )
+
+adults_resus_comp_1 <- national_all_phases(
+  df = ed_to_aggregate, 
+  component = adults_resus_patient_check_in,
+  exclude = 'Not applicable'
+  )
+
+paediatric_waiting_room_comp_1 <- national_all_phases(
+  df = ed_to_aggregate, 
+  component = paediatric_waiting_room_patient_check_in,
+  exclude = 'Not applicable'
+  )
+
+paediatric_majors_comp_1 <- national_all_phases(
+  df = ed_to_aggregate, 
+  component = paediatric_majors_patient_check_in,
+  exclude = 'Not applicable'
+  )
+
+paediatric_resus_comp_1 <- national_all_phases(
+  df = ed_to_aggregate, 
+  component = paediatric_resus_patient_check_in,
+  exclude = 'Not applicable'
+  )
+```
+
+**Note:** The graphs and tables presented below show data for sites with emergency department clinical settings. Therefore, the total presented for this section (n = `r total_sites_ed`) is smaller than the total number of all Martha's Rule sites (n = `r total_sites`)
+
+### Component 1
+
+Patients will be asked, at least daily, about how they are feeling, and if they are getting better or worse, and this information will be acted on in a structured way.
+
+#### National overview (adults)
+
+::: panel-tabset
+#### Waiting room
+
+**Figure 56:** Stages of adoption of component 1 across Martha’s Rule sites with waiting room units
+
+```{r, fig.height=8,fig.width=10}
+plot_national(df = adults_waiting_room_comp_1)
+```
+
+**Underlying data**
+
+```{r}
+adults_waiting_room_comp_1 |> kable()
+```
+
+#### Majors
+
+**Figure 57:** Stages of adoption of component 1 across Martha’s Rule sites with majors units
+
+```{r, fig.height=8,fig.width=10}
+plot_national(df = adults_majors_comp_1)
+```
+
+**Underlying data**
+
+```{r}
+adults_majors_comp_1 |> kable()
+```
+
+#### TES
+
+**Figure 58:** Stages of adoption of component 1 across Martha’s Rule sites with temporary escalation spaces
+
+```{r, fig.height=8,fig.width=10}
+plot_national(df = adults_tes_comp_1)
+```
+
+**Underlying data**
+
+```{r}
+adults_tes_comp_1 |> kable()
+```
+
+#### Resus
+
+**Figure 59:** Stages of adoption of component 1 across Martha’s Rule sites with resus units
+
+```{r, fig.height=8,fig.width=10}
+plot_national(df = adults_resus_comp_1)
+```
+
+**Underlying data**
+
+```{r}
+adults_resus_comp_1 |> kable()
+```
+
+:::
+
+#### PSC Overview (adults)
+
+::: panel-tabset
+#### Waiting room
+
+**Figure 60:** Adoption stages for component 1 across all sites with waiting room units, by PSC
+
+```{r, fig.height=10,fig.width=12}
+likert_component(df = ed_to_aggregate, 
+  component = adults_waiting_room_patient_check_in,
+  exclude = 'Not applicable')
+```
+
+**Underlying data**
+
+```{r}
+psc_all_phases_table(df = ed_to_aggregate, 
+  component = adults_waiting_room_patient_check_in,
+  exclude = 'Not applicable') |>
+  rename('Component 1' = adults_waiting_room_patient_check_in) |>
+  DT::datatable(options = list(pageLength = 10))
+```
+
+#### Majors 
+
+**Figure 61:** Adoption stages for component 1 across all sites with majors units, by PSC
+
+```{r, fig.height=10,fig.width=12}
+likert_component(df = ed_to_aggregate, 
+  component = adults_majors_patient_check_in,
+  exclude = 'Not applicable')
+```
+
+**Underlying data**
+
+```{r}
+psc_all_phases_table(df = ed_to_aggregate, 
+  component = adults_majors_patient_check_in,
+  exclude = 'Not applicable') |>
+  rename('Component 1' = adults_majors_patient_check_in) |>
+  DT::datatable(options = list(pageLength = 10))
+```
+
+#### TES 
+
+**Figure 62:** Adoption stages for component 1 across all sites with temporary escalation spaces, by PSC
+
+```{r, fig.height=10,fig.width=12}
+likert_component(df = ed_to_aggregate, 
+  component = adults_tes_patient_check_in,
+  exclude = 'Not applicable')
+```
+
+**Underlying data**
+
+```{r}
+psc_all_phases_table(df = ed_to_aggregate, 
+  component = adults_tes_patient_check_in,
+  exclude = 'Not applicable') |>
+  rename('Component 1' = adults_tes_patient_check_in) |>
+  DT::datatable(options = list(pageLength = 10))
+```
+
+#### Resus 
+
+**Figure 63:** Adoption stages for component 1 across all sites with resus units, by PSC
+
+```{r, fig.height=10,fig.width=12}
+likert_component(df = ed_to_aggregate, 
+  component = adults_resus_patient_check_in,
+  exclude = 'Not applicable')
+```
+
+**Underlying data**
+
+```{r}
+psc_all_phases_table(df = ed_to_aggregate, 
+  component = adults_resus_patient_check_in,
+  exclude = 'Not applicable') |>
+  rename('Component 1' = adults_resus_patient_check_in) |>
+  DT::datatable(options = list(pageLength = 10))
+```
+:::
+
+#### National overview (paeds)
+
+::: panel-tabset
+#### Waiting room
+
+**Figure 64:** Stages of adoption of component 1 across Martha’s Rule sites with waiting room units
+
+```{r, fig.height=8,fig.width=10}
+plot_national(df = paediatric_waiting_room_comp_1)
+```
+
+**Underlying data**
+
+```{r}
+paediatric_waiting_room_comp_1 |> kable()
+```
+
+#### Majors
+
+**Figure 65:** Stages of adoption of component 1 across Martha’s Rule sites with majors units
+
+```{r, fig.height=8,fig.width=10}
+plot_national(df = paediatric_majors_comp_1)
+```
+
+**Underlying data**
+
+```{r}
+paediatric_majors_comp_1 |> kable()
+```
+
+
+#### Resus
+
+**Figure 66:** Stages of adoption of component 1 across Martha’s Rule sites with resus units
+
+```{r, fig.height=8,fig.width=10}
+plot_national(df = paediatric_resus_comp_1)
+```
+
+**Underlying data**
+
+```{r}
+paediatric_resus_comp_1 |> kable()
+```
+:::
+
+#### PSC Overview (paeds)
+
+::: panel-tabset
+#### Waiting room
+
+**Figure 67:** Adoption stages for component 1 across all sites with waiting room units, by PSC
+
+```{r, fig.height=10,fig.width=12}
+likert_component(df = ed_to_aggregate, 
+  component = paediatric_waiting_room_patient_check_in,
+  exclude = 'Not applicable')
+```
+
+**Underlying data**
+
+```{r}
+psc_all_phases_table(df = ed_to_aggregate, 
+  component = paediatric_waiting_room_patient_check_in,
+  exclude = 'Not applicable') |>
+  rename('Component 1' = paediatric_waiting_room_patient_check_in) |>
+  DT::datatable(options = list(pageLength = 10))
+```
+
+#### Majors 
+
+**Figure 68:** Adoption stages for component 1 across all sites with majors units, by PSC
+
+```{r, fig.height=10,fig.width=12}
+likert_component(df = ed_to_aggregate, 
+  component = paediatric_majors_patient_check_in,
+  exclude = 'Not applicable')
+```
+
+**Underlying data**
+
+```{r}
+psc_all_phases_table(df = ed_to_aggregate, 
+  component = paediatric_majors_patient_check_in,
+  exclude = 'Not applicable') |>
+  rename('Component 1' = paediatric_majors_patient_check_in) |>
+  DT::datatable(options = list(pageLength = 10))
+```
+
+#### Resus 
+
+**Figure 69:** Adoption stages for component 1 across all sites with resus units, by PSC
+
+```{r, fig.height=10,fig.width=12}
+likert_component(df = ed_to_aggregate, 
+  component = paediatric_resus_patient_check_in,
+  exclude = 'Not applicable')
+```
+
+**Underlying data**
+
+```{r}
+psc_all_phases_table(df = ed_to_aggregate, 
+  component = paediatric_resus_patient_check_in,
+  exclude = 'Not applicable') |>
+  rename('Component 1' = paediatric_resus_patient_check_in) |>
+  DT::datatable(options = list(pageLength = 10))
+```
+::: 
+
+### Component 2
+
+All staff will be able, at any time, to ask for a review from a different team if they are concerned that a patient is deteriorating, and they are not being responded to.
+
+```{r}
+adults_waiting_room_comp_2 <- national_all_phases(
+  df = ed_to_aggregate, 
+  component = adults_waiting_room_independent_clinical_review,
+  exclude = 'Not applicable'
+  )
+
+adults_majors_comp_2 <- national_all_phases(
+  df = ed_to_aggregate, 
+  component = adults_majors_independent_clinical_review,
+  exclude = 'Not applicable'
+  )
+
+adults_tes_comp_2 <- national_all_phases(
+  df = ed_to_aggregate, 
+  component = adults_tes_independent_clinical_review,
+  exclude = 'Not applicable'
+  )
+
+adults_resus_comp_2 <- national_all_phases(
+  df = ed_to_aggregate, 
+  component = adults_resus_independent_clinical_review,
+  exclude = 'Not applicable'
+  )
+
+paediatric_waiting_room_comp_2 <- national_all_phases(
+  df = ed_to_aggregate, 
+  component = paediatric_waiting_room_independent_clinical_review,
+  exclude = 'Not applicable'
+  )
+
+paediatric_majors_comp_2 <- national_all_phases(
+  df = ed_to_aggregate, 
+  component = paediatric_majors_independent_clinical_review,
+  exclude = 'Not applicable'
+  )
+
+paediatric_resus_comp_2 <- national_all_phases(
+  df = ed_to_aggregate, 
+  component = paediatric_resus_independent_clinical_review,
+  exclude = 'Not applicable'
+  )
+```
+
+#### National overview (adults)
+
+::: panel-tabset
+#### Waiting room
+
+**Figure 70:** Stages of adoption of component 2 across Martha’s Rule sites with waiting room units
+
+```{r, fig.height=8,fig.width=10}
+plot_national(df = adults_waiting_room_comp_2)
+```
+
+**Underlying data**
+
+```{r}
+adults_waiting_room_comp_2 |> kable()
+```
+
+#### Majors
+
+**Figure 71:** Stages of adoption of component 2 across Martha’s Rule sites with majors units
+
+```{r, fig.height=8,fig.width=10}
+plot_national(df = adults_majors_comp_2)
+```
+
+**Underlying data**
+
+```{r}
+adults_majors_comp_2 |> kable()
+```
+
+#### TES
+
+**Figure 72:** Stages of adoption of component 2 across Martha’s Rule sites with temporary escalation spaces
+
+```{r, fig.height=8,fig.width=10}
+plot_national(df = adults_tes_comp_2)
+```
+
+**Underlying data**
+
+```{r}
+adults_tes_comp_2 |> kable()
+```
+
+#### Resus
+
+**Figure 73:** Stages of adoption of component 2 across Martha’s Rule sites with resus units
+
+```{r, fig.height=8,fig.width=10}
+plot_national(df = adults_resus_comp_2)
+```
+
+**Underlying data**
+
+```{r}
+adults_resus_comp_2 |> kable()
+```
+
+:::
+
+#### PSC Overview (adults)
+
+::: panel-tabset
+#### Waiting room
+
+**Figure 74:** Adoption stages for component 2 across all sites with waiting room units, by PSC
+
+```{r, fig.height=10,fig.width=12}
+likert_component(df = ed_to_aggregate, 
+  component = adults_waiting_room_independent_clinical_review,
+  exclude = 'Not applicable')
+```
+
+**Underlying data**
+
+```{r}
+psc_all_phases_table(df = ed_to_aggregate, 
+  component = adults_waiting_room_independent_clinical_review,
+  exclude = 'Not applicable') |>
+  rename('Component 2' = adults_waiting_room_independent_clinical_review) |>
+  DT::datatable(options = list(pageLength = 10))
+```
+
+#### Majors 
+
+**Figure 75:** Adoption stages for component 2 across all sites with majors units, by PSC
+
+```{r, fig.height=10,fig.width=12}
+likert_component(df = ed_to_aggregate, 
+  component = adults_majors_independent_clinical_review,
+  exclude = 'Not applicable')
+```
+
+**Underlying data**
+
+```{r}
+psc_all_phases_table(df = ed_to_aggregate, 
+  component = adults_majors_independent_clinical_review,
+  exclude = 'Not applicable') |>
+  rename('Component 2' = adults_majors_independent_clinical_review) |>
+  DT::datatable(options = list(pageLength = 10))
+```
+
+#### TES 
+
+**Figure 76:** Adoption stages for component 2 across all sites with temporary escalation spaces, by PSC
+
+```{r, fig.height=10,fig.width=12}
+likert_component(df = ed_to_aggregate, 
+  component = adults_tes_independent_clinical_review,
+  exclude = 'Not applicable')
+```
+
+**Underlying data**
+
+```{r}
+psc_all_phases_table(df = ed_to_aggregate, 
+  component = adults_tes_independent_clinical_review,
+  exclude = 'Not applicable') |>
+  rename('Component 2' = adults_tes_independent_clinical_review) |>
+  DT::datatable(options = list(pageLength = 10))
+```
+
+#### Resus 
+
+**Figure 77:** Adoption stages for component 2 across all sites with resus units, by PSC
+
+```{r, fig.height=10,fig.width=12}
+likert_component(df = ed_to_aggregate, 
+  component = adults_resus_independent_clinical_review,
+  exclude = 'Not applicable')
+```
+
+**Underlying data**
+
+```{r}
+psc_all_phases_table(df = ed_to_aggregate, 
+  component = adults_resus_independent_clinical_review,
+  exclude = 'Not applicable') |>
+  rename('Component 2' = adults_resus_independent_clinical_review) |>
+  DT::datatable(options = list(pageLength = 10))
+```
+:::
+
+#### National overview (paeds)
+
+::: panel-tabset
+#### Waiting room
+
+**Figure 78:** Stages of adoption of component 2 across Martha’s Rule sites with waiting room units
+
+```{r, fig.height=8,fig.width=10}
+plot_national(df = paediatric_waiting_room_comp_2)
+```
+
+**Underlying data**
+
+```{r}
+paediatric_waiting_room_comp_2 |> kable()
+```
+
+#### Majors
+
+**Figure 79:** Stages of adoption of component 2 across Martha’s Rule sites with majors units
+
+```{r, fig.height=8,fig.width=10}
+plot_national(df = paediatric_majors_comp_2)
+```
+
+**Underlying data**
+
+```{r}
+paediatric_majors_comp_2 |> kable()
+```
+
+
+#### Resus
+
+**Figure 80:** Stages of adoption of component 2 across Martha’s Rule sites with resus units
+
+```{r, fig.height=8,fig.width=10}
+plot_national(df = paediatric_resus_comp_2)
+```
+
+**Underlying data**
+
+```{r}
+paediatric_resus_comp_2 |> kable()
+```
+:::
+
+#### PSC Overview (paeds)
+
+::: panel-tabset
+#### Waiting room
+
+**Figure 81:** Adoption stages for component 2 across all sites with waiting room units, by PSC
+
+```{r, fig.height=10,fig.width=12}
+likert_component(df = ed_to_aggregate, 
+  component = paediatric_waiting_room_independent_clinical_review,
+  exclude = 'Not applicable')
+```
+
+**Underlying data**
+
+```{r}
+psc_all_phases_table(df = ed_to_aggregate, 
+  component = paediatric_waiting_room_independent_clinical_review,
+  exclude = 'Not applicable') |>
+  rename('Component 2' = paediatric_waiting_room_independent_clinical_review) |>
+  DT::datatable(options = list(pageLength = 10))
+```
+
+#### Majors 
+
+**Figure 82:** Adoption stages for component 2 across all sites with majors units, by PSC
+
+```{r, fig.height=10,fig.width=12}
+likert_component(df = ed_to_aggregate, 
+  component = paediatric_majors_independent_clinical_review,
+  exclude = 'Not applicable')
+```
+
+**Underlying data**
+
+```{r}
+psc_all_phases_table(df = ed_to_aggregate, 
+  component = paediatric_majors_independent_clinical_review,
+  exclude = 'Not applicable') |>
+  rename('Component 2' = paediatric_majors_independent_clinical_review) |>
+  DT::datatable(options = list(pageLength = 10))
+```
+
+#### Resus 
+
+**Figure 83:** Adoption stages for component 2 across all sites with resus units, by PSC
+
+```{r, fig.height=10,fig.width=12}
+likert_component(df = ed_to_aggregate, 
+  component = paediatric_resus_independent_clinical_review,
+  exclude = 'Not applicable')
+```
+
+**Underlying data**
+
+```{r}
+psc_all_phases_table(df = ed_to_aggregate, 
+  component = paediatric_resus_independent_clinical_review,
+  exclude = 'Not applicable') |>
+  rename('Component 2' = paediatric_resus_independent_clinical_review) |>
+  DT::datatable(options = list(pageLength = 10))
+```
+::: 
+
+### Component 3
+
+This escalation route will also always be available to patients themselves, their families and carers and advertised across the hospital.
+
+```{r}
+adults_waiting_room_comp_3 <- national_all_phases(
+  df = ed_to_aggregate, 
+  component = adults_waiting_room_escalation_available_to_patient_carers,
+  exclude = 'Not applicable'
+  )
+
+adults_majors_comp_3 <- national_all_phases(
+  df = ed_to_aggregate, 
+  component = adults_majors_escalation_available_to_patient_carers,
+  exclude = 'Not applicable'
+  )
+
+adults_tes_comp_3 <- national_all_phases(
+  df = ed_to_aggregate, 
+  component = adults_tes_escalation_available_to_patient_carers,
+  exclude = 'Not applicable'
+  )
+
+adults_resus_comp_3 <- national_all_phases(
+  df = ed_to_aggregate, 
+  component = adults_resus_escalation_available_to_patient_carers,
+  exclude = 'Not applicable'
+  )
+
+paediatric_waiting_room_comp_3 <- national_all_phases(
+  df = ed_to_aggregate, 
+  component = paediatric_waiting_room_escalation_available_to_patient_carers,
+  exclude = 'Not applicable'
+  )
+
+paediatric_majors_comp_3 <- national_all_phases(
+  df = ed_to_aggregate, 
+  component = paediatric_majors_escalation_available_to_patient_carers,
+  exclude = 'Not applicable'
+  )
+
+paediatric_resus_comp_3 <- national_all_phases(
+  df = ed_to_aggregate, 
+  component = paediatric_resus_escalation_available_to_patient_carers,
+  exclude = 'Not applicable'
+  )
+```
+
+#### National overview (adults)
+
+::: panel-tabset
+#### Waiting room
+
+**Figure 84:** Stages of adoption of component 3 across Martha’s Rule sites with waiting room units
+
+```{r, fig.height=8,fig.width=10}
+plot_national(df = adults_waiting_room_comp_3)
+```
+
+**Underlying data**
+
+```{r}
+adults_waiting_room_comp_3 |> kable()
+```
+
+#### Majors
+
+**Figure 85:** Stages of adoption of component 3 across Martha’s Rule sites with majors units
+
+```{r, fig.height=8,fig.width=10}
+plot_national(df = adults_majors_comp_3)
+```
+
+**Underlying data**
+
+```{r}
+adults_majors_comp_3 |> kable()
+```
+
+#### TES
+
+**Figure 86:** Stages of adoption of component 3 across Martha’s Rule sites with temporary escalation spaces
+
+```{r, fig.height=8,fig.width=10}
+plot_national(df = adults_tes_comp_3)
+```
+
+**Underlying data**
+
+```{r}
+adults_tes_comp_3 |> kable()
+```
+
+#### Resus
+
+**Figure 87:** Stages of adoption of component 3 across Martha’s Rule sites with resus units
+
+```{r, fig.height=8,fig.width=10}
+plot_national(df = adults_resus_comp_3)
+```
+
+**Underlying data**
+
+```{r}
+adults_resus_comp_3 |> kable()
+```
+
+:::
+
+#### PSC Overview (adults)
+
+::: panel-tabset
+#### Waiting room
+
+**Figure 88:** Adoption stages for component 3 across all sites with waiting room units, by PSC
+
+```{r, fig.height=10,fig.width=12}
+likert_component(df = ed_to_aggregate, 
+  component = adults_waiting_room_escalation_available_to_patient_carers,
+  exclude = 'Not applicable')
+```
+
+**Underlying data**
+
+```{r}
+psc_all_phases_table(df = ed_to_aggregate, 
+  component = adults_waiting_room_escalation_available_to_patient_carers,
+  exclude = 'Not applicable') |>
+  rename('Component 3' = adults_waiting_room_escalation_available_to_patient_carers) |>
+  DT::datatable(options = list(pageLength = 10))
+```
+
+#### Majors 
+
+**Figure 89:** Adoption stages for component 3 across all sites with majors units, by PSC
+
+```{r, fig.height=10,fig.width=12}
+likert_component(df = ed_to_aggregate, 
+  component = adults_majors_escalation_available_to_patient_carers,
+  exclude = 'Not applicable')
+```
+
+**Underlying data**
+
+```{r}
+psc_all_phases_table(df = ed_to_aggregate, 
+  component = adults_majors_escalation_available_to_patient_carers,
+  exclude = 'Not applicable') |>
+  rename('Component 3' = adults_majors_escalation_available_to_patient_carers) |>
+  DT::datatable(options = list(pageLength = 10))
+```
+
+#### TES 
+
+**Figure 90:** Adoption stages for component 3 across all sites with temporary escalation spaces, by PSC
+
+```{r, fig.height=10,fig.width=12}
+likert_component(df = ed_to_aggregate, 
+  component = adults_tes_escalation_available_to_patient_carers,
+  exclude = 'Not applicable')
+```
+
+**Underlying data**
+
+```{r}
+psc_all_phases_table(df = ed_to_aggregate, 
+  component = adults_tes_escalation_available_to_patient_carers,
+  exclude = 'Not applicable') |>
+  rename('Component 3' = adults_tes_escalation_available_to_patient_carers) |>
+  DT::datatable(options = list(pageLength = 10))
+```
+
+#### Resus 
+
+**Figure 91:** Adoption stages for component 3 across all sites with resus units, by PSC
+
+```{r, fig.height=10,fig.width=12}
+likert_component(df = ed_to_aggregate, 
+  component = adults_resus_escalation_available_to_patient_carers,
+  exclude = 'Not applicable')
+```
+
+**Underlying data**
+
+```{r}
+psc_all_phases_table(df = ed_to_aggregate, 
+  component = adults_resus_escalation_available_to_patient_carers,
+  exclude = 'Not applicable') |>
+  rename('Component 3' = adults_resus_escalation_available_to_patient_carers) |>
+  DT::datatable(options = list(pageLength = 10))
+```
+:::
+
+#### National overview (paeds)
+
+::: panel-tabset
+#### Waiting room
+
+**Figure 92:** Stages of adoption of component 3 across Martha’s Rule sites with waiting room units
+
+```{r, fig.height=8,fig.width=10}
+plot_national(df = paediatric_waiting_room_comp_3)
+```
+
+**Underlying data**
+
+```{r}
+paediatric_waiting_room_comp_3 |> kable()
+```
+
+#### Majors
+
+**Figure 93:** Stages of adoption of component 3 across Martha’s Rule sites with majors units
+
+```{r, fig.height=8,fig.width=10}
+plot_national(df = paediatric_majors_comp_3)
+```
+
+**Underlying data**
+
+```{r}
+paediatric_majors_comp_3 |> kable()
+```
+
+
+#### Resus
+
+**Figure 94:** Stages of adoption of component 3 across Martha’s Rule sites with resus units
+
+```{r, fig.height=8,fig.width=10}
+plot_national(df = paediatric_resus_comp_3)
+```
+
+**Underlying data**
+
+```{r}
+paediatric_resus_comp_3 |> kable()
+```
+:::
+
+#### PSC Overview (paeds)
+
+::: panel-tabset
+#### Waiting room
+
+**Figure 95:** Adoption stages for component 3 across all sites with waiting room units, by PSC
+
+```{r, fig.height=10,fig.width=12}
+likert_component(df = ed_to_aggregate, 
+  component = paediatric_waiting_room_escalation_available_to_patient_carers,
+  exclude = 'Not applicable')
+```
+
+**Underlying data**
+
+```{r}
+psc_all_phases_table(df = ed_to_aggregate, 
+  component = paediatric_waiting_room_escalation_available_to_patient_carers,
+  exclude = 'Not applicable') |>
+  rename('Component 3' = paediatric_waiting_room_escalation_available_to_patient_carers) |>
+  DT::datatable(options = list(pageLength = 10))
+```
+
+#### Majors 
+
+**Figure 96:** Adoption stages for component 3 across all sites with majors units, by PSC
+
+```{r, fig.height=10,fig.width=12}
+likert_component(df = ed_to_aggregate, 
+  component = paediatric_majors_escalation_available_to_patient_carers,
+  exclude = 'Not applicable')
+```
+
+**Underlying data**
+
+```{r}
+psc_all_phases_table(df = ed_to_aggregate, 
+  component = paediatric_majors_escalation_available_to_patient_carers,
+  exclude = 'Not applicable') |>
+  rename('Component 3' = paediatric_majors_escalation_available_to_patient_carers) |>
+  DT::datatable(options = list(pageLength = 10))
+```
+
+#### Resus 
+
+**Figure 97:** Adoption stages for component 3 across all sites with resus units, by PSC
+
+```{r, fig.height=10,fig.width=12}
+likert_component(df = ed_to_aggregate, 
+  component = paediatric_resus_escalation_available_to_patient_carers,
+  exclude = 'Not applicable')
+```
+
+**Underlying data**
+
+```{r}
+psc_all_phases_table(df = ed_to_aggregate, 
+  component = paediatric_resus_escalation_available_to_patient_carers,
+  exclude = 'Not applicable') |>
+  rename('Component 3' = paediatric_resus_escalation_available_to_patient_carers) |>
+  DT::datatable(options = list(pageLength = 10))
+```
+::: 
 
 ## All adult data
 
