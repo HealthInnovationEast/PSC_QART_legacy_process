@@ -2286,7 +2286,7 @@ psc_all_phases_table(df = matneo_to_aggregate,
 ```
 :::
 
-## TESTING Stages of adoption across emergency department settings
+## Stages of adoption across emergency department settings
 
 ```{r}
 adults_waiting_room_comp_1 <- national_all_phases(
@@ -3269,5 +3269,104 @@ adults_paeds_to_aggregate |>
       c('#D73027', '#F46D43', '#FDAE61')
     )
   )
+```
+:::
+
+::: {style="width: 55vw;"}
+## All MatNeo data
+
+```{r}
+matneo_to_aggregate |>
+  select(
+    'Trust' = name_trust_code, 
+    'Site' = name_site_code,
+    'Antenatal 1' = antenatal_patient_check_in,
+    'Antenatal 2' = antenatal_independent_clinical_review,
+    'Antenatal 3' = antenatal_escalation_available_to_patient_carers,
+    'Intrapartum 1' = intrapartum_patient_check_in,
+    'Intrapartum 2' = intrapartum_independent_clinical_review,
+    'Intrapartum 3' = intrapartum_escalation_available_to_patient_carers,
+    'Postnatal 1' = postnatal_patient_check_in,
+    'Postnatal 2' = postnatal_independent_clinical_review,
+    'Postnatal 3' = postnatal_escalation_available_to_patient_carers,
+    'Transitional 1' = transitional_patient_check_in,
+    'Transitional 2' = transitional_independent_clinical_review,
+    'Transitional 3' = transitional_escalation_available_to_patient_carers,
+    'Neonatal 1' = neonatal_patient_check_in,
+    'Neonatal 2' =neonatal_independent_clinical_review,
+    'Neonatal 3' = neonatal_escalation_available_to_patient_carers
+         ) |>
+    DT::datatable(options = 
+                    list(pageLength = 10,
+                         columnDefs = list(
+                           list(width = '110px', targets = c(2, 3)),
+                           list(width = '50px', targets = c(4)),
+                           list(width = '80px', targets = c(5, 6, 7))
+                           )
+                         )
+                  ) 
+```
+:::
+
+::: {style="width: 55vw;"}
+## All Adult ED data
+
+```{r}
+ed_to_aggregate |>
+  select(
+    'Trust' = name_trust_code, 
+    'Site' = name_site_code,
+    'Waiting room 1' = adults_waiting_room_patient_check_in, 
+    'Waiting room 2' = adults_waiting_room_independent_clinical_review, 
+    'Waiting room 3' = adults_waiting_room_escalation_available_to_patient_carers, 
+    'Majors 1' = adults_majors_patient_check_in, 
+    'Majors 2' = adults_majors_independent_clinical_review, 
+    'Majors 3' = adults_majors_escalation_available_to_patient_carers, 
+    'TES 1' = adults_tes_patient_check_in, 
+    'TES 2' = adults_tes_independent_clinical_review, 
+    'TES 3' = adults_tes_escalation_available_to_patient_carers, 
+    'Resus 1' = adults_resus_patient_check_in, 
+    'Resus 2' = adults_resus_independent_clinical_review, 
+    'Resus 3' = adults_resus_escalation_available_to_patient_carers
+    ) |>
+  DT::datatable(options = 
+                    list(pageLength = 10,
+                         columnDefs = list(
+                           list(width = '110px', targets = c(2, 3)),
+                           list(width = '50px', targets = c(4)),
+                           list(width = '80px', targets = c(5, 6, 7))
+                           )
+                         )
+                  ) 
+```
+:::
+
+::: {style="width: 55vw;"}
+## All Paeds ED data
+
+```{r}
+ed_to_aggregate |>
+  select(
+    'Trust' = name_trust_code, 
+    'Site' = name_site_code,
+    'Waiting room 1' = paediatric_waiting_room_patient_check_in, 
+    'Waiting room 2' = paediatric_waiting_room_independent_clinical_review, 
+    'Waiting room 3' = paediatric_waiting_room_escalation_available_to_patient_carers, 
+    'Majors 1' = paediatric_majors_patient_check_in, 
+    'Majors 2' = paediatric_majors_independent_clinical_review, 
+    'Majors 3' = paediatric_majors_escalation_available_to_patient_carers, 
+    'Resus 1' = paediatric_resus_patient_check_in, 
+    'Resus 2' = paediatric_resus_independent_clinical_review, 
+    'Resus 3' = paediatric_resus_escalation_available_to_patient_carers
+    ) |>
+  DT::datatable(options = 
+                    list(pageLength = 10,
+                         columnDefs = list(
+                           list(width = '110px', targets = c(2, 3)),
+                           list(width = '50px', targets = c(4)),
+                           list(width = '80px', targets = c(5, 6, 7))
+                           )
+                         )
+                  ) 
 ```
 :::
