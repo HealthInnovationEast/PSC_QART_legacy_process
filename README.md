@@ -1,16 +1,13 @@
 # QART_Automation
 
-There are 5 main scripts for this automation process and 2 config scripts.
+There are 4 main scripts for this automation process and 1 config script.
 
-## Config scripts
+## Config script
 
 -   *config_sharepoint_location.R* - This creates the chosenlib variable and base_url which will be used in all of the other scripts.
     *site_url*, *base_url* and *chosenlib* variables will need to be altered depending on required location.
     Once the location has been selected, these variables should not be changed.
     This file also reads in lookup tables.
-
--   *config_quarter_info.R* - This creates the quarter information.
-    *current_quarter_year* will need to be changed each time this is run.
 
 ## Main scripts
 
@@ -19,16 +16,7 @@ There are 5 main scripts for this automation process and 2 config scripts.
 -   *create_empty_templates* - this will be run once per quarter to create the excel templates.
     To run, change the *current_quarter_year* variable in *config_quarter_location.R* and source the *create_empty_templates.R* script.It will add a folder to each location folder for this new quarter and add an empty template file, populated with the locations for that site.
 
--   *combine_templates* - this will be run once the excel templates have been populated by the PSC's.
-    To run, confirm that the *current_quarter_year* variable is still correct (it should have been changed when *create_empty_tables.R* was run), and source the *combine_templates.R* script.
-
 -   *qart_slides.qmd* - produces PowerPoint slide deck displaying data submitted by the PSC's for a financial year quarter.
 
 -   *run_quarto.R* - parameterised script to render *qart_slides.qmd*.
     Specify reporting quarter of interest via the `report_quarter` parameter.
-
-## Template files
-
--   *template_files/readme.txt* - this file is the readme file that will be pasted in each site folder when *setup_site_folders.R* is run
-
--   *template_files/preferred_template.xlsx*- this file is the excel file that network information will be added to in order to create each networks template.
