@@ -7,7 +7,9 @@ format:
     fig-dpi: 800
 editor: visual
 params: 
-  report_quarter: "2024/25 Q2" #note this will be overwritten by param in run_quarto.R 
+  reporting_quarter: '2024/25 Q3'
+  master_files_folder: '1. Master files'
+  quarter_string: '24_25_Q3'
 ---
 
 ```{r}
@@ -25,15 +27,35 @@ library(forcats)
 library(scales)
 library(ggsci)
 library(viridis)
+library(Microsoft365R)
 
-mat_neo_data <- read_excel(here("data/MatNeoSIP.xlsx"), sheet = "Data") |>
-  clean_names() |>
-  rename(
-    "stage_7_all" = "stage_7",
-    "quarter" = "date"
-  ) |>
-  rename_with(~ str_replace(., "x", "stage_"), starts_with("x")) |>
-  mutate(psc = str_remove_all(psc, 'HIN'))
+source('config_sharepoint_location.R')
+
+# params
+reporting_quarter <- params$reporting_quarter
+master_files_folder <- params$master_files_folder
+quarter_string <- params$quarter_string
+
+# go into share point and download latest data
+master_files_dr <- chosenlib$get_item(glue::glue("{base_url}/{master_files_folder}"))
+
+mat_neo_data_file <- master_files_dr$list_files() |> 
+  select(name) |> 
+  filter(str_detect(name, 
+                    # below parameter is generated in read_qart_submissions.R
+                    quarter_string)
+         ) |>
+  as.vector() |>
+  unlist() |> 
+  unname()
+
+mat_neo_identified_data <- master_files_dr$get_item(str_glue({mat_neo_data_file}))
+
+mat_neo_identified_data$download(dest = here("data", str_glue({mat_neo_data_file})), 
+                       overwrite = T)
+
+mat_neo_data <- read.csv(here(str_glue('data/{mat_neo_data_file}'))) |>
+  mutate(updated_psc_name = str_remove_all(updated_psc_name, 'HIN'))
 ```
 
 ```{r}
@@ -47,12 +69,12 @@ aggregate_int <- function(df, my_filter, intervention) {
   df |>
     filter(!!my_filter) |>
     group_by(
-      psc,
+      updated_psc_name,
       !!intervention
     ) |>
     summarise(n = n()) |>
     ungroup() |>
-    group_by(psc) |>
+    group_by(updated_psc_name) |>
     mutate(
       total = sum(n),
       percentage = n / total
@@ -74,7 +96,7 @@ aggregate_stage <- function(df, intervention, stage = "Stage 7") {
     str_to_title() # 3 capitalise clean string into title
 
   df |>
-    select(psc:quarter, !!intervention) |>
+    select(updated_psc_name:quarter, !!intervention) |>
     mutate(
       stage_x_or_above = str_count(!!intervention, stage)
     ) |>
@@ -93,11 +115,11 @@ aggregate_stage <- function(df, intervention, stage = "Stage 7") {
 # 3 make graph
 visualise_bars <- function(df, intervention,
                            intervention_name = NULL,
-                           # most plots will have psc in their x axis, but some will need quarter instead
-                           aes_x = expr(psc),
+                           # most plots will have updated_psc_name in their x axis, but some will need quarter instead
+                           aes_x = expr(updated_psc_name),
                            # mopst plots will use the title below, except the quarter charts
                            plot_title = "Percentage of NHS Trusts at each implementation stage, by PSC",
-                           plot_caption = glue::glue("Data reported by the PSC's for {report_quarter}")) {
+                           plot_caption = glue::glue("Data reported by the PSC's for {reporting_quarter}")) {
   # to quote variable
   intervention <- enquo(intervention)
 
@@ -197,7 +219,7 @@ visualise_line <- function(df, aes_group, aes_colour,
     labs(
       title = "Adoption of optimisation interventions across NHS Trusts",
       subtitle = subtitle_string,
-      caption = glue::glue("Data reported by the PSC's for {report_quarter}")
+      caption = glue::glue("Data reported by the PSC's for {reporting_quarter}")
     ) +
     theme_classic() +
     theme(
@@ -214,8 +236,6 @@ visualise_line <- function(df, aes_group, aes_colour,
       legend.justification = "left"
     )
 }
-
-report_quarter <- params$report_quarter
 ```
 
 # MatNeoSIP - Optimisation
@@ -224,11 +244,12 @@ report_quarter <- params$report_quarter
 
 ![](data/matneo_overview.PNG)
 
-## title slide
+## 
 
 ```{r}
 mat_neo_long <- mat_neo_data |>
-  filter(quarter == report_quarter) |>
+  select(-c(retroactive_fix, discrepancy_type)) |>
+  filter(quarter == reporting_quarter) |>
   pivot_longer(
     cols = magnesium_sulphate:mews,
     names_to = "intervention",
@@ -248,11 +269,13 @@ aggregate_int(
   )
 ```
 
+## 
+
 ```{r}
 # deploy functions
 aggregate_int(
   mat_neo_data,
-  expr(quarter == report_quarter),
+  expr(quarter == reporting_quarter),
   place_of_birth
 ) |>
   visualise_bars(
@@ -261,10 +284,12 @@ aggregate_int(
   )
 ```
 
+## 
+
 ```{r}
 aggregate_int(
   mat_neo_data,
-  expr(quarter == report_quarter),
+  expr(quarter == reporting_quarter),
   maternal_breast_milk
 ) |>
   visualise_bars(
@@ -272,61 +297,73 @@ aggregate_int(
   )
 ```
 
+## 
+
 ```{r}
-aggregate_int(mat_neo_data, expr(quarter == report_quarter), normothermia) |>
+aggregate_int(mat_neo_data, expr(quarter == reporting_quarter), normothermia) |>
   visualise_bars(
     normothermia
   )
 ```
 
+## 
+
 ```{r}
-aggregate_int(mat_neo_data, expr(quarter == report_quarter), optimal_cord_management) |>
+aggregate_int(mat_neo_data, expr(quarter == reporting_quarter), optimal_cord_management) |>
   visualise_bars(
     optimal_cord_management
   )
 ```
 
 ```{r}
-aggregate_int(mat_neo_data, expr(quarter == report_quarter), antibiotics) |>
+aggregate_int(mat_neo_data, expr(quarter == reporting_quarter), antibiotics) |>
   visualise_bars(
     antibiotics
   )
 ```
 
+## 
+
 ```{r}
-aggregate_int(mat_neo_data, expr(quarter == report_quarter), corticosteroids) |>
+aggregate_int(mat_neo_data, expr(quarter == reporting_quarter), corticosteroids) |>
   visualise_bars(
     corticosteroids
   )
 ```
 
 ```{r}
-aggregate_int(mat_neo_data, expr(quarter == report_quarter), magnesium_sulphate) |>
+aggregate_int(mat_neo_data, expr(quarter == reporting_quarter), magnesium_sulphate) |>
   visualise_bars(
     magnesium_sulphate
   )
 ```
 
+## 
+
 ```{r}
-aggregate_int(mat_neo_data, expr(quarter == report_quarter), caffeine) |>
+aggregate_int(mat_neo_data, expr(quarter == reporting_quarter), caffeine) |>
   visualise_bars(
     caffeine
   )
 ```
 
+## 
+
 ```{r}
-aggregate_int(mat_neo_data, expr(quarter == report_quarter), volume_targeted_ventilation) |>
+aggregate_int(mat_neo_data, expr(quarter == reporting_quarter), volume_targeted_ventilation) |>
   visualise_bars(
     volume_targeted_ventilation
   )
 ```
+
+## 
 
 ```{r}
 #stage to use as benchmark progress
 stage <- "Stage 7"
 
 mat_neo_agg_stage_provider <- mat_neo_data |>
-  select(psc:volume_targeted_ventilation) |>
+  select(updated_psc_name:volume_targeted_ventilation) |>
   mutate(
     all_stages = paste(magnesium_sulphate,
       corticosteroids,
@@ -369,6 +406,8 @@ visualise_line(
   )
 ```
 
+## 
+
 ```{r}
 spaghetti_data <- bind_rows(
   aggregate_stage(mat_neo_data, magnesium_sulphate),
@@ -398,26 +437,30 @@ visualise_line(
 
 # MatNeoSIP - Deterioration Tools
 
-## temporary title
+## 
 
 ```{r}
-aggregate_int(mat_neo_data, expr(quarter == report_quarter), newtt2) |>
+aggregate_int(mat_neo_data, expr(quarter == reporting_quarter), newtt2) |>
   visualise_bars(
     newtt2,
     "NEWTT2"
   )
 ```
 
+## 
+
 ```{r}
-aggregate_int(mat_neo_data, expr(quarter == report_quarter), mews) |> visualise_bars(
+aggregate_int(mat_neo_data, expr(quarter == reporting_quarter), mews) |> visualise_bars(
   mews,
   "MEWS"
 )
 ```
 
+## 
+
 ```{r}
 mat_neo_agg_newtt2_quarter <- mat_neo_data |>
-  select(quarter, organisation, newtt2) |>
+  select(quarter, organisation_name_verified, newtt2) |>
   mutate(newtt2 = na_if(newtt2, "N/A")) |> 
   filter(!quarter %in% c('2021/22 Q1', '2021/22 Q2', 
                       '2021/22 Q3', '2021/22 Q4')
@@ -443,9 +486,11 @@ visualise_bars(
 )
 ```
 
+## 
+
 ```{r}
 mat_neo_agg_mews_quarter <- mat_neo_data |>
-  select(quarter, organisation, mews) |>
+  select(quarter, organisation_name_verified, mews) |>
   mutate(mews = na_if(mews, "N/A")) |> 
   filter(!quarter %in% c('2021/22 Q1', '2021/22 Q2', 
                       '2021/22 Q3', '2021/22 Q4')

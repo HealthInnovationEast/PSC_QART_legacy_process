@@ -1,15 +1,4 @@
-library(here)
-library(readxl)
-library(tidyverse)
-library(janitor)
-library(glue)
-library(Microsoft365R)
-
-source("config_sharepoint_location.R")
-
-######### parameter
-reporting_quarter <- "2024/25 Q3"
-#########
+# script to find submissions from PSC on sharepoint and collate data for power point
 
 hin_folders <- dr$list_files() |>
   select(name) |>
@@ -27,7 +16,7 @@ write.csv(hin_names,
           row.names = F
 )
 
-# empty data frame to save submnissions
+# empty data frame to save submissions
 results <- tibble()
 
 for (hin in hin_folders) {
@@ -58,7 +47,7 @@ for (hin in hin_folders) {
 
   hin_submission <- hin_dir$get_item(hin_submission_file)
 
-  # # download file and store temporarily
+  # download file and store temporarily
   tf <- tempfile(
     pattern = str_remove(hin_submission_file, fixed(".xlsx")),
     fileext = ".xlsx"
@@ -72,17 +61,19 @@ for (hin in hin_folders) {
   # read
   data <- read_excel(
     path = tf, sheet = "MatNeo",
-    range = "B7:L44"
+    range = "B7:N44"
   )
 
   # cut 1 opt data
   data_opt <- data[1:16, ]
 
-  data_opt[2, 1] <- "ICB"
-  data_opt[2, 2] <- "Trust"
-
+  data_opt[1, 1] <- "api_icb_code"
+  data_opt[1, 2] <- "api_org_code"
+  data_opt[1, 3] <- "api_icb_name"
+  data_opt[1, 4] <- "organisation_name_verified"
+  
   data_opt_tidy <- data_opt |>
-    row_to_names(row_number = 2) |>
+    row_to_names(row_number = 1) |>
     remove_empty("rows")
 
   # validation - if cells are blank don't continue with upload
@@ -93,12 +84,12 @@ for (hin in hin_folders) {
   }
 
   # cut 2 newtt2 data
-  data_nwwtt2_mews <- data[22:46, 1:6]
+  data_nwwtt2_mews <- data[21:46, 1:8]
 
   nwwtt2_location <- data.frame(which(data_nwwtt2_mews == "NEWTT 2", arr.ind = T))
   # validation
 
-  if (nwwtt2_location$col != 3) {
+  if (nwwtt2_location$col != 5) {
     print(glue::glue("Skipping {hin}"))
     print("NWWTT2 data not found in expected location")
     next
@@ -107,7 +98,8 @@ for (hin in hin_folders) {
   data_nwwtt2 <- data_nwwtt2_mews[, 1:nwwtt2_location$col] |>
     tail(-2)
 
-  names(data_nwwtt2) <- c("ICB", "Trust", "Newtt2")
+  names(data_nwwtt2) <- c('api_icb_code', 'api_org_code', 'api_icb_name', 
+                          'organisation_name_verified', "Newtt2")
 
   data_nwwtt2_tidy <- data_nwwtt2 |>
     remove_empty("rows")
@@ -123,16 +115,17 @@ for (hin in hin_folders) {
   mews_location <- data.frame(which(data_nwwtt2_mews == "MEWS", arr.ind = T))
 
   # validation
-  if (mews_location$col != 5) {
+  if (mews_location$col != 7) {
     print(glue::glue("Skipping {hin}"))
     print("MEWS data not found in expected location")
     next
   }
 
-  data_mews <- data_nwwtt2_mews[, c(1:2, mews_location$col)] |>
+  data_mews <- data_nwwtt2_mews[, c(1:4, mews_location$col)] |>
     tail(-2)
 
-  names(data_mews) <- c("ICB", "Trust", "Mews")
+  names(data_mews) <- c('api_icb_code', 'api_org_code', 'api_icb_name', 
+                        'organisation_name_verified', "Mews")
 
   data_mews_tidy <- data_mews |>
     remove_empty("rows")
@@ -147,26 +140,28 @@ for (hin in hin_folders) {
   # now join all 3 cuts
   data_combined <- data_opt_tidy |>
     mutate(
-      hin_name = hin,
-      .before = ICB
+      updated_psc_name = hin,
+      .before = api_icb_code
     ) |>
-    left_join(data_nwwtt2_tidy, by = c("ICB", "Trust")) |>
-    left_join(data_mews_tidy, by = c("ICB", "Trust")) |>
+    left_join(data_nwwtt2_tidy, by = c('api_icb_code', 'api_org_code', 'api_icb_name', 
+                                       'organisation_name_verified')) |>
+    left_join(data_mews_tidy, by = c('api_icb_code', 'api_org_code', 'api_icb_name', 
+                                     'organisation_name_verified')) |>
     mutate(
-      quarter = reporting_quarter,
-      .after = Trust
-    )
+      quarter = reporting_quarter_string,
+      .after = organisation_name_verified
+    ) |>
+    # order columns to emulate structure in previous usbmisisosn data file
+    select(updated_psc_name, api_icb_code, api_icb_name,
+           api_org_code, organisation_name_verified, quarter:Mews)
 
   print(glue::glue("Successful data extraction for {hin}. Data retrieved from:"))
   print(glue::glue("{hin_submission_file}"))
 
-  # results <- results |>
-  #   bind_rows(data_combined)
-  
   results <- rbind(results, data_combined)
 }
 
-if (length(unique(results$hin_name)) != 15){
+if (length(unique(results$updated_psc_name)) != 15){
   stop('Data not appended correctly')
 }
 
@@ -177,21 +172,22 @@ orgs_newtt2 <- results |>
   filter(str_detect(Newtt2, '(?i)stage (4|5|6|7)')) 
 
 print(str_glue("Number of organisations using NEWTT2:
-               {length(unique(orgs_newtt2$Trust))}"))
+               {length(unique(orgs_newtt2$organisation_name_verified))}"))
 
 orgs_mews <- results |>
   filter(str_detect(Mews, '(?i)stage (4|5|6|7)')) 
 
 print(str_glue("Number of organisations using MEWS:
-               {length(unique(orgs_mews$Trust))}"))
+               {length(unique(orgs_mews$organisation_name_verified))}"))
 
 # write combined data
-quarter_string <- reporting_quarter |>
+quarter_string <- reporting_quarter_string |>
   str_replace_all("/| ", "_")
 
-time_stamp_ext <- format(Sys.time(), "%Y-%m-%d_%H%M%S.csv")
+time_stamp_ext <- format(Sys.time(), "%Y_%m_%d_%H%M%S.csv")
+reporting_quarter_submissions_path <- glue::glue("output/psc_submissions_{quarter_string}_processed_{time_stamp_ext}")
 
 write.csv(results,
-  file = here(glue::glue("output/psc_submissions_{quarter_string}_processed_{time_stamp_ext}")),
+  file = here(reporting_quarter_submissions_path),
   row.names = F
 )
