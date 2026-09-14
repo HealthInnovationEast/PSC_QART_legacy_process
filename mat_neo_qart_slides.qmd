@@ -1,0 +1,250 @@
+---
+title: "NatPatSIP - Quarterly Presentation"
+author: "Patient Safety Analysis Team"
+format: 
+  pptx:
+    reference-doc: template.pptx
+    fig-dpi: 800
+editor: source
+params: 
+  reporting_quarter: '2025/26 Q2'
+  master_files_folder: '1. Master files'
+  quarter_string: '2025_26_Q2'
+---
+
+```{r}
+#|echo: false
+#|warning: false
+
+# read in required packages
+library(here)
+library(tidyverse)
+library(janitor)
+library(lubridate)
+library(ggplot2)
+library(readxl)
+library(forcats)
+library(scales)
+library(ggsci)
+library(viridis)
+library(Microsoft365R)
+
+source('config_sharepoint_location.R')
+
+# params
+reporting_quarter <- params$reporting_quarter
+master_files_folder <- params$master_files_folder
+quarter_string <- params$quarter_string
+
+# go into share point and download latest data
+master_files_dr <- chosenlib$get_item(glue::glue("{base_url}/{master_files_folder}"))
+
+mat_neo_data_file <- master_files_dr$list_files() |> 
+  select(name) |> 
+  filter(str_detect(name, 
+                    # quarter_string parameter is generated in read_qart_submissions.R
+                    paste0('mat_neo_qart_all_data_upto_', quarter_string)
+                    )
+         ) |>
+  as.vector() |>
+  unlist() |> 
+  unname()
+
+mat_neo_identified_data <- master_files_dr$get_item(str_glue({mat_neo_data_file}))
+
+mat_neo_identified_data$download(dest = here("data", str_glue({mat_neo_data_file})), 
+                       overwrite = T)
+
+mat_neo_data <- read.csv(here(str_glue('data/{mat_neo_data_file}'))) |>
+  mutate(updated_psc_name = str_remove_all(updated_psc_name, 'HIN'))
+```
+
+```{r}
+# MEWS and NEWS numbers 
+mat_neo_data_latest_quarter <- mat_neo_data |>
+  filter(quarter == reporting_quarter)
+
+# number of organisations using the deterioration tools
+# these numbers are used for an impact slide produced by improvement team
+# our role is to provide an update on these figures
+orgs_newtt2 <- mat_neo_data_latest_quarter |>
+  filter(str_detect(newtt2, '(?i)stage (4|5|6|7)')) |>
+  select(updated_psc_name, api_icb_code, 
+         api_icb_name, api_org_code, organisation_name_verified, 
+         quarter, newtt2)
+         
+write.csv(orgs_newtt2, 
+          here('output', str_glue('matneo_qart_newtt2_{quarter_string}.csv')),
+          row.names = F
+          )
+
+orgs_mews <- mat_neo_data_latest_quarter |>
+  filter(str_detect(mews, '(?i)stage (4|5|6|7)')) |>
+  select(updated_psc_name, api_icb_code, 
+         api_icb_name, api_org_code, organisation_name_verified, 
+         quarter, mews)
+
+write.csv(orgs_mews, 
+          here('output', str_glue('matneo_qart_mews_{quarter_string}.csv')),
+          row.names = F
+          )
+```
+
+
+```{r}
+# functions
+
+# 1 aggregate by quarter and calculate how many NHS orgs are reporting at a custom stage for a given intervention
+aggregate_stage <- function(df, intervention, stage = "Stage 7") {
+  # to quote variable
+  intervention <- enquo(intervention)
+
+  # to quote intervention name
+  intervention_string <- deparse(intervention)
+
+  intervention_name <- intervention_string |>
+    str_remove("~") |> # 1 remove ~ added by deparse
+    str_replace_all("_", " ") |> # 2 replace _ with blank space
+    str_to_title() # 3 capitalise clean string into title
+
+  df |>
+    select(updated_psc_name:quarter, !!intervention) |>
+    mutate(
+      stage_x_or_above = str_count(!!intervention, stage)
+    ) |>
+    summarise(
+      stage_x_all = sum(stage_x_or_above, na.rm = T),
+      all_reporters = n(),
+      percentage = (stage_x_all / all_reporters),
+      .by = quarter
+    ) |>
+    mutate(
+      intervention = intervention_name,
+      .after = quarter
+     )
+}
+
+# 2 visualise line plots
+visualise_line <- function(df, aes_group, aes_colour, subtitle_string) {
+  ggplot(
+    data = df,
+    aes(quarter,
+      percentage,
+      group = !!aes_group,
+      colour = !!aes_colour
+    )
+  ) +
+    scale_y_continuous(
+      labels = scales::percent_format(),
+      limits = c(0, 1)
+     ) +
+    labs(
+      title = "Adoption of optimisation interventions across NHS Trusts",
+      subtitle = subtitle_string,
+      caption = glue::glue("Data reported by the PSC's up to {reporting_quarter}")
+    ) +
+    theme_classic() +
+    theme(
+      axis.title = element_blank(),
+      axis.text.x = element_text(angle = 90),
+      panel.grid.major.y = element_line(),
+      plot.caption = element_text(
+        face = "italic",
+        size = 10,
+        hjust = 0 # so caption is on right hand side
+      ),
+      legend.title = element_blank(),
+      legend.position = "bottom",
+      legend.justification = "left"
+    )
+}
+```
+
+# MatNeoSIP - Optimisation
+
+## Maternity and Neonatal – Programme Overview
+
+![](data/matneo_overview.PNG)
+
+## 
+
+```{r}
+spaghetti_data <- bind_rows(
+  aggregate_stage(mat_neo_data, magnesium_sulphate),
+  aggregate_stage(mat_neo_data, corticosteroids),
+  aggregate_stage(mat_neo_data, antibiotics),
+  aggregate_stage(mat_neo_data, optimal_cord_management),
+  aggregate_stage(mat_neo_data, normothermia),
+  aggregate_stage(mat_neo_data, maternal_breast_milk),
+  aggregate_stage(mat_neo_data, place_of_birth),
+  aggregate_stage(mat_neo_data, caffeine), # not incorporated before project take over
+  aggregate_stage(mat_neo_data, volume_targeted_ventilation) # ditto
+)
+
+visualise_line(
+  df = spaghetti_data,
+  aes_group = expr(intervention),
+  aes_colour = expr(intervention),
+  subtitle_string = "Percentage of organisations reporting all implementation stages at level 7, by intervention"
+) +
+  geom_line() +
+  geom_point(size = 2) +
+  ggsci::scale_colour_jco()
+```
+
+## 
+
+```{r}
+spaghetti_data <- bind_rows(
+  aggregate_stage(mat_neo_data, newtt2, stage = '(?i)stage (4|5|6|7)'),
+  aggregate_stage(mat_neo_data, mews, stage = '(?i)stage (4|5|6|7)')
+)
+
+visualise_line(
+  df = spaghetti_data,
+  aes_group = expr(intervention),
+  aes_colour = expr(intervention),
+  subtitle_string = "Percentage of organisations reporting deterioration tool use at stage 4 or above"
+) +
+  geom_line() +
+  geom_point(size = 2) +
+  ggsci::scale_colour_jco()
+```
+
+## 
+
+```{r}
+spaghetti_data <- bind_rows(
+  aggregate_stage(mat_neo_data, newtt2, stage = '(?i)stage (5|6|7)'),
+  aggregate_stage(mat_neo_data, mews, stage = '(?i)stage (5|6|7)')
+)
+
+visualise_line(
+  df = spaghetti_data,
+  aes_group = expr(intervention),
+  aes_colour = expr(intervention),
+  subtitle_string = "Percentage of organisations reporting deterioration tool use at stage 5 or above"
+) +
+  geom_line() +
+  geom_point(size = 2) +
+  ggsci::scale_colour_jco()
+```
+
+## 
+
+```{r}
+spaghetti_data <- bind_rows(
+  aggregate_stage(mat_neo_data, newtt2, stage = "Stage 7"),
+  aggregate_stage(mat_neo_data, mews, stage = "Stage 7")
+)
+
+visualise_line(
+  df = spaghetti_data,
+  aes_group = expr(intervention),
+  aes_colour = expr(intervention),
+  subtitle_string = "Percentage of organisations reporting deterioration tool use at stage 7"
+) +
+  geom_line() +
+  geom_point(size = 2) +
+  ggsci::scale_colour_jco()
+```

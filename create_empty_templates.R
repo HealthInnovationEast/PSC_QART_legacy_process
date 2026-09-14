@@ -1,44 +1,93 @@
 message('Creating templates...')
 
 # script to create empty excel templates with organisation names for each PSC. 
-location_lookup <- read.csv(here("lookups", "psc_icb_trust_lookup.csv")) # created via active_organisation_check.R  
-pscs <- unique(location_lookup$updated_psc_name)
 
 # download template file from SharePoint
-master_files_dr <- chosenlib$get_item(glue::glue("{base_url}/{master_files_folder}"))
 template_file <- master_files_dr$get_item(str_glue({template_file_name}))
 template_file$download(dest = here("lookups", str_glue({template_file_name})), 
                        overwrite = T)
 
 # file friendly naming string for saving results
 current_quarter_year <- str_remove_all(reporting_quarter_string, '20|/')
-  
+
+# if testing one template
+# pscs = pscs[pscs %in% c('North West Coast HIN')]
+
 # loop through locations provided in psc_lookup.csv
 for (psc in pscs) {
-  # grid with icb codes and names
-  location_icb <- location_lookup |>
+  # grid with trust code, site code, trust name, site name 
+  # generated in trust_site_codes.R
+  location_trust_sites <- psc_trust_site_lookup |>
     filter(updated_psc_name == psc) |>
-    distinct(api_icb_code, api_icb_name)
+    select(api_org_code, api_org_name,
+           site_sdcs_code, api_site_name, phase) |>
+    # this is to avoid printing string '#N/A' for empty cells
+    mutate(across(where(is.character), ~replace_na(., ' ')))
+  
+  # all other grids generated 
+  # grid with icb codes and names
+  location_icb <- psc_icb_trust_lookup |>
+    filter(updated_psc_name == psc) |>
+    distinct(api_current_icb_code, api_current_icb_name)
+  
+  # wider form of location_icb_trust for medsip
+  location_icb_wide <- location_icb |> 
+    pivot_wider(names_from = api_current_icb_code, 
+                values_from = api_current_icb_name)
 
-  # grid with icb code, icb name, trust code, and trust name
-  location_icb_trust <- location_lookup |>
+  # grid with icb code, trust code, icb name, and trust name
+  location_icb_trust <- psc_icb_trust_lookup |>
     filter(updated_psc_name == psc) |>
     # choosing this order to accommodate most aesthetic width of cells in template
-    select(
-      api_icb_code, api_current_code,
-      api_icb_name, api_current_org_name
+    distinct(
+      api_current_icb_code, api_current_code,
+      api_current_icb_name, api_current_org_name
     )
 
   # grid with trust code and trust name
-  location_trusts <- location_lookup |>
+  location_trusts <- psc_icb_trust_lookup |>
     filter(updated_psc_name == psc) |>
     # choosing this order to accommodate most aesthetic width of cells in template
-    select(api_current_code, api_current_org_name)
+    distinct(api_current_code, api_current_org_name)
 
   # load template excel file
   wb <- openxlsx2::wb_load(here("lookups", str_glue({template_file_name})))
   
+  # add trust and sites to Martha's Rule tabs
+  # MR adult and paeds
+  wb <- wb_add_data(wb,
+                    sheet = "MR - Adult & Paeds",
+                    x = location_trust_sites |> 
+                      filter(phase %in% c('1', '2')),
+                    start_col = 2,
+                    start_row = 7,
+                    col_names = FALSE
+  )
+  
+  # MR matneo
+  wb <- wb_add_data(wb,
+                    sheet = "MR - Maternity & Neonatal",
+                    x = location_trust_sites |>
+                      filter(phase == 'matneo') |> 
+                      select(-phase),
+                    start_col = 2,
+                    start_row = 7,
+                    col_names = FALSE
+  )
+  
+  # MR ED
+  wb <- wb_add_data(wb,
+                    sheet = "MR - Emergency Departments",
+                    x = location_trust_sites |>
+                      filter(phase == 'ed') |> 
+                      select(-phase),
+                    start_col = 2,
+                    start_row = 7,
+                    col_names = FALSE
+  )
+  
   # add ICB names to Medicines tab
+  # long form
   wb <- wb_add_data(wb,
     sheet = "Medicines",
     x = location_icb,
@@ -46,50 +95,42 @@ for (psc in pscs) {
     start_row = 6,
     col_names = FALSE
   )
-
+  
+  # wide form
   wb <- wb_add_data(wb,
     sheet = "Medicines",
-    x = location_icb,
-    start_col = 2,
-    start_row = 17,
-    col_names = FALSE
+    x = location_icb_wide,
+    start_col = 4,
+    start_row = 15,
+    col_names = TRUE
   )
 
   # add ICB and Trust names to MatNeo tab
-
-  # optimisation grid
-  wb <- wb_add_data(wb,
-    sheet = "MatNeo",
-    x = location_icb_trust,
-    start_col = 2,
-    start_row = 9,
-    col_names = FALSE
-  )
 
   # deterioration tools grid
   wb <- wb_add_data(wb,
     sheet = "MatNeo",
     x = location_icb_trust,
     start_col = 2,
-    start_row = 30,
+    start_row = 8,
     col_names = FALSE
   )
 
-  # preterm birth lead engagement
+  # abc grid
   wb <- wb_add_data(wb,
     sheet = "MatNeo",
-    x = location_trusts,
-    start_col = 3,
-    start_row = 62,
+    x = location_icb_trust,
+    start_col = 2,
+    start_row = 42,
     col_names = FALSE
   )
-
+  
   # PAS score
   wb <- wb_add_data(wb,
     sheet = "MatNeo",
     x = location_icb,
     start_col = 3,
-    start_row = 82,
+    start_row = 63,
     col_names = FALSE
   )
 

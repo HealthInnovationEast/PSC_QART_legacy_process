@@ -20,8 +20,6 @@ At the beginning of a new financial year quarter (e.g., 2024/25 Q1) the PSC's wi
 
 ## Key files on SharePoint
 
-All files mentioned here are available [here](https://nhs.sharepoint.com/sites/MED/ps2/it/mit/ResLib/Forms/AllItems.aspx?id=%2Fsites%2FMED%2Fps2%2Fit%2Fmit%2FResLib%2FMeasurement%2FQART%2F1%2E%20Master%20files&viewid=004a6df1%2D11b9%2D421a%2Dae98%2D34527e51aae8).
-
 Used for retroactive steps:
 
 -   *readme.txt* - this file is the readme file that was pasted in each site folder when *setup_site_folders.R* was run.
