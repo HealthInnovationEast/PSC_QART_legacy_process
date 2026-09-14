@@ -63,8 +63,8 @@ site_lookup_file_name <- 'MR_Phase1_2_&_3_Master.xlsx'
 if (stage_of_process == "prepare_templates") {
   # will produce a new version of psc_icb_trust_lookup.csv to account for org changes (if there have been any)
   source('active_organisation_check.R') 
-  # EXPERIMENTAL: there's been a request to add trust sites for new template
-  # eventually this should be incorporated in active_organisation_check.R
+  # below accommodates adding martha's rule trust sites from 2526
+  # eventually this could be incorporated in active_organisation_check.R
   source('trust_site_codes.R')
   # IMPORTANT: make sure you have updated the reporting quarter in the intro tab
   source('create_empty_templates.R')
