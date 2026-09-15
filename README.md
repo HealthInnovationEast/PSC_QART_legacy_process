@@ -2,74 +2,68 @@
 
 ## W**hat is QART?**
 
-QART is a quarterly assurance process whereby the Patient Safety Improvement team at NHSE oversees 15 Patient Safety Collaboratives (PSC's) across England. Hosted within the Health Innovation Networks (HIN's), the PSC's report the progress of different improvement programmes. Although QART covers all improvement programmes, a heavy portion of the reporting focuses on the Maternity and Neonatal Safety Improvement Programme (MatNeoSIP). This process was handed over to the analytical team who have not only automated the process but also reviewed, identified, and addressed data quality (DQ) issues.
+QART is a quarterly assurance process used by the Patient Safety Improvement team at NHS England to monitor the progress of different Patient Safety Improvement Programmes (SIPs) in England. Data on the adoption of different programme components is recorded by the 15 Patient Safety Collaboratives (PSCs), which are hosted within the Health Innovation Networks (HINs).
+
+The Patient Safety Analysis team has developed and maintained a reproducible analytical pipeline to automate components of data collection and processing to support QART. The code underpinning that pipeline is stored in this repo.
 
 ## Process overview
 
-At the beginning of a new financial year quarter (e.g., 2024/25 Q1) the PSC's will report on progress for the quarter that has just passed (e.g., 2023/24 Q4). Thus the reporting quarter is always one quarter *behind* the current quarter. The outcome of the process is a PowerPoint presentation focused on the adoption of the MatNeoSIP interventions. These are the steps required to produce that presentation:
+At the beginning of a new quarter (e.g., 2026/27 Q1), the PSCs will report on the adoption of different programme components for different SIPs. Data is lagged by a quarter, meaning submissions received in Q1 would be for adoption progress observed in Q4. The steps below summarise the workflow supported by this pipeline, as at Q1 of financial year 26/27 (April, May, June 2026):
 
--   Produce excel templates for each PSC where they will record progress.
+- Generation of excel templates for each PSC (these templates are used to record data at organisation level).
 
--   Wait 3 weeks for PSC submissions.
+- PSCs record data within 3 weeks and make a submission.
 
--   Collate all PSC submissions and check for data completeness.
+- Collate all PSC submissions and check for data completeness.
 
--   Process data for calculations (note reporting doesn't go beyond summary statistics).
+- Process data for calculations (reporting doesn't go beyond summary statistics).
 
--   Use processed data to make presentation graphs
+- Use processed data to produce analytical outputs. These have changed throughout the lifespan of the pipeline, reflecting evolving analytical needs. The current output is an interactive HTML report for Martha's Rule, a patient safety initiative under the Managing Deterioration SIP.
 
-## Key files on SharePoint
+## SharePoint for file management
 
-Used for retroactive steps:
+The pipeline has been designed to connect to a designated SharePoint area to facilitate file storage and business support. Throughout the entire process, the pipeline downloads and uploads files frequently to SharePoint. Connection is enabled by the `Microsoft365R` package.
 
--   *readme.txt* - this file is the readme file that was pasted in each site folder when *setup_site_folders.R* was run.
--   *MatNeoSIP.xlsx* - Handed over file with several tabs where most of the process used to take place. The quarterly data from 2021/22 Q1 to 2024/25 Q3 is in the 'Data' tab. 'QART info' was used to calculate aggregations on the data. The remaining tabs were dedicated to make the plots for the presentation.
--   *hin_names.csv* - Look up of up to date HIN names. It would require updating if at least one of the HIN's changes their name. Names are current as of April 2025.
+Currently the SharePoint area consists of:
 
-Used in ready to go process:
+- Individual PSC folders, where excel templates for data collection and returned data inputs saved every quarter.
 
--   *preferred_template.xlsx* - Excel blueprint file that will be filled out with organisations assigned to each PSC. This file downloaded from SharePoint by script *create_empty_templates.R,* which will create the 15 templates to send out.
+- An output folder, where analytical outputs are saved.
 
-    -   **IMPORTANT:** You will have to make sure **every quarter** that you go into this file and update the intro tab to show the correct reporting quarter. Do this *before* creating templates for a new reporting quarter.
+- A master files folder, where files needed and produced by running of the pipeline are saved. Key files include:
 
--   *mat_neo_qart_cleansed_upto_2024_25_Q3.csv* - A corrected version of data in *MatNeoSIP.xlsx* which addresses data quality issues explained below.
+  - *qart_template_2627.xlsx* - Excel blueprint file. Used as a template to fill out details for organisations under the geography of a PSC. Tabs are colour-coded to reflect relevance to specific SIPs. This file is downloaded from SharePoint by the *create_empty_templates.R* script, which creates the 15 templates to send out.
 
--   *matneo_overview.png* - Overview of the MatNeo programme. This picture goes in the slide deck generated by `qart_slides.qmd`. This file downloaded from SharePoint in *run_quarto.R.*
+    - **IMPORTANT:** You will have to make sure **every quarter** that you go into the template file and update the intro tab to update the reporting quarter. Do this *before* creating templates for a new reporting quarter.
 
-## Retroactive Fixes to the data
+  - *MR_Phase1_2\_&\_3_Master.xlsx* - Look up file containing all of Martha's Rule hospital site codes and other organisation details. File is provided by business support.
 
-Retroactive corrections to the data up to 2024/25 Q3 were needed to generate data ready for automation. These corrections addressed DQ issues whereby data were recorded for both legacy and successor organisations several quarters *after* an organisation change had taken place (**effectively generating a case of duplicated organisations in the data set**). A secondary DQ issue was the use of outdated organisation names. There's no need to re-run the scripts below and they are not sourced in the master script *process_flow.R* :
+  - *hin_names.csv* - List up to date HIN names. It would require updating if at least one of the HIN's changes their name. Names are current as of April 2025.
 
--   *retroactive_org_changes.R* - Read previous submissions from `MatNeoSIP.xlsx` and updated HIN names using `hin_names.csv`. More importantly, this script checked the NHS trusts present in the data up to 2024/25 Q2 and determined whether an organisation was legacy via a series of calls to the [ODS API](https://digital.nhs.uk/developer/api-catalogue/organisation-data-service-ord). This script generated 2 output files `psc_icb_trust_lookup.csv` and `discrepancies_lookup.csv`.
+  - Cumulative data files and lookups. Described below as they are generated sequentially by the pipeline.
 
--   *retroactive_data_cleanse.R* - This script used `discrepancies_lookup.csv` to reolve conflicts in data points with an outdated name or where where data was recorded simultaneously for *both* a legacy organisation and its successor (i.e., a legacy carry over).
+## Pipeline overview
 
-    The name fixes were addressed easily, as it was just replacing outdated names with correct ones. The legacy carry overs were more complex as data points from multiple organisations needed to be compared and a value for each intervention had to be chosen. The output of this file was a cleansed version of `MatNeoSIP.xlsx` - i.e., a file with quarterly data from 2021/22 Q1 to 2024/25 Q3 (`mat_neo_qart_cleansed_upto_2425_Q3.csv`). New data will be appended to previous submissions containing these cleansed data.
+These are the scripts that reflect the most version version of the pipeline, as at Q1 2627:
 
-## Retroactive SharePoint Set up
+- *param_flow.R* - This is the master script and sources the scripts below in a order of execution based on a few parameters. the script handles the two-stage process in which QART is executed: preparing templates and processing submissions.
 
--   *retroactive_setup_site_folders.R* - Created folders for each PSC in the chosen SharePoint location to save excel templates and collected data. As the SharePoint location has now been chosen, it will not need re-running.
+- *config_sharepoint_location.R* - Creates 3 important variables (`site_url`, `chosenlib`, and `base_url`) which will be used in other scripts to navigate around SharePoint. Once a SharePoint location has been selected, these variables should not be changed.
 
-## Ready to go process
+- *active_organisation_check.R* - Used in template preparation. Developed in response to data quality issues observed in MatNeo QART data. This script updates NHS-trust-to-ICB pairs, before filling out templates, accounting for changes such as mergers and name updates. The code looks at the organisation list from the previous quarter (e.g., 2025/26 Q4), and prepares a list to use for the reporting quarter (e.g., 2026/27 Q1). Makes use of the [NHS ODS API](https://digital.nhs.uk/developer/api-catalogue/organisation-data-service-ord) for validation. This script outputs a file named `psc_icb_trust_lookup.csv`, which will be saved to the SharePoint master files folder.
 
-These are the scripts that will be run from 2024/25 Q4 onward, and rely on using the cleansed data and future submissions from PSC's:
+- *trust_site_codes.R* - Similar to above, but produces up to date site-to-NHS-trust pairs. Developed to accommodate Martha's Rule data collection needs. Extracts hispital site codes from *`MR_Phase1_2_&_3_Master.xlsx`* and validates them through the ODS API. Output file is named `psc_trust_site_lookup.csv`, also saved to master files folder.
 
--   *process_flow.R* - This is the master script and sources the scripts below in a order of execution based on a few parameters. This script includes steps that only need running once and will leave the process fit for iteration from 2024/25 Q3 onwards.
+- *create_empty_templates.R* - Used to generate data collection templates for every PSC. Fills out templates with updated organisation details across all SIPs for every PSC, by using *`qart_template_2627.xlsx`*, and `psc_icb_trust_lookup` and `psc_trust_site_lookup` objects. Templates are uploaded to the corresponding PSC folder in SharePoint.
 
--   *config_sharepoint_location.R* - Creates 3 important variables (`site_url`, `chosenlib`, and `base_url`) which will be used in other scripts to navigate around SharePoint. Once a SharePoint location has been selected, these variables should not be changed.
+- *read_qart_submissions.R* - Used to process submissions. Goes through every PSC folder, identifies the submission file (i.e., file name ending in 'returned'), and extracts SIP data. All data reported will be collated in a csv file, which is saved locally and will be used for modifying a cumulative data file in *`append_data.R`*.
 
--   *active_organisation_check.R* - A simplified version of *retroactive_org_changes.R.* The purpose of this script is to update the organisation list before we send templates to the PSC's. This means that the script looks at the organisation list in the previous quarter (e.g., 2024/25 Q3), to prepare the list for the present reporting quarter (e.g., 2024/25 Q4). It will make use of the [ODS API](https://digital.nhs.uk/developer/api-catalogue/organisation-data-service-ord) and will output a new `psc_icb_trust_lookup.csv`, which will be available in SharePoint.
+  - Note: The output of this script is dependent on which SIPs require analytical outputs produced through this pipeline. Previously generated a file for MatNeo SIP submissions. Currently, 3 csv files are produced, each reflecting a different clinical setting where Martha's Rule is being adopted.
 
--   *create_empty_templates.R* - Creates excel templates with organisation and ICB names for each PSC, using `psc_icb_trust_lookup.csv` and `preferred_template.xlsx`. Templates are uploaded to the corresponding PSC SharePoint folders generated via *setup_site_folders.R*.
+- *append_data.R* - Takes submissions files produced in *read_qart_submissions.R* and appends it to previous submissions, generating an up to date cumulative data file for a SIP. The appended data files are uploaded to the master files folder in SharePoint. Cumulative data files follow this naming convention: `<programme_name_setting>_upto_<financial_year>_<quarter_number>.csv`
 
--   *read_qart_submissions.R* - Goes through every PSC folder, identifies the submitted data (i.e., file name ending in 'returned'), and extracts the MatNeo qart data. Output of this script is a collated data file with data for all trusts in all PSC's, which will be appended to the cleansed data.
+  - **Note:** this script currently generates a new cumulative data file every quarter.
 
-    -   **Note:** script will also generate a `hin_names.csv` lookup, but this would only be useful if one the HIN's have changed their name, otherwise it's the same version of the one already available in master files. HIN names are current as of April 2025.
+- *run_quarto.R* - Used to generate analytical outputs after submissions have been processed. Currently uses parameters set in `param_flow.R` to render `marthas_qart_report.qmd`. Saves output(s) in SharePoint output folder.
 
--   *append_data.R* - Takes processed submissions file produced in *read_qart_submissions.R* and appends it to (cleansed) previous submissions. The apended data file is uploaded to master files folder in SharePoint.
-
-    -   **Note:** Script is currently designed to save a new version of the appended data every quarter.
-
--   *run_quarto.R* - parameterised script to render *qart_slides.qmd*. Parameters are already defined in *process_flow.R*.
-
--   *qart_slides.qmd* - Reads data file produced in *append_data.R*. Output is a PowerPoint slide deck visualising data for each MatNeo intervention, by PSC, for a reporting quarter.
+- *marthas_qart_report.qmd* - Quarto file containing code responsible for report layout and data visualisation. Produces HTML report for Martha's Rule. Executed via *run_quarto.R,* this script reads data files produced in *`append_data.R`*.
