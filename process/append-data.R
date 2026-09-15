@@ -2,13 +2,13 @@
 # function to append quarterly submissions to files with cumulative data
 # ==============================================================================
 
-#' This function takes the output csv files generated in read_qart_submissions.R
+#' This function takes the output csv files generated in read-qart-submissions.R
 #' and appends the data in those files to cumulative data files 
 
 #' @param previous_submission String. Name of the file containing cumulative data.
 #'                            Needs to include .csv extension
 #' @param file_path String. Local file path with current submissions from all 15 HINs
-#'                  paths are produced in read_qart_submissions.R
+#'                  paths are produced in read-qart-submissions.R
 #' @param updated_file_name_start String. Reflects the beginning of the
 #'              entire file name to be used to save file with current and cumulative data
 #' @output updated csv file with current and cumulative data. File is saved on sharepoint

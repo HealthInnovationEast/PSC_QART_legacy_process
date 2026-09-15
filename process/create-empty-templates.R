@@ -16,7 +16,7 @@ current_quarter_year <- str_remove_all(reporting_quarter_string, '20|/')
 # loop through locations provided in psc_lookup.csv
 for (psc in pscs) {
   # grid with trust code, site code, trust name, site name 
-  # generated in trust_site_codes.R
+  # generated in trust-site-codes.R
   location_trust_sites <- psc_trust_site_lookup |>
     filter(updated_psc_name == psc) |>
     select(api_org_code, api_org_name,
