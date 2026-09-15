@@ -11,7 +11,7 @@ library(lubridate)
 library(openxlsx2)
 library(quarto)
 
-source('config_sharepoint_location.R')
+source('config-sharepoint-location.R')
 
 # ----------------- these variables will **change** every quarter
 
@@ -62,19 +62,19 @@ site_lookup_file_name <- 'MR_Phase1_2_&_3_Master.xlsx'
 
 if (stage_of_process == "prepare_templates") {
   # will produce a new version of psc_icb_trust_lookup.csv to account for org changes (if there have been any)
-  source('active_organisation_check.R') 
+  source('process/active-organisation-check.R') 
   # below accommodates adding martha's rule trust sites from 2526
   # eventually this could be incorporated in active_organisation_check.R
-  source('trust_site_codes.R')
+  source('process/trust-site-codes.R')
   # IMPORTANT: make sure you have updated the reporting quarter in the intro tab
-  source('create_empty_templates.R')
+  source('process/create-empty-templates.R')
 } 
 
 if (stage_of_process == "process_submissions") {
   # goes into sharepoint and collates submitted data for every PSC
-  source('read_qart_submissions.R')
+  source('process/read-qart-submissions.R')
   # appends collated data to previous submissions
-  source('append_data.R')
+  source('process/append-data.R')
   # uses appended data to produce power point slide
-  source('run_quarto.R') # runs qart_slides.qmd AND progression_slides.qmd
+  source('run-quarto.R') # runs qart_slides.qmd AND progression_slides.qmd
 }

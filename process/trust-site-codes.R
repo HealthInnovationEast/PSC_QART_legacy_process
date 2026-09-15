@@ -1,6 +1,6 @@
 message('Adding trust site codes...')
 
-# bring psc-icb-trust lookup created via active_Organisation_check.R  
+# bring psc-icb-trust lookup created via active-organisation-check.R  
 psc_icb_trust_lookup <- read.csv(here("lookups", "psc_icb_trust_lookup.csv")) 
 pscs <- unique(psc_icb_trust_lookup$updated_psc_name)
 

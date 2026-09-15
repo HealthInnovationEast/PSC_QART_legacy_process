@@ -9,7 +9,7 @@ library(httr)
 library(jsonlite)
 library(lubridate)
 
-source('config_sharepoint_location.R')
+source('config-sharepoint-location.R')
 
 # script to retroactively correct errors in data up to 2024/25 Q3
 master_files_dr <- chosenlib$get_item(glue::glue("{base_url}/1. Master files"))

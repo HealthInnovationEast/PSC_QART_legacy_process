@@ -40,7 +40,7 @@ library(DT)
 library(PostcodesioR)
 library(sf)
 
-source('config_sharepoint_location.R')
+source('config-sharepoint-location.R')
 
 # params
 reporting_quarter <- params$reporting_quarter
@@ -81,7 +81,7 @@ postcodes_lookup_table <- lapply(unique(site_postcode_list$api_site_postcode),
 adults_paeds_data_file <- master_files_dr$list_files() |>
   select(name) |>
   filter(str_detect(name,
-                    # below parameter is generated in read_qart_submissions.R
+                    # below parameter is generated in read-qart-submissions.R
                     paste0('marthas_qart_adults_paeds_data_upto_', quarter_string)
                     )
          ) |>
@@ -116,7 +116,7 @@ adults_paeds_data_postcode  <- adults_paeds_data_raw |>
 matneo_data_file <- master_files_dr$list_files() |>
   select(name) |>
   filter(str_detect(name,
-                    # below parameter is generated in read_qart_submissions.R
+                    # below parameter is generated in read-qart-submissions.R
                     paste0('marthas_qart_matneo_data_upto_', quarter_string)
                     )
          ) |>
@@ -147,7 +147,7 @@ matneo_data_raw <- matneo_data |>
 ed_data_file <- master_files_dr$list_files() |>
   select(name) |>
   filter(str_detect(name,
-                    # below parameter is generated in read_qart_submissions.R
+                    # below parameter is generated in read-qart-submissions.R
                     paste0('marthas_qart_ed_data_upto_', quarter_string)
                     )
          ) |>
