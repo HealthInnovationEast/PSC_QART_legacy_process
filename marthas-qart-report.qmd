@@ -40,6 +40,10 @@ library(DT)
 library(PostcodesioR)
 library(sf)
 
+library(glue)
+library(labelled)
+
+sharepoint_local_access <- TRUE
 source('config-sharepoint-location.R')
 
 # params
@@ -51,25 +55,13 @@ quarter_string <- params$quarter_string
 ```{r}
 # TODO: create function
 # go into share point and download lookup with postcode info for map
-master_files_dr <- chosenlib$get_item(glue::glue(
-  "{base_url}/{master_files_folder}"))
+lookup_data_file <- "psc_trust_site_lookup.csv"
 
-lookup_data_file <- master_files_dr$list_files() |>
-  select(name) |>
-  filter(str_detect(name,'psc_trust_site_lookup.csv'
-                    )
-         ) |>
-  as.vector() |>
-  unlist() |>
-  unname()
-
-lookup_file_identified <- master_files_dr$get_item(str_glue({lookup_data_file}))
-
-lookup_file_identified$download(dest = here("data", str_glue({lookup_data_file})),
-                       overwrite = T)
+get_SP_file(paste0(master_files_folder, "/", lookup_data_file),
+            here("data", lookup_data_file))
 
 # bring site look up with postcode info and get geo info
-site_postcode_list <- read.csv(here('data', 'psc_trust_site_lookup.csv')) |>
+site_postcode_list <- read.csv(here('data', lookup_data_file)) |>
   select(site_sdcs_code, api_site_postcode)
 
 postcodes_lookup_table <- lapply(unique(site_postcode_list$api_site_postcode),
@@ -78,7 +70,7 @@ postcodes_lookup_table <- lapply(unique(site_postcode_list$api_site_postcode),
   right_join(site_postcode_list, by = c('postcode' = 'api_site_postcode'))
 
 # go into share point and download adults and paeds data
-adults_paeds_data_file <- master_files_dr$list_files() |>
+adults_paeds_data_file <- list_SP_files(paste0(base_url, "/", master_files_folder)) |>
   select(name) |>
   filter(str_detect(name,
                     # below parameter is generated in read-qart-submissions.R
@@ -89,13 +81,8 @@ adults_paeds_data_file <- master_files_dr$list_files() |>
   unlist() |>
   unname()
 
-adults_paeds_identified_data <-master_files_dr$get_item(
-  str_glue({adults_paeds_data_file}))
-
-adults_paeds_identified_data$download(
-  dest = here("data", str_glue({adults_paeds_data_file})),
-  overwrite = T
-  )
+get_SP_file(paste0(master_files_folder, "/", adults_paeds_data_file),
+            here("data", adults_paeds_data_file))
 
 adults_paeds_data <- read.csv(
   here(str_glue('data/{adults_paeds_data_file}'))
@@ -113,7 +100,7 @@ adults_paeds_data_postcode  <- adults_paeds_data_raw |>
 
 # download matneo data 
 
-matneo_data_file <- master_files_dr$list_files() |>
+matneo_data_file <- list_SP_files(paste0(base_url, "/", master_files_folder)) |>
   select(name) |>
   filter(str_detect(name,
                     # below parameter is generated in read-qart-submissions.R
@@ -124,13 +111,8 @@ matneo_data_file <- master_files_dr$list_files() |>
   unlist() |>
   unname()
 
-matneo_data_file_identified_data <- master_files_dr$get_item(
-  str_glue({matneo_data_file}))
-
-matneo_data_file_identified_data$download(
-  dest = here("data", str_glue({matneo_data_file})),
-  overwrite = T
-  )
+get_SP_file(paste0(master_files_folder, "/", matneo_data_file),
+            here("data", matneo_data_file))
 
 matneo_data <- read.csv(
   here(str_glue('data/{matneo_data_file}'))
@@ -144,7 +126,7 @@ matneo_data_raw <- matneo_data |>
 
 # download ED data 
 
-ed_data_file <- master_files_dr$list_files() |>
+ed_data_file <- list_SP_files(paste0(base_url, "/", master_files_folder)) |>
   select(name) |>
   filter(str_detect(name,
                     # below parameter is generated in read-qart-submissions.R
@@ -155,13 +137,8 @@ ed_data_file <- master_files_dr$list_files() |>
   unlist() |>
   unname()
 
-ed_data_file_identified_data <- master_files_dr$get_item(
-  str_glue({ed_data_file}))
-
-ed_data_file_identified_data$download(
-  dest = here("data", str_glue({ed_data_file})),
-  overwrite = T
-  )
+get_SP_file(paste0(master_files_folder, "/", ed_data_file),
+            here("data", ed_data_file))
 
 ed_data <- read.csv(
   here(str_glue('data/{ed_data_file}'))
@@ -257,8 +234,9 @@ adults_paeds_to_aggregate |>
 
 ```{r}
 # get UK boundaries
+# Originally downloaded from: "https://open-geography-portalx-ons.hub.arcgis.com/datasets/ons::countries-december-2025-boundaries-uk-buc.geojson"
 uk <- st_read(
-  "https://open-geography-portalx-ons.hub.arcgis.com/datasets/ons::countries-december-2025-boundaries-uk-buc.geojson",
+  "data/countries_outline.geojson",
   #suppress output message
   quiet = T
 )

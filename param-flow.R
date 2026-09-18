@@ -11,6 +11,8 @@ library(lubridate)
 library(openxlsx2)
 library(quarto)
 
+sharepoint_local_access <- TRUE
+
 source('config-sharepoint-location.R')
 
 # ----------------- these variables will **change** every quarter

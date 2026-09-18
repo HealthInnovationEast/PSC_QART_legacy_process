@@ -6,9 +6,8 @@ pscs <- unique(psc_icb_trust_lookup$updated_psc_name)
 
 # download look up provided by improvement team
 message(str_glue('Site look up list provided: {site_lookup_file_name}'))
-site_lookup_file <- master_files_dr$get_item(str_glue({site_lookup_file_name}))
-site_lookup_file$download(dest = here("lookups", str_glue({site_lookup_file_name})), 
-                            overwrite = T)
+get_SP_file(paste0(master_files_folder, "/", site_lookup_file_name),
+            here(paste0("lookups/", site_lookup_file_name)))
 
 # upload look up
 sites_phase_1 <- read_excel(here("lookups", str_glue({site_lookup_file_name})),
@@ -52,18 +51,18 @@ call_by_site_code <- function(trust_site_code) {
     "https://directory.spineservices.nhs.uk/ORD/2-0-0/organisations/",
     trust_site_code
   )))
-  
+
   api_site_name <- site_info$Organisation$Name
   api_site_postcode <- site_info$Organisation$GeoLoc$Location$PostCode
-  
+
   print(glue::glue("** Getting parent code for {trust_site_code} - {api_site_name}  **"))
-  
+
   relationships <- length(site_info$Organisation$Rels$Rel)
-  
+
   # setup counter for how many hits were potentially correct
   n_status <- 0
   rel_n <- NA
-  
+
   for (relationship in 1:relationships) {
     rel_id <- site_info$Organisation$Rels$Rel[[relationship]]$id
     rel_status <- site_info$Organisation$Rels$Rel[[relationship]]$Status
@@ -73,14 +72,14 @@ call_by_site_code <- function(trust_site_code) {
       print(glue::glue("Index of relationship extracted: {rel_n}"))
     }
   }
-  
+
   if (n_status == 1) {
     api_parent_code <- site_info$Organisation$Rels$Rel[[rel_n]]$Target$OrgId$extension
   } else {
     print(str_glue("Setting parent code to NA as either 0 or more than 1 hits met our criteria"))
     api_parent_code <- NA
   }
-  
+
   tibble(
     trust_site_code,
     api_site_name,
@@ -89,15 +88,15 @@ call_by_site_code <- function(trust_site_code) {
   )
 }
 
-call_site_postcode_and_parent_codes <- apply(site_lookup_parsed #|> 
+call_site_postcode_and_parent_codes <- apply(site_lookup_parsed #|>
                                                #select(trust_site_code)
-                                             , 
+                                             ,
                                              1, call_by_site_code) |>
-  bind_rows() 
+  bind_rows()
 
 # get trust names, start, and end dates using function developed in active_orgsanisation_check.R 
 call_org_names_and_dates <- apply(
-  call_site_postcode_and_parent_codes |> 
+  call_site_postcode_and_parent_codes |>
     distinct(api_parent_code)
                                   , 1, 
                                   call_by_org_code) |>
@@ -114,12 +113,12 @@ ods_site_trust_details <- call_org_names_and_dates |>
   select(api_org_code, api_org_name, 
          trust_site_code, api_site_name,
          api_site_postcode) 
-  
+
 # join ods details to list by hin
 psc_trust_site_lookup <- site_lookup |>
-  left_join(ods_site_trust_details, 
+  left_join(ods_site_trust_details,
             by = c('site_sdcs_code' = 'trust_site_code')) |>
-  mutate(updated_psc_name = 
+  mutate(updated_psc_name =
            case_when(
              hin_psc == 'East Midlands' ~ 'East Midlands HIN',
              hin_psc == 'East' ~ 'Eastern HIN',
@@ -151,7 +150,5 @@ psc_trust_site_lookup <- site_lookup |>
 # save work locally and on sharepoint
 write.csv(psc_trust_site_lookup, here("lookups", "psc_trust_site_lookup.csv"), row.names = F)
 
-chosenlib$upload_file(
-  dest = str_glue("{base_url}/1. Master files/psc_trust_site_lookup.csv"),
-  src = "lookups/psc_trust_site_lookup.csv"
-)
+upload_SP_file(here("lookups/psc_trust_site_lookup.csv"),
+               paste0(master_files_folder, "/psc_trust_site_lookup.csv"))

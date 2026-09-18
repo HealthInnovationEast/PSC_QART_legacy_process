@@ -5,10 +5,8 @@
 
 
 # download previously submitted matneo data from SharePoint
-master_files_dr <- chosenlib$get_item(glue::glue("{base_url}/{master_files_folder}"))
-previous_data_file <- master_files_dr$get_item(str_glue({previous_mat_neo_submissions_file_name}))
-previous_data_file$download(dest = here("output", str_glue({previous_mat_neo_submissions_file_name})), 
-                       overwrite = T)
+get_SP_file(paste0(master_files_folder, "/", previous_mat_neo_submissions_file_name),
+            here(paste0("output/", previous_mat_neo_submissions_file_name)))
 
 # upload data 
 org_names_previous_submissions <- read.csv(
@@ -347,10 +345,8 @@ write.csv(map_psc_trust_icb_active_orgs_final,
           here("lookups", "psc_icb_trust_lookup.csv"), row.names = F)
 
 # save file on SharePoint 
-chosenlib$upload_file(
-  dest = str_glue("{base_url}/1. Master files/psc_icb_trust_lookup.csv"),
-  src = "lookups/psc_icb_trust_lookup.csv"
-)
+upload_SP_file(here("lookups/psc_icb_trust_lookup.csv"),
+               paste0(master_files_folder, "/psc_icb_trust_lookup.csv"))
 
 # print a message of where organisation changes have occurred 
 map_legacy <- call_orgs_legacy_status_quarter |> 

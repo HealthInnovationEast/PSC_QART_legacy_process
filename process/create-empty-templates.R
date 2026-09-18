@@ -3,9 +3,8 @@ message('Creating templates...')
 # script to create empty excel templates with organisation names for each PSC. 
 
 # download template file from SharePoint
-template_file <- master_files_dr$get_item(str_glue({template_file_name}))
-template_file$download(dest = here("lookups", str_glue({template_file_name})), 
-                       overwrite = T)
+get_SP_file(paste0(master_files_folder, "/", template_file_name),
+            here("lookups", template_file_name))
 
 # file friendly naming string for saving results
 current_quarter_year <- str_remove_all(reporting_quarter_string, '20|/')
@@ -23,16 +22,16 @@ for (psc in pscs) {
            site_sdcs_code, api_site_name, phase) |>
     # this is to avoid printing string '#N/A' for empty cells
     mutate(across(where(is.character), ~replace_na(., ' ')))
-  
-  # all other grids generated 
+
+  # all other grids generated
   # grid with icb codes and names
   location_icb <- psc_icb_trust_lookup |>
     filter(updated_psc_name == psc) |>
     distinct(api_current_icb_code, api_current_icb_name)
-  
+
   # wider form of location_icb_trust for medsip
-  location_icb_wide <- location_icb |> 
-    pivot_wider(names_from = api_current_icb_code, 
+  location_icb_wide <- location_icb |>
+    pivot_wider(names_from = api_current_icb_code,
                 values_from = api_current_icb_name)
 
   # grid with icb code, trust code, icb name, and trust name
@@ -52,7 +51,7 @@ for (psc in pscs) {
 
   # load template excel file
   wb <- openxlsx2::wb_load(here("lookups", str_glue({template_file_name})))
-  
+
   # add trust and sites to Martha's Rule tabs
   # MR adult and paeds
   wb <- wb_add_data(wb,
@@ -63,7 +62,7 @@ for (psc in pscs) {
                     start_row = 7,
                     col_names = FALSE
   )
-  
+
   # MR matneo
   wb <- wb_add_data(wb,
                     sheet = "MR - Maternity & Neonatal",
@@ -74,7 +73,7 @@ for (psc in pscs) {
                     start_row = 7,
                     col_names = FALSE
   )
-  
+
   # MR ED
   wb <- wb_add_data(wb,
                     sheet = "MR - Emergency Departments",
@@ -85,7 +84,7 @@ for (psc in pscs) {
                     start_row = 7,
                     col_names = FALSE
   )
-  
+
   # add ICB names to Medicines tab
   # long form
   wb <- wb_add_data(wb,
@@ -95,7 +94,7 @@ for (psc in pscs) {
     start_row = 6,
     col_names = FALSE
   )
-  
+
   # wide form
   wb <- wb_add_data(wb,
     sheet = "Medicines",
@@ -124,7 +123,7 @@ for (psc in pscs) {
     start_row = 42,
     col_names = FALSE
   )
-  
+
   # PAS score
   wb <- wb_add_data(wb,
     sheet = "MatNeo",
@@ -141,11 +140,9 @@ for (psc in pscs) {
   # upload
   print(str_glue("Uploading template to:
                  {base_url}/{psc}"))
-  
-  chosenlib$upload_file(
-    dest = str_glue("{base_url}/{psc}/{psc} QART {current_quarter_year}.xlsx"),
-    src = "output/empty_template.xlsx"
-  )
+
+  upload_SP_file(here("output/empty_template.xlsx"),
+                 paste0(psc, "/", psc, " QART ", current_quarter_year, ".xlsx"))
 
   # delete template file from local location.
   file.remove("output/empty_template.xlsx")
