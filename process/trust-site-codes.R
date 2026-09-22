@@ -1,43 +1,35 @@
 message('Adding trust site codes...')
 
-# bring psc-icb-trust lookup created via active-organisation-check.R  
-psc_icb_trust_lookup <- read.csv(here("lookups", "psc_icb_trust_lookup.csv")) 
-pscs <- unique(psc_icb_trust_lookup$updated_psc_name)
+# bring psc-icb-trust lookup created via active-organisation-check.R
+psc_icb_trust_lookup <- read.csv(here("lookups", "psc_icb_trust_lookup.csv"))
 
 # download look up provided by improvement team
 message(str_glue('Site look up list provided: {site_lookup_file_name}'))
 get_SP_file(paste0(master_files_folder, "/", site_lookup_file_name),
-            here(paste0("lookups/", site_lookup_file_name)))
+            here("lookups", site_lookup_file_name))
 
-# upload look up
-sites_phase_1 <- read_excel(here("lookups", str_glue({site_lookup_file_name})),
-                            sheet = 'Phase 1 sites') |>
-  clean_names() |>
-  select(hin_psc, site_sdcs_code) |>
-  mutate(phase = '1')
+# prepare look up
+full_sites_list <- read_excel(here("lookups", site_lookup_file_name)) |>
+  remove_empty("rows") |>
+  select(`HIN/ PSC`, `Site SDCS Code`, `Site phase`, MatNeo, `ED Adult`, `ED Paeds`)
 
-sites_phase_2 <- read_excel(here("lookups", str_glue({site_lookup_file_name})),
-                          sheet = 'Phase 2 sites') |>
-  clean_names() |>
-  select(hin_psc, site_sdcs_code) |>
-  mutate(phase = '2')
+MatNeo_ED_phases <- full_sites_list |>
+  mutate(ED = ifelse(`ED Adult` == "y" | `ED Paeds` == "y",
+                     "y", "n")) |>
+  select(-c(`ED Adult`, `ED Paeds`)) |>
+  pivot_longer(cols = c(MatNeo, ED),
+               names_to = "extra_phases",
+               values_to = "exists") |>
+  filter(exists == "y") |>
+  select(-c(exists, `Site phase`)) |>
+  rename(phase = extra_phases)
 
-sites_phase_3_matneo <- read_excel(here("lookups", str_glue({site_lookup_file_name})),
-                            sheet = 'Phase 3 MatNeo') |>
-  clean_names() |>
-  select(hin_psc, site_sdcs_code) |>
-  mutate(phase = 'matneo')
-
-sites_phase_3_ed <- read_excel(here("lookups", str_glue({site_lookup_file_name})),
-                                   sheet = 'Phase 3 ED') |>
-  clean_names() |>
-  select(hin_psc, site_sdcs_code) |>
-  mutate(phase = 'ed')
-
-# combine all sites 
-# there's duplicate codes here given different phases
-site_lookup <- bind_rows(sites_phase_1, sites_phase_2, 
-                         sites_phase_3_matneo, sites_phase_3_ed)
+site_lookup <- full_sites_list |>
+  select(`HIN/ PSC`, `Site SDCS Code`, phase = `Site phase`) |>
+  mutate(phase = as.character(phase)) |>
+  bind_rows(MatNeo_ED_phases) |>
+  rename(hin_psc = `HIN/ PSC`,
+         site_sdcs_code = `Site SDCS Code`)
 
 # wrangle to allow left join to psc_icb_trust_lookup
 site_lookup_parsed <- site_lookup |>
@@ -55,8 +47,6 @@ call_by_site_code <- function(trust_site_code) {
   api_site_name <- site_info$Organisation$Name
   api_site_postcode <- site_info$Organisation$GeoLoc$Location$PostCode
 
-  print(glue::glue("** Getting parent code for {trust_site_code} - {api_site_name}  **"))
-
   relationships <- length(site_info$Organisation$Rels$Rel)
 
   # setup counter for how many hits were potentially correct
@@ -68,8 +58,7 @@ call_by_site_code <- function(trust_site_code) {
     rel_status <- site_info$Organisation$Rels$Rel[[relationship]]$Status
     if (rel_id == "RE6" & rel_status == "Active") { # RE5 is the parent trust relationship
       n_status <- n_status + 1
-      rel_n <- relationship # extract relationship number
-      print(glue::glue("Index of relationship extracted: {rel_n}"))
+      rel_n <- relationship # extract relationship number=
     }
   }
 
@@ -88,9 +77,7 @@ call_by_site_code <- function(trust_site_code) {
   )
 }
 
-call_site_postcode_and_parent_codes <- apply(site_lookup_parsed #|>
-                                               #select(trust_site_code)
-                                             ,
+call_site_postcode_and_parent_codes <- apply(site_lookup_parsed,
                                              1, call_by_site_code) |>
   bind_rows()
 

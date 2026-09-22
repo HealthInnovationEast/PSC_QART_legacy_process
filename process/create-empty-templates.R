@@ -6,6 +6,12 @@ message('Creating templates...')
 get_SP_file(paste0(master_files_folder, "/", template_file_name),
             here("lookups", template_file_name))
 
+# load lookups
+psc_trust_site_lookup <- read.csv(here("lookups", "psc_trust_site_lookup.csv"))
+psc_icb_trust_lookup <- read.csv(here("lookups", "psc_icb_trust_lookup.csv"))
+ICBs_by_HIN <- read.csv(here("lookups", ICBs_by_HIN_file_name),
+                        check.names = FALSE)
+
 # file friendly naming string for saving results
 current_quarter_year <- str_remove_all(reporting_quarter_string, '20|/')
 
@@ -25,14 +31,14 @@ for (psc in pscs) {
 
   # all other grids generated
   # grid with icb codes and names
-  location_icb <- psc_icb_trust_lookup |>
-    filter(updated_psc_name == psc) |>
-    distinct(api_current_icb_code, api_current_icb_name)
+  location_icb <- ICBs_by_HIN |>
+    filter(`HIN Name` == psc) |>
+    distinct(`ICB Code`, `ICB Name`)
 
   # wider form of location_icb_trust for medsip
   location_icb_wide <- location_icb |>
-    pivot_wider(names_from = api_current_icb_code,
-                values_from = api_current_icb_name)
+    pivot_wider(names_from = `ICB Code`,
+                values_from = `ICB Name`)
 
   # grid with icb code, trust code, icb name, and trust name
   location_icb_trust <- psc_icb_trust_lookup |>
@@ -67,7 +73,7 @@ for (psc in pscs) {
   wb <- wb_add_data(wb,
                     sheet = "MR - Maternity & Neonatal",
                     x = location_trust_sites |>
-                      filter(phase == 'matneo') |> 
+                      filter(phase == 'MatNeo') |> 
                       select(-phase),
                     start_col = 2,
                     start_row = 7,
@@ -78,7 +84,7 @@ for (psc in pscs) {
   wb <- wb_add_data(wb,
                     sheet = "MR - Emergency Departments",
                     x = location_trust_sites |>
-                      filter(phase == 'ed') |> 
+                      filter(phase == 'ED') |> 
                       select(-phase),
                     start_col = 2,
                     start_row = 7,
@@ -139,7 +145,7 @@ for (psc in pscs) {
 
   # upload
   print(str_glue("Uploading template to:
-                 {base_url}/{psc}"))
+                 {base_url}{psc}"))
 
   upload_SP_file(here("output/empty_template.xlsx"),
                  paste0(psc, "/", psc, " QART ", current_quarter_year, ".xlsx"))

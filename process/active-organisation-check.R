@@ -8,6 +8,10 @@
 get_SP_file(paste0(master_files_folder, "/", previous_mat_neo_submissions_file_name),
             here(paste0("output/", previous_mat_neo_submissions_file_name)))
 
+# download ICBs_by_HIN from SharePoint
+get_SP_file(paste0(master_files_folder, "/", ICBs_by_HIN_file_name),
+            here("lookups", ICBs_by_HIN_file_name))
+
 # upload data 
 org_names_previous_submissions <- read.csv(
   here(str_glue('output/{previous_mat_neo_submissions_file_name}'))
@@ -50,11 +54,7 @@ call_by_org_code <- function(api_org_code) {
   api_org_name <- trust_info$Organisation$Name
   api_org_date <- trust_info$Organisation$Date
   
-  print(glue::glue("** Getting mapping for {api_org_code} - {api_org_name} **"))
-  
   date_elements <- as.numeric(length(api_org_date))
-  
-  print(glue::glue("Found {date_elements} date type(s)"))
   
   # if there's only one date type, it is always operational
   # (legal dates are only provided when they differ from operational)
@@ -67,7 +67,7 @@ call_by_org_code <- function(api_org_code) {
     # this should be NULL
     api_date_end <- api_org_date[1][[1]]$End
     api_succ_code <- NA
-    print(glue::glue("Retrieved {api_date_type} Date Info"))
+
   } else if (date_elements == 2) {
     # some orgs might have both operational AND Legal date types
     # but this doesn't automatically equate to the org being legacy
@@ -120,7 +120,6 @@ call_by_org_code <- function(api_org_code) {
         api_succ_code <- NA
       }
     }
-    print(glue::glue("Retrieved {api_date_type} Date Info"))
   }
   
   # this is useful for quarters where theyere have not been any mergers 
@@ -226,8 +225,6 @@ call_icb_code <- function(api_current_code) {
   
   api_current_org_name <- trust_info$Organisation$Name
   
-  print(glue::glue("** Getting ICB code for {api_current_org_name} **"))
-  
   relationships <- length(trust_info$Organisation$Rels$Rel)
   
   # setup counter for how many hits were potentially correct
@@ -240,7 +237,6 @@ call_icb_code <- function(api_current_code) {
     if (rel_id == "RE5" & rel_status == "Active") { # RE5 is the ICB relationship
       n_status <- n_status + 1
       rel_n <- relationship # extract relationship number
-      print(glue::glue("Index of relationship extracted: {rel_n}"))
     }
   }
   
@@ -370,3 +366,24 @@ if (nrow(map_legacy) > 0){
   message("There have been no organisation changes between now an the previous quarter")
 }
 
+# Check ICBs from ICBs_by_HIN lookup
+ICBs_by_HIN <- read.csv(here("lookups", ICBs_by_HIN_file_name),
+                        check.names = FALSE) |>
+  left_join(map_psc_trust_icb_active_orgs |>
+              distinct(api_current_icb_code, previous_quarter_icb_name,
+                     api_current_icb_name, icb_name_change),
+            by = join_by(`ICB Code` == api_current_icb_code))
+
+ICB_changes <- ICBs_by_HIN %>%
+  filter(is.na(icb_name_change) | icb_name_change == TRUE)
+
+if (nrow(ICB_changes) != 0) {
+  warning(paste0("There have been ",
+                 nrow(ICB_changes %>% filter(icb_name_change == TRUE)),
+                 " ICB name changes affecting the ICB to HIN lookup and ",
+                 nrow(ICB_changes %>% filter(is.na(icb_name_change))),
+                 " new ICBs. See lookups/icb_lookup_changes.csv for details and amend as needed"))
+  write.csv(ICB_changes, 
+            "lookups/icb_lookup_changes.csv",
+            row.names = FALSE)
+}

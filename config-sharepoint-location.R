@@ -26,7 +26,7 @@ get_SP_file <- function(SP_file_path, local_location) {
                   " to ", local_location))
     }
   } else {
-    temp_item <- dr$get_item(SP_file_path)
+    temp_item <- chosenlib$get_item(paste0(base_url, SP_file_path))
 
     temp_item$download(
       dest = local_location,
@@ -48,7 +48,7 @@ upload_SP_file <- function(local_file, SP_destination){
     }
   } else {
     chosenlib$upload_file(
-      dest = SP_destination,
+      dest = paste0(base_url, SP_destination),
       src = local_file,
       overwrite = TRUE
     )
