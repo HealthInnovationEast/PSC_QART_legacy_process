@@ -2,10 +2,9 @@
 quarto_render(
   "marthas-qart-report.qmd",
   execute_params = list(
-    reporting_quarter = reporting_quarter_string,
     master_files_folder = master_files_folder,
-    # below parameter is generated in read-qart-submissions.R
-    quarter_string = quarter_string
+    reporting_quarter = reporting_quarter_string,
+    quarter_string = reporting_quarter_file_string
     ))
 
 new_file_name <- glue::glue("Marthas_QART_{quarter_string}.html")

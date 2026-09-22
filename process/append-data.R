@@ -54,7 +54,9 @@ append_data <- function(previous_submission,
 
   message("Saving updated Martha's data to SharePoint")
 
-  file_name <- glue('{updated_file_name_start}_data_upto_{quarter_string}.csv')
+  file_name <- paste0(updated_file_name_start, 
+                      "_data_upto_", 
+                      reporting_quarter_file_string, ".csv")
 
   write.csv(all_submissions,
             str_glue("output/{file_name}"),

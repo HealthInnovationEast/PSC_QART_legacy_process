@@ -228,15 +228,12 @@ if (length(unique(results_marthas_adult_paeds$updated_psc_name)) != 15 &
 }
 
 # write quarterly data files
-quarter_string <- reporting_quarter_string |>
-  str_replace_all("/| ", "_")
-
 time_stamp_ext <- format(Sys.time(), "%Y_%m_%d_%H%M%S.csv")
 
 # create paths for saving
-marthas_adults_paeds_submissions_path <- glue::glue("output/marthas_adults_paeds_psc_submissions_{quarter_string}_processed_{time_stamp_ext}")
-marthas_mat_neo_submissions_path <- glue::glue("output/marthas_mat_neo_psc_submissions_{quarter_string}_processed_{time_stamp_ext}")
-marthas_ed_submissions_path <- glue::glue("output/marthas_ed_psc_submissions_{quarter_string}_processed_{time_stamp_ext}")
+marthas_adults_paeds_submissions_path <- glue::glue("output/marthas_adults_paeds_psc_submissions_{reporting_quarter_file_string}_processed_{time_stamp_ext}")
+marthas_mat_neo_submissions_path <- glue::glue("output/marthas_mat_neo_psc_submissions_{reporting_quarter_file_string}_processed_{time_stamp_ext}")
+marthas_ed_submissions_path <- glue::glue("output/marthas_ed_psc_submissions_{reporting_quarter_file_string}_processed_{time_stamp_ext}")
 
 # loop over results and file names to save as csv's
 results <- list(results_marthas_adult_paeds,

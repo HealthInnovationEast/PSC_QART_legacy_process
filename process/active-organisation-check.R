@@ -1,4 +1,4 @@
-# script to check legacy status of trusts in PSC's 
+# script to check legacy status of trusts in PSCs 
 
 # here we evaluate the organisation names for quarters after retroactive changes have been applied 
 # i.e., to account for changes in orgs applicable from 2024/25 Q4 and after
@@ -325,11 +325,16 @@ qa_name_changes <- map_psc_trust_icb_active_orgs |>
 empty_qa_name_changes <- nrow(qa_name_changes) == 0
 
 if (empty_qa_name_changes == F) {
-  warning("There have been either ICB or Trust name changes")
-  t(qa_name_changes |> 
-      select(previous_quarter_icb_name, api_current_icb_name,
-             previous_quarter_org_name , api_current_org_name)
-    ) 
+  warning(paste0("There have been ",
+                 nrow(qa_name_changes |>
+                        filter(icb_name_change == TRUE)),
+                 " ICB name changes and ",
+                 nrow(qa_name_changes |>
+                        filter(trust_name_change == TRUE)),
+                 " Trust name changes. See lookups/icb_and_trust_changes.csv for details"))
+  write.csv(qa_name_changes, 
+            "lookups/icb_and_trust_changes.csv",
+            row.names = FALSE)
 } else {
   message("There have been no organisation changes between now an the previous quarter")
 }

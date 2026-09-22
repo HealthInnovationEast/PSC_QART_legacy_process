@@ -17,12 +17,13 @@ if (sharepoint_local_access) {
 get_SP_file <- function(SP_file_path, local_location) {
   if (sharepoint_local_access){
     copy_success <- file.copy(paste0(SP_folder_path,
-                     SP_file_path),
-              local_location,
-              overwrite = TRUE)
+                                     SP_file_path),
+                              local_location,
+                              overwrite = TRUE)
     if (!copy_success) {
       stop(paste0("File download failed: ",
-                  SP_file_path, " to ", local_location))
+                  paste0(SP_folder_path, SP_file_path),
+                  " to ", local_location))
     }
   } else {
     temp_item <- dr$get_item(SP_file_path)
@@ -36,16 +37,20 @@ get_SP_file <- function(SP_file_path, local_location) {
 
 upload_SP_file <- function(local_file, SP_destination){
   if (sharepoint_local_access){
-    copy_success <- file.copy(local_file, paste0(SP_folder_path,
-                                 SP_destination))
+    copy_success <- file.copy(local_file,
+                              paste0(SP_folder_path,
+                                     SP_destination),
+                              overwrite = TRUE)
     if (!copy_success) {
       stop(paste0("File upload failed: ",
-                  local_file, " to ", SP_destination))
+                  local_file, " to ",
+                  paste0(SP_folder_path, SP_destination)))
     }
   } else {
     chosenlib$upload_file(
       dest = SP_destination,
-      src = local_file
+      src = local_file,
+      overwrite = TRUE
     )
   }
 }
