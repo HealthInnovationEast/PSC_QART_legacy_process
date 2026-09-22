@@ -38,9 +38,6 @@ append_data <- function(previous_submission,
 
   data_name <- str_extract(previous_submission, '^.*?(?=_data_upto)')
 
-  message(glue("Previous {data_name} file has data up to "),
-          max(previous_submission_data$quarter))
-
   # collated data produced in read_quart_submissions.R
   reporting_quarter_submissions <- read.csv(
     here(file_path)) |>
@@ -52,7 +49,7 @@ append_data <- function(previous_submission,
     mutate_all(as.character) |>
     bind_rows(reporting_quarter_submissions)
 
-  message("Saving updated Martha's data to SharePoint")
+  message("Saving updated data to SharePoint")
 
   file_name <- paste0(updated_file_name_start, 
                       "_data_upto_", 
@@ -86,4 +83,10 @@ append_data(
   previous_submission = previous_marthas_submissions_ed,
   file_path = marthas_ed_submissions_path,
   updated_file_name_start = 'marthas_qart_ed'
+)
+
+append_data(
+  previous_submission = previous_mat_neo_submissions_file_name,
+  file_path = mat_neo_opt_submissions_path,
+  updated_file_name_start = 'mat_neo_qart_all'
 )

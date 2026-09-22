@@ -90,6 +90,7 @@ collect_sheet_data <- function(
 results_marthas_adult_paeds <- tibble()
 results_marthas_mat_neo <- tibble()
 results_marthas_ed <- tibble()
+results_mat_neo <- tibble()
 
 # for testing
 # hin_folders = 'Manchester HIN'
@@ -209,7 +210,99 @@ for (hin in hin_folders) {
     tidy_col_names = col_names_ed,
     col_names = FALSE,
     hin_name = hin)
-
+  
+  # read matneo data
+  message("Reading MatNeo submissions")
+  
+  data_mat_neo <- read_excel(
+    path = tf_name, sheet = "MatNeo",
+    range = "B5:N56"
+  )
+  
+  # NEWTT 2 data
+  data_nwwtt2_mews <- data_mat_neo[1:16, 1:8]
+  
+  nwwtt2_location <- data.frame(which(data_nwwtt2_mews == "NEWTT 2", arr.ind = T))
+  # validation
+  
+  if (nwwtt2_location$col != 5) {
+    print(glue::glue("Skipping {hin}"))
+    print("NWWTT2 data not found in expected location")
+    next
+  }
+  
+  data_nwwtt2 <- data_nwwtt2_mews[, 1:nwwtt2_location$col] |>
+    tail(-2)
+  
+  names(data_nwwtt2) <- c('api_icb_code', 'api_org_code', 'api_icb_name', 
+                          'organisation_name_verified', "Newtt2")
+  
+  data_nwwtt2_tidy <- data_nwwtt2 |>
+    remove_empty("rows")
+  
+  # validation
+  if (purrr::is_empty(which(is.na(data_nwwtt2_tidy))) == FALSE) {
+    print(glue::glue("Skipping {hin}"))
+    print("NWWTT2 grid was not fully complete")
+    next
+  }
+  
+  # MEWS data
+  mews_location <- data.frame(which(data_nwwtt2_mews == "MEWS", arr.ind = T))
+  
+  # validation
+  if (mews_location$col != 7) {
+    print(glue::glue("Skipping {hin}"))
+    print("MEWS data not found in expected location")
+    next
+  }
+  
+  data_mews <- data_nwwtt2_mews[, c(1:4, mews_location$col)] |>
+    tail(-2)
+  
+  names(data_mews) <- c('api_icb_code', 'api_org_code', 'api_icb_name', 
+                        'organisation_name_verified', "MEWS")
+  
+  data_mews_tidy <- data_mews |>
+    remove_empty("rows")
+  
+  # validation
+  if (purrr::is_empty(which(is.na(data_mews_tidy))) == FALSE) {
+    print(glue::glue("Skipping {hin}"))
+    print("MEWS grid was not fully complete")
+    next
+  }
+  
+  # IFH data
+  data_ABC <- data_mat_neo[34:50, 1:8]
+  
+  data_IFH <- data_ABC[4:17, 1:6] |>
+    remove_empty("rows")
+  
+  names(data_IFH) <- c('api_icb_code', 'api_org_code', 'api_icb_name', 
+                       'organisation_name_verified', "IFH_prevQ", "IFH_currentQ")
+  
+  
+  # now join all 3 cuts
+  data_combined <- data_IFH |>
+    mutate(
+      updated_psc_name = hin,
+      .before = api_icb_code
+    ) |>
+    left_join(data_nwwtt2_tidy, by = c('api_icb_code', 'api_org_code', 'api_icb_name', 
+                                       'organisation_name_verified')) |>
+    left_join(data_mews_tidy, by = c('api_icb_code', 'api_org_code', 'api_icb_name', 
+                                     'organisation_name_verified')) |>
+    mutate(
+      quarter = reporting_quarter_string,
+      .after = organisation_name_verified
+    )
+  
+  print(glue::glue("Successful data extraction for {hin}. Data retrieved from:"))
+  print(glue::glue("{hin_submission_file}"))
+  
+  results_mat_neo <- rbind(results_mat_neo, data_combined)
+  
   # append extracted data to list
   results_marthas_adult_paeds <- bind_rows(results_marthas_adult_paeds,
                                            data_marthas_tidy_adult_paeds)
@@ -222,7 +315,8 @@ for (hin in hin_folders) {
 
 if (length(unique(results_marthas_adult_paeds$updated_psc_name)) != 15 &
     length(unique(results_marthas_mat_neo$updated_psc_name)) != 15 &
-    length(unique(results_marthas_ed$updated_psc_name)) != 15
+    length(unique(results_marthas_ed$updated_psc_name)) != 15 & 
+    length(unique(results_mat_neo$updated_psc_name)) != 15
     ){
   stop('Data not appended correctly')
 }
@@ -234,15 +328,18 @@ time_stamp_ext <- format(Sys.time(), "%Y_%m_%d_%H%M%S.csv")
 marthas_adults_paeds_submissions_path <- glue::glue("output/marthas_adults_paeds_psc_submissions_{reporting_quarter_file_string}_processed_{time_stamp_ext}")
 marthas_mat_neo_submissions_path <- glue::glue("output/marthas_mat_neo_psc_submissions_{reporting_quarter_file_string}_processed_{time_stamp_ext}")
 marthas_ed_submissions_path <- glue::glue("output/marthas_ed_psc_submissions_{reporting_quarter_file_string}_processed_{time_stamp_ext}")
+mat_neo_opt_submissions_path <- glue::glue("output/mat_neo_optimisation_psc_submissions_{reporting_quarter_file_string}_processed_{time_stamp_ext}")
 
 # loop over results and file names to save as csv's
 results <- list(results_marthas_adult_paeds,
                 results_marthas_mat_neo,
-                results_marthas_ed)
+                results_marthas_ed,
+                results_mat_neo)
 
 paths <- c(marthas_adults_paeds_submissions_path,
            marthas_mat_neo_submissions_path,
-           marthas_ed_submissions_path)
+           marthas_ed_submissions_path,
+           mat_neo_opt_submissions_path)
 
 for (i in seq_along(results)){
   write.csv(

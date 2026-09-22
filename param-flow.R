@@ -19,7 +19,7 @@ source('config-sharepoint-location.R')
 
 # this is the stage of the task we want executed
 # either "prepare_templates" or "process_submissions"
-stage_of_process <- "prepare_templates" 
+stage_of_process <- "process_submissions" 
 
 # set dates by setting end of reporting quarter 
 # (mind that latest data will be lagged by 1 quarter)
