@@ -12,14 +12,16 @@ psc_icb_trust_lookup <- read.csv(here("lookups", "psc_icb_trust_lookup.csv"))
 ICBs_by_HIN <- read.csv(here("lookups", ICBs_by_HIN_file_name),
                         check.names = FALSE)
 
+HINs <- unique(ICBs_by_HIN$`HIN Name`)
+
 # file friendly naming string for saving results
 current_quarter_year <- str_remove_all(reporting_quarter_string, '20|/')
 
 # if testing one template
-# pscs = pscs[pscs %in% c('North West Coast HIN')]
+# HINs = HINs[HINs %in% c('North West Coast HIN')]
 
 # loop through locations provided in psc_lookup.csv
-for (psc in pscs) {
+for (psc in HINs) {
   # grid with trust code, site code, trust name, site name 
   # generated in trust-site-codes.R
   location_trust_sites <- psc_trust_site_lookup |>
@@ -138,6 +140,8 @@ for (psc in pscs) {
     start_row = 63,
     col_names = FALSE
   )
+
+  wb <- wb_set_active_sheet(wb, sheet = "Intro")
 
   wb_save(wb,
     file = "output/empty_template.xlsx"
