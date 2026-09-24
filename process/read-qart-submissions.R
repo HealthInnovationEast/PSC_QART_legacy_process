@@ -330,7 +330,7 @@ marthas_mat_neo_submissions_path <- glue::glue("output/marthas_mat_neo_psc_submi
 marthas_ed_submissions_path <- glue::glue("output/marthas_ed_psc_submissions_{reporting_quarter_file_string}_processed_{time_stamp_ext}")
 mat_neo_opt_submissions_path <- glue::glue("output/mat_neo_optimisation_psc_submissions_{reporting_quarter_file_string}_processed_{time_stamp_ext}")
 
-# loop over results and file names to save as csv's
+# loop over results and file names to save as CSVs
 results <- list(results_marthas_adult_paeds,
                 results_marthas_mat_neo,
                 results_marthas_ed,

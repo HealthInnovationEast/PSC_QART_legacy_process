@@ -39,6 +39,7 @@ library(DT)
 # post code and mapping libraries
 library(PostcodesioR)
 library(sf)
+library(httr)
 
 library(glue)
 library(labelled)
@@ -53,22 +54,6 @@ quarter_string <- params$quarter_string
 ```
 
 ```{r}
-# TODO: create function
-# go into share point and download lookup with postcode info for map
-lookup_data_file <- "psc_trust_site_lookup.csv"
-
-get_SP_file(paste0(master_files_folder, "/", lookup_data_file),
-            here("data", lookup_data_file))
-
-# bring site look up with postcode info and get geo info
-site_postcode_list <- read.csv(here('data', lookup_data_file)) |>
-  select(site_sdcs_code, api_site_postcode)
-
-postcodes_lookup_table <- lapply(unique(site_postcode_list$api_site_postcode),
-                                 PostcodesioR::postcode_lookup) |>
-  bind_rows() |>
-  right_join(site_postcode_list, by = c('postcode' = 'api_site_postcode'))
-
 # go into share point and download adults and paeds data
 adults_paeds_data_file <- list_SP_files(paste0(base_url, "/", master_files_folder)) |>
   select(name) |>
@@ -93,10 +78,6 @@ latest_quarter <- max(adults_paeds_data$quarter)
 
 adults_paeds_data_raw <- adults_paeds_data |>
   filter(quarter == latest_quarter)
-
-adults_paeds_data_postcode  <- adults_paeds_data_raw |>
-  left_join(postcodes_lookup_table, by = c('site_code' = 'site_sdcs_code')) |>
-  relocate(postcode, .after = name_of_site)
 
 # download matneo data 
 
@@ -150,6 +131,31 @@ latest_quarter <- max(ed_data$quarter)
 ed_data_raw <- ed_data |>
   filter(quarter == latest_quarter)
 ```
+
+```{r}
+# Convert Postcode to Long + Lat - could adjust so only runs if missing values to speed up
+get_location_by_site_code <- function(trust_site_code) {
+  site_info <- content(GET(paste0(
+    "https://directory.spineservices.nhs.uk/ORD/2-0-0/organisations/",
+    trust_site_code
+  )))
+  
+  api_site_postcode <- site_info$Organisation$GeoLoc$Location$PostCode
+  Sys.sleep(0.15)
+  postcode_details <- PostcodesioR::postcode_lookup(api_site_postcode)
+  postcode_details["site_code"] <- trust_site_code
+  return(postcode_details)
+}
+
+postcodes_lookup_table <- lapply(unique(adults_paeds_data_raw$site_code),
+                                 get_location_by_site_code) |>
+  bind_rows()
+
+adults_paeds_data_postcode  <- adults_paeds_data_raw |>
+  left_join(postcodes_lookup_table, by = join_by(site_code)) |>
+  relocate(postcode, .after = name_of_site)
+```
+
 
 ## User guidance notes
 
