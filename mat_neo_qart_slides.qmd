@@ -7,9 +7,9 @@ format:
     fig-dpi: 800
 editor: source
 params: 
-  reporting_quarter: '2025/26 Q2'
-  master_files_folder: '1. Master files'
-  quarter_string: '2025_26_Q2'
+  reporting_quarter: 'placeholder'
+  master_files_folder: 'placeholder'
+  quarter_string: 'placeholder'
 ---
 
 ```{r}
@@ -29,17 +29,19 @@ library(ggsci)
 library(viridis)
 library(Microsoft365R)
 
+sharepoint_local_access <- TRUE
 source('config-sharepoint-location.R')
 
 # params
 reporting_quarter <- params$reporting_quarter
 master_files_folder <- params$master_files_folder
 quarter_string <- params$quarter_string
+```
 
+```{r }
 # go into share point and download latest data
-master_files_dr <- chosenlib$get_item(glue::glue("{base_url}/{master_files_folder}"))
 
-mat_neo_data_file <- master_files_dr$list_files() |> 
+mat_neo_data_file <- list_SP_files(paste0(base_url, "/", master_files_folder)) |> 
   select(name) |> 
   filter(str_detect(name, 
                     # quarter_string parameter is generated in read-qart-submissions.R
@@ -50,10 +52,8 @@ mat_neo_data_file <- master_files_dr$list_files() |>
   unlist() |> 
   unname()
 
-mat_neo_identified_data <- master_files_dr$get_item(str_glue({mat_neo_data_file}))
-
-mat_neo_identified_data$download(dest = here("data", str_glue({mat_neo_data_file})), 
-                       overwrite = T)
+get_SP_file(paste0(master_files_folder, "/", mat_neo_data_file),
+            here("data", mat_neo_data_file))
 
 mat_neo_data <- read.csv(here(str_glue('data/{mat_neo_data_file}'))) |>
   mutate(updated_psc_name = str_remove_all(updated_psc_name, 'HIN'))
@@ -166,9 +166,8 @@ visualise_line <- function(df, aes_group, aes_colour, subtitle_string) {
 
 ![](data/matneo_overview.PNG)
 
-## 
 
-```{r}
+```{r eval=FALSE}
 spaghetti_data <- bind_rows(
   aggregate_stage(mat_neo_data, magnesium_sulphate),
   aggregate_stage(mat_neo_data, corticosteroids),
@@ -192,7 +191,7 @@ visualise_line(
   ggsci::scale_colour_jco()
 ```
 
-## 
+## Early recognition and management of deterioration - Stage 4 or above
 
 ```{r}
 spaghetti_data <- bind_rows(
@@ -211,7 +210,7 @@ visualise_line(
   ggsci::scale_colour_jco()
 ```
 
-## 
+##Early recognition and management of deterioration - Stage 5 or above
 
 ```{r}
 spaghetti_data <- bind_rows(
@@ -230,7 +229,7 @@ visualise_line(
   ggsci::scale_colour_jco()
 ```
 
-## 
+## Early recognition and management of deterioration - Stage 7
 
 ```{r}
 spaghetti_data <- bind_rows(

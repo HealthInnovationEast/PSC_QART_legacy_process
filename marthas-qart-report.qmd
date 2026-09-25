@@ -12,9 +12,9 @@ execute:
   echo: false
   warning: false
 params: 
-  reporting_quarter: '2026/27 Q1'
-  master_files_folder: '1. Master files'
-  quarter_string: '2026_27_Q1'
+  reporting_quarter: 'placeholder'
+  master_files_folder: 'placeholder'
+  quarter_string: 'placeholder'
 ---
 
 ```{r}
