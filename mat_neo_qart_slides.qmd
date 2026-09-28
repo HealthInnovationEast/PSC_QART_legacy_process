@@ -164,7 +164,7 @@ visualise_line <- function(df, aes_group, aes_colour, subtitle_string) {
 
 ## Maternity and Neonatal – Programme Overview
 
-![](data/matneo_overview.PNG)
+![](data/matneo_overview.png)
 
 
 ```{r eval=FALSE}
