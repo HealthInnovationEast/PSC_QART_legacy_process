@@ -19,11 +19,11 @@ source('config-sharepoint-location.R')
 
 # this is the stage of the task we want executed
 # either "prepare_templates" or "process_submissions"
-stage_of_process <- "prepare_templates" 
+stage_of_process <- "process_submissions" 
 
 # set dates by setting end of reporting quarter 
 # (mind that latest data will be lagged by 1 quarter)
-reporting_quarter_end_date <- ymd('2026-09-30')
+reporting_quarter_end_date <- ymd('2026-06-30')
 
 
 # ----------------- code below stays **fixed**
@@ -78,7 +78,7 @@ if (stage_of_process == "prepare_templates") {
   source('process/trust-site-codes.R')
   # IMPORTANT: make sure you have updated the reporting quarter in the intro tab
   source('process/create-empty-templates.R')
-} 
+}
 
 if (stage_of_process == "process_submissions") {
   # goes into sharepoint and collates submitted data for every PSC
@@ -86,5 +86,7 @@ if (stage_of_process == "process_submissions") {
   # appends collated data to previous submissions
   source('process/append-data.R')
   # uses appended data to produce power point slide
-  source('run-quarto.R') # runs qart_slides.qmd AND progression_slides.qmd
+  source('run-quarto.R') # runs qart_slides.qmd AND mat_neo_qart_slides.qmd
+  # creates programme slides
+  source('process/create_programme_powerpoints.R') # runs powerpoint_creation.py
 }

@@ -49,3 +49,10 @@ po/*~
 # RStudio Connect folder
 rsconnect/
 .positai
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Python environment
+.venv/

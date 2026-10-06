@@ -83,7 +83,7 @@ for ppt_file in input_folder.glob("*.pptx"):
                                           ReadOnly=True,
                                           WithWindow=False)
     for i in slides_to_save:
-        pptx.Slides[i].Export(f"{hin_folder}/Slide{i}.PNG", "PNG")
+        pptx.Slides[i-1].Export(f"{hin_folder}/Slide{i}.PNG", "PNG")
     pptx.Close()
 Application.Quit()
 

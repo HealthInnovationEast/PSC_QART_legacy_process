@@ -68,6 +68,19 @@ These are the scripts that reflect the most recent version of the pipeline, as a
 
 - *marthas-qart-report.qmd* - Quarto file containing code responsible for report layout and data visualisation. Produces HTML report for Martha's Rule. Executed via `run-quarto.R`*,* this script uses data files produced in `append-data.R` and aggregates data by PSC.
 
+- *mat_neo_qart_slides.qmd* - Quarto file that creates programme overview slides with figures that aggregate data from all HINs
+
+- *create_programme_powerpoints.R* - Wrapper for python script that also downloads pptx submission files and uploads programme slide outputs
+
+- *powerpoint_creation.py* - Script for creating the four programme slide decks
+  
 ## Attic
 
 This folder is a repository for scripts that previously supported this pipeline but are no longer needed. During the development of this automation project, the QART process was audited and data quality issues were identified and resolved. That work served to scale up the pipeline to its current version. There is a separate README file with more details about the issues resolved.
+
+## Python set up
+Before running the output generation pipeline, install the required python dependencies:
+```
+python -m pip install -r requirements.txt
+```
+As running python from R, the version of python on PATH will be run. Therefore, don't use a virtual environment.
