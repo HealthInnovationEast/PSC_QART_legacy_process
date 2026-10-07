@@ -1,6 +1,3 @@
-# Currently manually downloading the powerpoint files
-# But will likely need to source an R script to download them from SharePoint
-
 from pptx import Presentation
 from pptx.util import Pt, Cm
 from pathlib import Path
@@ -20,7 +17,8 @@ groups = {
     "Martha's Rule": {},
     "Medicines Safety": {},
     "Maternity and Neonatal Safety": {},
-    "System Safety": {}
+    "System Safety": {},
+    "Overview": {}
 }
 
 # Prepare PowerPoint for saving as images
@@ -54,6 +52,11 @@ for ppt_file in input_folder.glob("*.pptx"):
     current_group = None
     slides_to_save = []
     for i, slide in enumerate(prs.slides, start=1):
+        if i==2:
+            hin_groups["Overview"] += [i]
+            slides_to_save += [i]
+            continue
+
         if slide.slide_layout.name == end_slide_layout:
             break
 
@@ -119,7 +122,8 @@ for group_name in groups.keys():
             textbox = slide.shapes.add_textbox(left=margin/2, top=0,
                                             width=Cm(15), height=margin)
             p = textbox.text_frame.paragraphs[0]
-            p.text = f"{group_name} - {hin} - Slide {section_slide_number}"
+            slide_detail = "Highlight Report" if group_name == "Overview" else f"Slide {section_slide_number}"
+            p.text = f"{group_name} - {hin} - {slide_detail}"
             p.font.size = Pt(24)
             p.font.bold = True
         HIN_num_slides.update({hin: section_slide_number})
@@ -129,6 +133,3 @@ for group_name in groups.keys():
     print(f"{group_name} slide deck created with slides from {num_HINs} HINs. Slide number details:")
     for hin in HIN_num_slides.keys():
         print(f" - {hin}: {HIN_num_slides[hin]} slides")
-
-# Add summary info boxes
-# Save to SharePoint
