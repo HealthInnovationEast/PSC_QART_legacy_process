@@ -1,5 +1,6 @@
 from pptx import Presentation
 from pptx.util import Pt, Cm
+from pptx.enum.dml import MSO_COLOR_TYPE
 from pathlib import Path
 import re
 import win32com.client
@@ -20,8 +21,11 @@ groups = {
     "Overview": {}
 }
 
+programmes = [g for g in groups.keys() if not g == "Overview"]
+
 # Prepare PowerPoint for saving as images
 Application = win32com.client.Dispatch("PowerPoint.Application")
+os.makedirs(f"{input_folder}/programme_slide/", exist_ok=True)
 
 # Define functions
 def clean_whitespace(t):
@@ -63,7 +67,7 @@ for ppt_file in input_folder.glob("*.pptx"):
         groups[g].update({hin_name: values})
 
     # Also, save the pptx as images
-    hin_folder = f"{input_folder.resolve()}/{re.sub(' ', '_', hin_name.lower())}"
+    hin_folder = f"{input_folder.resolve()}/{hin_name}"
     os.makedirs(hin_folder, exist_ok=True)
 
     pptx = Application.Presentations.Open(str(ppt_file.resolve()),
@@ -71,7 +75,83 @@ for ppt_file in input_folder.glob("*.pptx"):
                                           WithWindow=False)
     for i in slides_to_save:
         pptx.Slides[i-1].Export(f"{hin_folder}/Slide{i}.PNG", "PNG")
+
+    # Create four new slide decks for each HIN for creating the summary slides
+    # Delete all slides except slide 2 (summary slide)
+    for i in range(pptx.Slides.Count, 0, -1):
+        if i != 2:
+            pptx.Slides(i).Delete()
+
+    # Save the new decks
+    for p in programmes:
+        pptx.SaveAs(f"{input_folder.resolve()}/programme_slide/{hin_name}__{p}.pptx")
+    print(f"{hin_name} programme slide files created")
     pptx.Close()
+
+# Prepare each programme summary slide
+for p_slide in (input_folder/"programme_slide").glob("*.pptx"):
+    hin = p_slide.name.split("__")[0]
+    programme = p_slide.name.split("__")[1].removesuffix(".pptx")
+    prs = Presentation(p_slide)
+    slide = prs.slides[0]
+
+    colour_type = None
+    line_colour = None
+
+    # Get colour of programme
+    for shape in slide.shapes:
+        if not hasattr(shape, "text"):
+            continue
+        clean_text = re.sub(" safety", "", clean_whitespace(shape.text.strip()).lower())
+    
+        if re.sub(" safety", "", programme.lower()) == clean_text:
+            colour_type = shape.line.color.type
+            if colour_type == MSO_COLOR_TYPE.RGB:
+                line_colour = shape.line.color.rgb
+            elif colour_type == MSO_COLOR_TYPE.SCHEME:
+                line_colour = shape.line.color.theme_color
+            else:
+                line_colour = None
+
+    # Remove shapes that don't match the colour
+    for shape in slide.shapes:
+        colour_match = False
+        if hasattr(shape, "text"):
+            if "Highlight Report" in shape.text:
+                colour_match = True
+            elif "Milestones status" in shape.text:
+                colour_match = True
+        else:
+            colour_match = True
+        if (not colour_match) and colour_type and line_colour:
+            if colour_type == MSO_COLOR_TYPE.RGB:
+                try:
+                    if shape.line.color.rgb == line_colour:
+                        colour_match = True
+                except:
+                    pass
+            elif colour_type == MSO_COLOR_TYPE.SCHEME:
+                try:
+                    if shape.line.color.theme_color == line_colour:
+                        colour_match = True
+                except:
+                    pass
+
+        # Delete if no match
+        if not colour_match:
+            shape.element.getparent().remove(shape.element)
+
+    # Resave slide
+    prs.save(p_slide)
+
+    # Save as image
+    pptx = Application.Presentations.Open(str(p_slide.resolve()),
+                                              ReadOnly=True,
+                                              WithWindow=False)
+    pptx.Slides[0].Export(re.sub("pptx", "PNG", str(p_slide.resolve())), "PNG")
+    pptx.Close()
+    print(f"Image created: {hin} programme slide for {programme}")
+
 Application.Quit()
 
 margin = Cm(2.5)
@@ -83,10 +163,24 @@ for group_name in groups.keys():
     for hin in groups[group_name].keys():
         num_HINs += 1
         slide_section_number = 0
-        for section_slide_number, original_slide_number in enumerate(groups[group_name][hin], start=1):
-            img_path = f"{input_folder}/{re.sub(' ', '_', hin.lower())}/Slide{original_slide_number}.PNG"
 
-            with Image.open(img_path) as img:
+        # Define image slides to add
+        if group_name in programmes:
+            image_slides = [{"image_file": f"{input_folder}/programme_slide/{hin}__{group_name}.PNG",
+                            "image_title": f"{group_name} - {hin} -\nExcerpt from Highlight Report slide"}]
+        else:
+            image_slides = []
+
+        for section_slide_number, original_slide_number in enumerate(groups[group_name][hin], start=1):
+            img_path = f"{input_folder}/{hin}/Slide{original_slide_number}.PNG"
+            slide_detail = "Highlight Report" if group_name == "Overview" else f"Slide {section_slide_number}"
+            img_title = f"{group_name} - {hin} - {slide_detail}"
+            image_slides.append({"image_file": img_path,
+                                 "image_title": img_title})
+
+        # Add the images to slides
+        for i_slide in image_slides:
+            with Image.open(i_slide["image_file"]) as img:
                 img_width_px, img_height_px = img.size
             avail_width = prs.slide_width - 2*margin
             avail_height = prs.slide_height - margin
@@ -100,14 +194,13 @@ for group_name in groups.keys():
             left = int((prs.slide_width - img_width) / 2)
 
             slide = prs.slides.add_slide(prs.slide_layouts[6])
-            slide.shapes.add_picture(img_path, left=left, top=margin,
-                                    width=img_width, height=img_height)
+            slide.shapes.add_picture(i_slide["image_file"], left=left, top=margin,
+                                     width=img_width, height=img_height)
 
             textbox = slide.shapes.add_textbox(left=margin/2, top=0,
                                             width=Cm(15), height=margin)
             p = textbox.text_frame.paragraphs[0]
-            slide_detail = "Highlight Report" if group_name == "Overview" else f"Slide {section_slide_number}"
-            p.text = f"{group_name} - {hin} - {slide_detail}"
+            p.text = i_slide["image_title"]
             p.font.size = Pt(24)
             p.font.bold = True
         HIN_num_slides.update({hin: section_slide_number})
