@@ -2,7 +2,6 @@ from pptx import Presentation
 from pptx.util import Pt, Cm
 from pathlib import Path
 import re
-from copy import deepcopy
 import win32com.client
 import os
 from PIL import Image
@@ -27,21 +26,6 @@ Application = win32com.client.Dispatch("PowerPoint.Application")
 # Define functions
 def clean_whitespace(t):
     return re.sub(r"’", "'", re.sub(r"[\r\n\s\r\u2028\u2029]+", " ", t).strip())
-
-def duplicate_slide(source_slide, target_prs):
-    layout_name = source_slide.slide_layout.name
-
-    if layout_name in [l.name for l in target_prs.slide_layouts]:
-        target_layout = next(layout for layout in target_prs.slide_layouts if layout.name == layout_name)
-    else:
-        target_layout = target_prs.slide_layouts[6]
-
-    new_slide = target_prs.slides.add_slide(target_layout)
-
-    for shape in source_slide.shapes:
-        el = deepcopy(shape.element)
-        new_slide.shapes._spTree.insert_element_before(el, "p:extLst")
-    return new_slide
 
 # Read each PowerPoint and identify needed slides
 for ppt_file in input_folder.glob("*.pptx"):
