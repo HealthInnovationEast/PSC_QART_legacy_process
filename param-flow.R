@@ -23,7 +23,7 @@ stage_of_process <- "process_submissions"
 
 # set dates by setting end of reporting quarter 
 # (mind that latest data will be lagged by 1 quarter)
-reporting_quarter_end_date <- ymd('2026-06-30')
+reporting_quarter_end_date <- ymd('2026-09-30')
 
 
 # ----------------- code below stays **fixed**
@@ -45,7 +45,7 @@ previous_mat_neo_submissions_file_name <- paste0("mat_neo_qart_all_data_upto_",
                                                  previous_quarter_file_string, ".csv") 
 
 # adults and paeds cumulative data, since 2526 Q1
-previous_marthas_submissions_adults_paeds <- paste0("marthas_qart_all_data_upto_",
+previous_marthas_submissions_adults_paeds <- paste0("marthas_qart_adults_paeds_data_upto_",
                                                     previous_quarter_file_string, ".csv")
 
 # mat neo and ED data, from 2627 Q1
