@@ -23,7 +23,7 @@ stage_of_process <- "process_submissions"
 
 # set dates by setting end of reporting quarter 
 # (mind that latest data will be lagged by 1 quarter)
-reporting_quarter_end_date <- ymd('2026-06-30')
+reporting_quarter_end_date <- ymd('2026-09-30')
 
 
 # ----------------- code below stays **fixed**
