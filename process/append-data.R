@@ -26,7 +26,7 @@ append_data <- function(previous_submission,
 
   if (nrow(previous_submission_file) == 0) {
     stop(
-      glue::glue("file not found in location '{master_files_location}':\n file name provided: '{previous_submission}'"))
+      glue::glue("file not found in location '{master_files_folder}':\n file name provided: '{previous_submission}'"))
   }
 
   # download file and save in local data directory
