@@ -121,6 +121,10 @@ for (hin in hin_folders) {
   tf_name <- paste0("data/", hin, "_submission_file.xlsx")
   get_SP_file(paste0(hin, "/", hin_submission_file),
               here(tf_name))
+  
+  # Get actual sheet names and create a lookup that ignores leading/trailing spaces
+  sheets <- excel_sheets(tf_name)
+  sheet_lookup <- setNames(sheets, trimws(sheets))
 
   # read martha's rule data
   message("Reading Martha's Rule submissions: adult and paeds")
@@ -137,7 +141,7 @@ for (hin in hin_folders) {
   # execute function
   data_marthas_tidy_adult_paeds <- collect_sheet_data(
     tf_name = tf_name,
-    sheet_name = "MR - Adult & Paeds",
+    sheet_name = sheet_lookup[["MR - Adult & Paeds"]],
     sheet_range = "B6:M30",
     del_cols = c('x9'),
     tidy_col_names = col_names_adult_paeds,
@@ -167,7 +171,7 @@ for (hin in hin_folders) {
   
   data_marthas_tidy_mat_neo <- collect_sheet_data(
     tf_name = tf_name, 
-    sheet_name = "MR - Maternity & Neonatal",
+    sheet_name = sheet_lookup[["MR - Maternity & Neonatal"]],
     sheet_range = "B7:X30",
     col_names = F,
     del_cols = c('x8', 'x12', 'x16', 'x20'),
@@ -204,7 +208,7 @@ for (hin in hin_folders) {
 
   data_marthas_tidy_ed <- collect_sheet_data(
     tf_name = tf_name,
-    sheet_name = "MR - Emergency Departments",
+    sheet_name = sheet_lookup[["MR - Emergency Departments"]],
     sheet_range = "B7:AF30",
     del_cols = c('x8', 'x12', 'x16', 'x20', 'x24', 'x28'),
     tidy_col_names = col_names_ed,
@@ -215,7 +219,7 @@ for (hin in hin_folders) {
   message("Reading MatNeo submissions")
   
   data_mat_neo <- read_excel(
-    path = tf_name, sheet = "MatNeo",
+    path = tf_name, sheet = sheet_lookup[["MatNeo"]],
     range = "B5:N56"
   )
   
