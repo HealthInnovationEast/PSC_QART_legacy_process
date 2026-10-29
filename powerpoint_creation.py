@@ -1,18 +1,22 @@
-from pptx import Presentation
-from pptx.util import Pt, Cm
-from pptx.enum.dml import MSO_COLOR_TYPE
-from pathlib import Path
-import re
-import win32com.client
-import os
-from PIL import Image
+from pathlib import Path          
+from pptx import Presentation     
+import win32com.client            
 
-input_folder = Path("data/powerpoints/")
-header_slide_layouts = {"Front title slide": 0,
-                        "8_Breaker Heading1-Blue-DarkBlueA": 14}
+# Source and output folders
+input_folder = Path("data/powerpoints")
+output_folder = Path("output/powerpoints")
+output_folder.mkdir(parents=True, exist_ok=True)
+
+# Layouts that identify programme section headers
+header_slide_layouts = {
+    "Front title slide": 0,
+    "8_Breaker Heading1-Blue-DarkBlueA": 14
+}
+
+# Processing stops when this layout is reached
 end_slide_layout = "End Slide ACCESSIBLE"
-template_file = "ppt_template.pptx"
 
+# Store slide numbers by programme and HIN
 groups = {
     "Martha's Rule": {},
     "Medicines Safety": {},
@@ -21,192 +25,243 @@ groups = {
     "Overview": {}
 }
 
-programmes = [g for g in groups.keys() if not g == "Overview"]
+# RGB colours used on overview slide
+programme_colours = {
+    "Martha's Rule": 10498160,
+    "Medicines Safety": 2145912,
+    "Maternity and Neonatal Safety": 7546286,
+    "System Safety": 35821
+}
 
-# Prepare PowerPoint for saving as images
-Application = win32com.client.Dispatch("PowerPoint.Application")
-os.makedirs(f"{input_folder}/programme_slide/", exist_ok=True)
+def clean_whitespace(text):
+    """Remove extra spaces and line breaks."""
+    return " ".join(text.replace("’", "'").split())
 
-# Define functions
-def clean_whitespace(t):
-    return re.sub(r"’", "'", re.sub(r"[\r\n\s\r\u2028\u2029]+", " ", t).strip())
+def get_hin_name(ppt_file):
+    """Extract HIN name from the PowerPoint filename."""
+    return ppt_file.stem.split("Qual")[0].rstrip("_ ").removesuffix("Master").rstrip("_ ")
 
-# Read each PowerPoint and identify needed slides
+
+def filter_overview_slide(overview_slide, programme):
+    """
+    Keep only the selected programme row on the
+    overview slide and remove all others.
+    """
+    # Do not filter the dedicated Overview deck
+    if programme == "Overview":
+        return
+
+    keep_colour = programme_colours.get(programme)
+
+    if keep_colour is None:
+        return
+
+    shapes_to_delete = []
+
+    for shape in overview_slide.Shapes:
+
+        try:
+            # Remove overall summary section at the top
+            if shape.Top < 120:
+                try:
+                    text = shape.TextFrame.TextRange.Text.lower()
+                    if (
+                        "overall summary" in text
+                        or text.strip() == "on plan"
+                    ):
+                        shapes_to_delete.append(shape)
+                        continue
+
+                except:
+                    pass
+
+                # Remove large overview text box
+                if shape.Name.startswith("Rounded Rectangle"):
+                    shapes_to_delete.append(shape)
+                    continue
+
+            # Check programme colour
+            try:
+                rgb = shape.Line.ForeColor.RGB
+                # Keep selected programme
+                if rgb == keep_colour:
+                    continue
+                # Remove other programme rows
+                if rgb in programme_colours.values():
+                    shapes_to_delete.append(shape)
+
+            except:
+                pass
+
+        except:
+            pass
+
+    # Delete shapes after iteration
+    for shape in reversed(shapes_to_delete):
+        try:
+            shape.Delete()
+        except:
+            pass
+
+# IDENTIFY SLIDES BY PROGRAMME
+source_files = {}
+
 for ppt_file in input_folder.glob("*.pptx"):
-    hin_name = str(Path(ppt_file).stem).split("Qual")[0].rstrip("[_ ]").removesuffix("Master").rstrip("[_ ]")
-    hin_groups = {k:[] for k in groups.keys()}
-    print(f"Reading {hin_name} PPTX file")
+    hin_name = get_hin_name(ppt_file)
+    print(f"Reading {hin_name}")
+    # Store full path to source file
+    source_files[hin_name] = str(ppt_file.resolve())
     prs = Presentation(ppt_file)
     current_group = None
-    slides_to_save = []
-    for i, slide in enumerate(prs.slides, start=1):
-        if i==2:
-            hin_groups["Overview"] += [i]
-            slides_to_save += [i]
+    # Create empty programme buckets
+    hin_groups = {group: [] for group in groups}
+    for slide_num, slide in enumerate(prs.slides, start=1):
+        # Slide 2 is always the overview slide
+        if slide_num == 2:
+            hin_groups["Overview"].append(slide_num)
             continue
-
+        # Stop processing once end slide is reached
         if slide.slide_layout.name == end_slide_layout:
             break
-
-        if slide.slide_layout.name in header_slide_layouts.keys():
-            header_placeholder_idx = header_slide_layouts[slide.slide_layout.name]
+        # Identify programme header slide
+        if slide.slide_layout.name in header_slide_layouts:
             try:
-                title = clean_whitespace(slide.placeholders[header_placeholder_idx].text)
+                placeholder_idx = header_slide_layouts[
+                    slide.slide_layout.name
+                ]
+
+                title = clean_whitespace(
+                    slide.placeholders[placeholder_idx].text
+                )
+
             except:
                 title = None
+            current_group = title if title in groups else None
 
-            if title in groups:
-                current_group = title
-            else:
-                current_group = None
-        else:
-            if current_group:
-                hin_groups[current_group] += [i]
-                slides_to_save += [i]
-    for g, values in hin_groups.items():
-        groups[g].update({hin_name: values})
+        # Add content slide to active programme
+        elif current_group:
+            hin_groups[current_group].append(slide_num)
 
-    # Also, save the pptx as images
-    hin_folder = f"{input_folder.resolve()}/{hin_name}"
-    os.makedirs(hin_folder, exist_ok=True)
+    # Save identified slides
+    for group_name, slide_list in hin_groups.items():
+        groups[group_name][hin_name] = slide_list
 
-    pptx = Application.Presentations.Open(str(ppt_file.resolve()),
-                                          ReadOnly=True,
-                                          WithWindow=False)
-    for i in slides_to_save:
-        pptx.Slides[i-1].Export(f"{hin_folder}/Slide{i}.PNG", "PNG")
+# PRINT PROGRAMME SUMMARY
+print("\nPROGRAMME SUMMARY")
+for programme in groups:
+    print(f"\n{programme}")
+    for hin_name, slide_list in groups[programme].items():
+        if slide_list:
+            print(f"  {hin_name}: {len(slide_list)} slides")
 
-    # Create four new slide decks for each HIN for creating the summary slides
-    # Delete all slides except slide 2 (summary slide)
-    for i in range(pptx.Slides.Count, 0, -1):
-        if i != 2:
-            pptx.Slides(i).Delete()
+# OPEN POWERPOINT APPLICATION
+Application = win32com.client.Dispatch(
+    "PowerPoint.Application"
+)
+Application.Visible = True
 
-    # Save the new decks
-    for p in programmes:
-        pptx.SaveAs(f"{input_folder.resolve()}/programme_slide/{hin_name}__{p}.pptx")
-    print(f"{hin_name} programme slide files created")
-    pptx.Close()
+# CREATE PROGRAMME DECKS
+for programme in groups:
+    print(f"\nCreating deck: {programme}")
+    # Create blank presentation
+    target_ppt = Application.Presentations.Add()
+    inserted_slides = 0
+    inserted_hins = 0
+    # Remove default blank slide
+    try:
 
-# Prepare each programme summary slide
-for p_slide in (input_folder/"programme_slide").glob("*.pptx"):
-    hin = p_slide.name.split("__")[0]
-    programme = p_slide.name.split("__")[1].removesuffix(".pptx")
-    prs = Presentation(p_slide)
-    slide = prs.slides[0]
+        while target_ppt.Slides.Count > 0:
+            target_ppt.Slides(1).Delete()
 
-    colour_type = None
-    line_colour = None
+    except:
+        pass
 
-    # Get colour of programme
-    for shape in slide.shapes:
-        if not hasattr(shape, "text"):
+    # Process every HIN
+    for hin_name, slide_numbers in groups[programme].items():
+        if not slide_numbers:
             continue
-        clean_text = re.sub(" safety", "", clean_whitespace(shape.text.strip()).lower())
-    
-        if re.sub(" safety", "", programme.lower()) == clean_text:
-            colour_type = shape.line.color.type
-            if colour_type == MSO_COLOR_TYPE.RGB:
-                line_colour = shape.line.color.rgb
-            elif colour_type == MSO_COLOR_TYPE.SCHEME:
-                line_colour = shape.line.color.theme_color
-            else:
-                line_colour = None
+        inserted_hins += 1
+        print(f"  {hin_name}: {len(slide_numbers)} slides")
+        # Open source presentation
+        source_ppt = Application.Presentations.Open(
+            source_files[hin_name],
+            ReadOnly=True,
+            WithWindow=False
+        )
 
-    # Remove shapes that don't match the colour
-    for shape in slide.shapes:
-        colour_match = False
-        if hasattr(shape, "text"):
-            if "Highlight Report" in shape.text:
-                colour_match = True
-            elif "Milestones status" in shape.text:
-                colour_match = True
-        else:
-            colour_match = True
-        if (not colour_match) and colour_type and line_colour:
-            if colour_type == MSO_COLOR_TYPE.RGB:
+        try:
+
+            # CREATE HIN TITLE SLIDE
+            divider_slide = target_ppt.Slides.Add(
+                target_ppt.Slides.Count + 1,
+                1
+            )
+
+            try:
+                divider_slide.Shapes.Title.TextFrame.TextRange.Text = hin_name
+            except:
+                pass
+
+            # ADD FILTERED OVERVIEW SLIDE
+            if programme != "Overview":
+                source_ppt.Slides(2).Copy()
+                target_ppt.Slides.Paste(
+                    target_ppt.Slides.Count + 1
+                )
+
+                overview_slide = target_ppt.Slides(
+                    target_ppt.Slides.Count
+                )
+
+                filter_overview_slide(
+                    overview_slide,
+                    programme
+                )
+
+            # COPY PROGRAMME CONTENT SLIDES
+            for slide_num in slide_numbers:
                 try:
-                    if shape.line.color.rgb == line_colour:
-                        colour_match = True
-                except:
-                    pass
-            elif colour_type == MSO_COLOR_TYPE.SCHEME:
-                try:
-                    if shape.line.color.theme_color == line_colour:
-                        colour_match = True
-                except:
-                    pass
+                    source_ppt.Slides(slide_num).Copy()
+                    target_ppt.Slides.Paste(
+                        target_ppt.Slides.Count + 1
+                    )
 
-        # Delete if no match
-        if not colour_match:
-            shape.element.getparent().remove(shape.element)
+                    inserted_slides += 1
 
-    # Resave slide
-    prs.save(p_slide)
+                except Exception as e:
 
-    # Save as image
-    pptx = Application.Presentations.Open(str(p_slide.resolve()),
-                                              ReadOnly=True,
-                                              WithWindow=False)
-    pptx.Slides[0].Export(re.sub("pptx", "PNG", str(p_slide.resolve())), "PNG")
-    pptx.Close()
-    print(f"Image created: {hin} programme slide for {programme}")
+                    print(
+                        f"Failed to copy "
+                        f"{hin_name} "
+                        f"slide {slide_num}"
+                    )
 
+                    print(e)
+
+        finally:
+            # Always close source PPT
+            source_ppt.Close()
+
+    # SAVE PROGRAMME DECK
+    if target_ppt.Slides.Count > 0:
+        output_file = (
+            output_folder /
+            f"{programme}.pptx"
+        ).resolve()
+
+        print(f"Saving to: {output_file}")
+
+        # 24 = PowerPoint .pptx format
+        target_ppt.SaveAs(str(output_file), 24)
+        print(f"Created {output_file}")
+        print(
+            f"Included {inserted_slides} slides "
+            f"from {inserted_hins} HINs"
+        )
+
+    target_ppt.Close()
+
+# CLOSE POWERPOINT
 Application.Quit()
 
-margin = Cm(2.5)
-# Create the new slides
-for group_name in groups.keys():
-    prs = Presentation(template_file)
-    num_HINs = 0
-    HIN_num_slides = {}
-    for hin in groups[group_name].keys():
-        num_HINs += 1
-        slide_section_number = 0
-
-        # Define image slides to add
-        if group_name in programmes:
-            image_slides = [{"image_file": f"{input_folder}/programme_slide/{hin}__{group_name}.PNG",
-                            "image_title": f"{group_name} - {hin} -\nExcerpt from Highlight Report slide"}]
-        else:
-            image_slides = []
-
-        for section_slide_number, original_slide_number in enumerate(groups[group_name][hin], start=1):
-            img_path = f"{input_folder}/{hin}/Slide{original_slide_number}.PNG"
-            slide_detail = "Highlight Report" if group_name == "Overview" else f"Slide {section_slide_number}"
-            img_title = f"{group_name} - {hin} - {slide_detail}"
-            image_slides.append({"image_file": img_path,
-                                 "image_title": img_title})
-
-        # Add the images to slides
-        for i_slide in image_slides:
-            with Image.open(i_slide["image_file"]) as img:
-                img_width_px, img_height_px = img.size
-            avail_width = prs.slide_width - 2*margin
-            avail_height = prs.slide_height - margin
-
-            scale = min(avail_width / img_width_px,
-                        avail_height / img_height_px)
-
-            img_width = int(img_width_px * scale)
-            img_height = int(img_height_px * scale)
-
-            left = int((prs.slide_width - img_width) / 2)
-
-            slide = prs.slides.add_slide(prs.slide_layouts[6])
-            slide.shapes.add_picture(i_slide["image_file"], left=left, top=margin,
-                                     width=img_width, height=img_height)
-
-            textbox = slide.shapes.add_textbox(left=margin/2, top=0,
-                                            width=Cm(15), height=margin)
-            p = textbox.text_frame.paragraphs[0]
-            p.text = i_slide["image_title"]
-            p.font.size = Pt(24)
-            p.font.bold = True
-        HIN_num_slides.update({hin: section_slide_number})
-
-    prs.save(f"output/powerpoints/{group_name}.pptx")
-
-    print(f"{group_name} slide deck created with slides from {num_HINs} HINs. Slide number details:")
-    for hin in HIN_num_slides.keys():
-        print(f" - {hin}: {HIN_num_slides[hin]} slides")
+print("\nAll programme decks created successfully.")
